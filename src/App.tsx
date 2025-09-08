@@ -62,7 +62,7 @@ export function App() {
         <div className="mx-auto max-w-7xl px-4 py-3 flex items-center justify-between">
           <div className="flex items-center gap-3">
             <div className="h-8 w-8 rounded-xl bg-gradient-to-br from-primary-500 to-primary-600" />
-            <h1 className="text-lg font-semibold text-slate-900">Agentic Wallet</h1>
+            <h1 className="text-lg font-semibold text-slate-900">Sherpa AI</h1>
           </div>
           <div className="text-xs text-slate-600 flex items-center gap-3">
             <span className={`inline-block w-2 h-2 rounded-full ${health === 'healthy' ? 'bg-green-500' : 'bg-yellow-500'}`} />
@@ -102,7 +102,7 @@ export function App() {
 
       <main className="flex-1">
         <div className="mx-auto max-w-7xl">
-          <DeFiChatAdaptiveUI />
+          <DeFiChatAdaptiveUI persona={persona as any} setPersona={setPersona as any} walletAddress={walletAddress || undefined} />
         </div>
       </main>
     </div>

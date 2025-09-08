@@ -1,4 +1,4 @@
-import React, { useMemo, useRef, useState } from 'react'
+import React, { useEffect, useMemo, useRef, useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
   ChevronDown,
@@ -137,12 +137,6 @@ const seedPanels: Panel[] = [
     title: 'Your Portfolio Snapshot',
     payload: { totalUsd: 18423, positions: [{ sym: 'ETH', usd: 9200 }, { sym: 'UNI', usd: 3100 }, { sym: 'USDC', usd: 6123 }] },
   },
-  {
-    id: 'aave_governance',
-    kind: 'governance',
-    title: 'Aave Proposal #237',
-    payload: { status: 'Active', endsIn: '2d 4h', summary: 'Risk parameter update for GHO facilitators.' },
-  },
 ]
 
 const seedIntro: AgentMessage[] = [
@@ -153,7 +147,6 @@ const seedIntro: AgentMessage[] = [
     actions: [
       { id: 'a1', label: 'Show my portfolio', type: 'show_panel', params: { panel_id: 'portfolio_overview' } },
       { id: 'a2', label: 'Uniswap this week', type: 'show_panel', params: { panel_id: 'uniswap_tvl_chart' } },
-      { id: 'a3', label: 'What’s Aave changing?', type: 'show_panel', params: { panel_id: 'aave_governance' } },
     ],
   },
 ]
@@ -162,71 +155,9 @@ function uid(prefix = 'id') {
   return `${prefix}_${Math.random().toString(36).slice(2, 9)}`
 }
 
-// -----------------------
-// Fake agent
-// -----------------------
-function mockAgent(query: string, persona: Persona): AgentMessage {
-  const lower = query.toLowerCase()
-
-  if (lower.includes('swap')) {
-    return {
-      id: uid('msg'),
-      role: 'assistant',
-      text: 'You could swap a portion of your ETH to USDC. Want me to simulate 25%, 50%, or a custom amount?',
-      actions: [
-        { id: uid('act'), label: 'Simulate 25%', type: 'simulate', params: { from: 'ETH', to: 'USDC', pct: 25 } },
-        { id: uid('act'), label: 'Simulate 50%', type: 'simulate', params: { from: 'ETH', to: 'USDC', pct: 50 } },
-        { id: uid('act'), label: 'Open Swap', type: 'swap', params: { from: 'ETH', to: 'USDC' } },
-      ],
-      panels: ['portfolio_overview'],
-      sources: ['defillama'],
-    }
-  }
-
-  if (lower.includes('uniswap') || lower.includes('uni')) {
-    return {
-      id: uid('msg'),
-      role: 'assistant',
-      text: 'Uniswap v3 fees are up ~12% w/w and TVL is trending higher. Want a deeper breakdown or do a small swap to reduce LP risk?',
-      actions: [
-        { id: uid('act'), label: 'View TVL chart', type: 'show_panel', params: { panel_id: 'uniswap_tvl_chart' } },
-        { id: uid('act'), label: 'Explain the drivers', type: 'explain', params: { topic: 'uniswap_fees' } },
-        { id: uid('act'), label: 'Swap on Uniswap', type: 'swap', params: { from: 'ETH', to: 'USDC' } },
-      ],
-      panels: ['uniswap_tvl_chart'],
-      sources: ['defillama'],
-    }
-  }
-
-  if (lower.includes('aave') || lower.includes('governance')) {
-    return {
-      id: uid('msg'),
-      role: 'assistant',
-      text: 'Aave proposal #237 is active. I can summarize risks or set a reminder before it closes.',
-      actions: [
-        { id: uid('act'), label: 'Show proposal', type: 'show_panel', params: { panel_id: 'aave_governance' } },
-        { id: uid('act'), label: 'Summarize risks', type: 'explain', params: { topic: 'aave_proposal_237_risks' } },
-        { id: uid('act'), label: 'Pro-only deep dive', type: 'subscribe', gated: 'pro' },
-      ],
-      panels: ['aave_governance'],
-      sources: ['snapshot', 'tally'],
-    }
-  }
-
-  return {
-    id: uid('msg'),
-    role: 'assistant',
-    text:
-      persona === 'technical'
-        ? 'What would you like to inspect: pool TVL, fees, or governance? I can render charts or run simulations.'
-        : 'I can show your portfolio, explain a protocol, or help you swap/bridge. What sounds good?',
-    actions: [
-      { id: uid('act'), label: 'My portfolio', type: 'show_panel', params: { panel_id: 'portfolio_overview' } },
-      { id: uid('act'), label: 'Bridge gas to Arbitrum', type: 'bridge', params: { from_chain: 'mainnet', to_chain: 'arbitrum' } },
-      { id: uid('act'), label: 'Learn about LP risks', type: 'explain', params: { topic: 'impermanent_loss' } },
-    ],
-  }
-}
+// Backend services
+import { api } from '../services/api'
+import { transformBackendPanels } from '../services/panels'
 
 function PersonaBadge({ p }: { p: Persona }) {
   const map = {
@@ -312,19 +243,7 @@ function RightPanel({ panels, highlight }: { panels: Panel[]; highlight?: string
                 </div>
               </div>
             )}
-            {p.kind === 'governance' && (
-              <div className="text-sm space-y-2">
-                <div className="flex items-center gap-2">
-                  <Badge variant="secondary">{p.payload.status}</Badge>
-                  <span className="text-slate-600">Ends in {p.payload.endsIn}</span>
-                </div>
-                <p className="text-slate-700">{p.payload.summary}</p>
-                <div className="flex gap-2">
-                  <Button size="sm" variant="outline">Set reminder</Button>
-                  <Button size="sm">Summarize</Button>
-                </div>
-              </div>
-            )}
+            {/* governance panel de-scoped */}
             {p.kind === 'card' && <div className="text-sm text-slate-400">{JSON.stringify(p.payload)}</div>}
           </CardContent>
         </Card>
@@ -361,8 +280,7 @@ function PersonaDropdown({ persona, setPersona }: { persona: Persona; setPersona
   )
 }
 
-export default function DeFiChatAdaptiveUI() {
-  const [persona, setPersona] = useState<Persona>('friendly')
+export default function DeFiChatAdaptiveUI({ persona, setPersona, walletAddress }: { persona: Persona; setPersona: (p: Persona) => void; walletAddress?: string }) {
   const [messages, setMessages] = useState<AgentMessage[]>(seedIntro)
   const [panels, setPanels] = useState<Panel[]>(seedPanels)
   const [highlight, setHighlight] = useState<string[] | undefined>(undefined)
@@ -370,14 +288,69 @@ export default function DeFiChatAdaptiveUI() {
   const [pro, setPro] = useState(false)
   const scrollRef = useRef<HTMLDivElement>(null)
 
-  const send = () => {
-    if (!input.trim()) return
-    const userMsg: AgentMessage = { id: uid('msg'), role: 'user', text: input }
-    const agentMsg = mockAgent(input, persona)
-    if (agentMsg.panels) setHighlight(agentMsg.panels)
-    setMessages((m) => [...m, userMsg, agentMsg])
+  // Load TVL chart from backend DefiLlama tool (if available)
+  useEffect(() => {
+    import('../services/defi').then(({ getUniswapTVL }) =>
+      getUniswapTVL('7d')
+        .then((series) => {
+          if (!series) return
+          setPanels((prev) => prev.map((p) => (p.id === 'uniswap_tvl_chart' ? { ...p, payload: { series } } : p)))
+        })
+        .catch(() => {})
+    )
+  }, [])
+
+  // Load portfolio panel when wallet address is available
+  useEffect(() => {
+    if (!walletAddress) return
+    api
+      .portfolio(walletAddress)
+      .then((res) => {
+        if (res.success && res.portfolio) {
+          const data = res.portfolio
+          const totalUsd = Number(data.total_value_usd || 0)
+          const positions = (data.tokens || []).slice(0, 6).map((t: any) => ({ sym: t.symbol || t.name || 'TOK', usd: Number(t.value_usd || 0) }))
+          const panel: Panel = { id: 'portfolio_overview', kind: 'portfolio', title: 'Your Portfolio Snapshot', payload: { totalUsd, positions } }
+          setPanels((prev) => {
+            const others = prev.filter((p) => p.id !== 'portfolio_overview')
+            return [panel, ...others]
+          })
+        }
+      })
+      .catch(() => {})
+  }, [walletAddress])
+
+  const send = async () => {
+    const q = input.trim()
+    if (!q) return
+    const userMsg: AgentMessage = { id: uid('msg'), role: 'user', text: q }
+    setMessages((m) => [...m, userMsg])
     setInput('')
-    setTimeout(() => scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: 'smooth' }), 0)
+    try {
+      const payload = {
+        messages: [{ role: 'user', content: q }],
+        address: walletAddress,
+        chain: 'ethereum',
+      }
+      const res = await api.chat(payload)
+      const newPanels = transformBackendPanels(res.panels)
+      if (newPanels.length) {
+        setPanels((prev) => mergePanelsLocal(prev, newPanels))
+        setHighlight(newPanels.map((p) => p.id))
+      }
+      const assistantMsg: AgentMessage = { id: uid('msg'), role: 'assistant', text: res.reply || 'Done.', sources: (res.sources || []).map(String) }
+      setMessages((m) => [...m, assistantMsg])
+    } catch (e: any) {
+      setMessages((m) => [...m, { id: uid('msg'), role: 'assistant', text: `Sorry, I hit an error contacting the API. ${e?.message || ''}` }])
+    } finally {
+      setTimeout(() => scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: 'smooth' }), 0)
+    }
+  }
+
+  function mergePanelsLocal(current: Panel[], incoming: Panel[]): Panel[] {
+    const byId = new Map(current.map((p) => [p.id, p] as const))
+    for (const p of incoming) byId.set(p.id, { ...(byId.get(p.id) || {} as any), ...p })
+    return Array.from(byId.values())
   }
 
   const handleAction = (a: AgentAction) => {
