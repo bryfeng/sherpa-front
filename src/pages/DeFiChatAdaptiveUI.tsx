@@ -130,7 +130,17 @@ const seedPanels: Panel[] = [
     id: 'uniswap_tvl_chart',
     kind: 'chart',
     title: 'Uniswap TVL (7d)',
-    payload: { series: [12.1, 12.3, 12.7, 12.5, 12.9, 13.4, 13.6] },
+    payload: {
+      points: (() => {
+        const vals = [12.1, 12.3, 12.7, 12.5, 12.9, 13.4, 13.6]
+        const now = Date.now()
+        const step = 24 * 60 * 60 * 1000
+        const start = now - (vals.length - 1) * step
+        return vals.map((v, i) => ({ time: start + i * step, tvl: v }))
+      })(),
+      unit: 'USD',
+      source: { name: 'DefiLlama', url: 'https://defillama.com/protocol/uniswap' },
+    },
   },
 ]
 
@@ -157,6 +167,9 @@ import { SimulateModal } from '../components/modals/SimulateModal'
 import { SwapModal } from '../components/modals/SwapModal'
 import { BridgeModal } from '../components/modals/BridgeModal'
 import { getPolymarketMarkets } from '../services/predictions'
+import type { TVLPoint } from '../services/defi'
+import { getUniswapTVL } from '../services/defi'
+import { ResponsiveContainer, AreaChart, Area, XAxis, YAxis, Tooltip, CartesianGrid } from 'recharts'
 
 function PersonaBadge({ p }: { p: Persona }) {
   const map = {
@@ -291,6 +304,135 @@ function MarkdownRenderer({ text }: { text: string }) {
   return <div className="space-y-1">{elements}</div>
 }
 
+// -----------------------
+// Chart helpers
+// -----------------------
+function ChartPanel({ p }: { p: Panel }) {
+  const [range, setRange] = React.useState<'7d' | '30d'>('7d')
+  const [points, setPoints] = React.useState<TVLPoint[]>(normalizeChartPoints(p.payload))
+  const unit = p.payload?.unit
+  const source = p.payload?.source
+
+  React.useEffect(() => {
+    setPoints(normalizeChartPoints(p.payload))
+  }, [p.payload])
+
+  const loadingRef = React.useRef(false)
+  async function load(next: '7d' | '30d') {
+    if (loadingRef.current) return
+    loadingRef.current = true
+    try {
+      const data = await getUniswapTVL(next)
+      if (data) setPoints(data)
+    } finally {
+      loadingRef.current = false
+    }
+  }
+
+  return (
+    <div className="w-full">
+      <div className="flex items-center justify-end mb-2">
+        <div className="inline-flex rounded-lg border border-slate-200 overflow-hidden">
+          {(['7d', '30d'] as const).map((r) => (
+            <button
+              key={r}
+              onClick={() => {
+                setRange(r)
+                // Only fetch for this known TVL chart
+                if (p.id === 'uniswap_tvl_chart') void load(r)
+              }}
+              className={`px-2 py-1 text-xs ${
+                range === r
+                  ? 'bg-primary-600 text-white'
+                  : 'bg-white text-slate-700 hover:bg-slate-50'
+              }`}
+              aria-pressed={range === r}
+            >
+              {r}
+            </button>
+          ))}
+        </div>
+      </div>
+      <div className="h-44 w-full">
+        <ResponsiveContainer width="100%" height="100%">
+          <AreaChart data={points} margin={{ top: 10, right: 12, bottom: 0, left: -20 }}>
+            <defs>
+              <linearGradient id={`tvlGradient-${p.id}`} x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0%" stopColor="#2563eb" stopOpacity={0.3} />
+                <stop offset="100%" stopColor="#2563eb" stopOpacity={0} />
+              </linearGradient>
+            </defs>
+            <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e5e7eb" />
+            <XAxis dataKey="time" tickFormatter={(v) => formatDateShort(v)} tick={{ fontSize: 10, fill: '#64748b' }} axisLine={false} tickLine={false} />
+            <YAxis dataKey="tvl" tickFormatter={(v) => formatCompact(v, unit)} tick={{ fontSize: 10, fill: '#64748b' }} axisLine={false} tickLine={false} />
+            <Tooltip
+              formatter={(value: any) => [formatCompact(Number(value), unit, false), 'TVL']}
+              labelFormatter={(label: any) => new Date(label).toLocaleDateString()}
+              contentStyle={{ fontSize: 12, borderRadius: 12, border: '1px solid #e2e8f0' }}
+            />
+            <Area type="monotone" dataKey="tvl" stroke="#2563eb" strokeWidth={2} fillOpacity={1} fill={`url(#tvlGradient-${p.id})`} />
+          </AreaChart>
+        </ResponsiveContainer>
+      </div>
+      <div className="mt-2 flex items-center justify-between text-xs text-slate-500">
+        <span>{range === '7d' ? '7-day' : '30-day'}</span>
+        <a
+          href={source?.url || 'https://defillama.com'}
+          target="_blank"
+          rel="noreferrer"
+          className="text-slate-500 hover:text-slate-700 hover:underline"
+          title="Open DefiLlama"
+        >
+          Source: {source?.name || 'DefiLlama'}
+        </a>
+      </div>
+    </div>
+  )
+}
+function normalizeChartPoints(payload: any): TVLPoint[] {
+  if (!payload) return []
+  if (Array.isArray(payload.points)) return payload.points as TVLPoint[]
+  if (Array.isArray(payload.series)) {
+    const vals: number[] = payload.series
+    const now = Date.now()
+    const step = 24 * 60 * 60 * 1000
+    const start = now - (vals.length - 1) * step
+    return vals.map((v, i) => ({ time: start + i * step, tvl: v }))
+  }
+  if (Array.isArray(payload.timestamps) && Array.isArray(payload.tvl) && payload.timestamps.length === payload.tvl.length) {
+    return (payload.tvl as number[]).map((v: number, i: number) => ({ time: payload.timestamps[i], tvl: v }))
+  }
+  return []
+}
+
+function formatDateShort(ts: number): string {
+  try {
+    return new Date(ts).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })
+  } catch {
+    return ''
+  }
+}
+
+function formatCompact(v: number, unit?: string, withUnit: boolean = true): string {
+  if (!Number.isFinite(v)) return ''
+  const abs = Math.abs(v)
+  let num = v
+  let suffix = ''
+  if (abs >= 1_000_000_000) {
+    num = v / 1_000_000_000
+    suffix = 'B'
+  } else if (abs >= 1_000_000) {
+    num = v / 1_000_000
+    suffix = 'M'
+  } else if (abs >= 1_000) {
+    num = v / 1_000
+    suffix = 'K'
+  }
+  const base = num.toFixed(num < 10 ? 2 : 1)
+  const u = unit ? ` ${unit}` : ''
+  return withUnit ? `${base}${suffix}${u}` : `${base}${suffix}`
+}
+
 function RightPanel({ panels, highlight, walletAddress }: { panels: Panel[]; highlight?: string[]; walletAddress?: string }) {
   const ordered = useMemo(() => {
     if (!highlight || highlight.length === 0) return panels
@@ -314,13 +456,7 @@ function RightPanel({ panels, highlight, walletAddress }: { panels: Panel[]; hig
             </CardTitle>
           </CardHeader>
           <CardContent>
-            {p.kind === 'chart' && (
-              <div className="h-40 w-full rounded-xl bg-slate-50 border border-slate-200 flex items-end gap-1 p-3">
-                {p.payload?.series?.map((v: number, i: number) => (
-                  <div key={i} className="flex-1 bg-primary-600/80 rounded-t" style={{ height: `${(v / Math.max(...p.payload.series)) * 100}%` }} />
-                ))}
-              </div>
-            )}
+            {p.kind === 'chart' && <ChartPanel p={p} />}
             {p.kind === 'portfolio' && (
               <PortfolioOverview payload={p.payload} walletAddress={walletAddress} />
             )}
@@ -415,9 +551,11 @@ export default function DeFiChatAdaptiveUI({ persona, setPersona, walletAddress,
   useEffect(() => {
     import('../services/defi').then(({ getUniswapTVL }) =>
       getUniswapTVL('7d')
-        .then((series) => {
-          if (!series) return
-          setPanels((prev) => prev.map((p) => (p.id === 'uniswap_tvl_chart' ? { ...p, payload: { series } } : p)))
+        .then((points) => {
+          if (!points) return
+          setPanels((prev) =>
+            prev.map((p) => (p.id === 'uniswap_tvl_chart' ? { ...p, payload: { ...(p.payload || {}), points } } : p)),
+          )
         })
         .catch(() => {})
     )
