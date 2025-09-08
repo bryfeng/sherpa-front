@@ -1,0 +1,1 @@
+import{a as s}from"./index-DqkAUW6j.js";const o="http://localhost:8000";async function l(t="7d"){try{const{data:r}=await s.get(`${o}/tools/defillama/tvl`,{params:{protocol:"uniswap",range:t}});return Array.isArray(r==null?void 0:r.tvl)?r.tvl:Array.isArray(r==null?void 0:r.series)?r.series:null}catch{return null}}export{l as getUniswapTVL};

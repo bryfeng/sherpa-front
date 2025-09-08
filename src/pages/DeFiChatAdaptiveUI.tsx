@@ -12,8 +12,8 @@ import {
   BarChart3,
   Repeat,
   ArrowLeftRight,
-  BookOpen,
   Star,
+  TrendingUp,
 } from 'lucide-react'
 
 // Local, minimal UI primitives (Tailwind styled)
@@ -107,7 +107,7 @@ export type AgentAction = {
 
 export type Panel = {
   id: string
-  kind: 'chart' | 'table' | 'card' | 'governance' | 'portfolio'
+  kind: 'chart' | 'table' | 'card' | 'portfolio' | 'prediction'
   title: string
   payload?: any
 }
@@ -118,7 +118,8 @@ export type AgentMessage = {
   text: string
   actions?: AgentAction[]
   panels?: string[]
-  sources?: string[]
+  sources?: any[]
+  typing?: boolean
 }
 
 // -----------------------
@@ -130,12 +131,6 @@ const seedPanels: Panel[] = [
     kind: 'chart',
     title: 'Uniswap TVL (7d)',
     payload: { series: [12.1, 12.3, 12.7, 12.5, 12.9, 13.4, 13.6] },
-  },
-  {
-    id: 'portfolio_overview',
-    kind: 'portfolio',
-    title: 'Your Portfolio Snapshot',
-    payload: { totalUsd: 18423, positions: [{ sym: 'ETH', usd: 9200 }, { sym: 'UNI', usd: 3100 }, { sym: 'USDC', usd: 6123 }] },
   },
 ]
 
@@ -158,6 +153,10 @@ function uid(prefix = 'id') {
 // Backend services
 import { api } from '../services/api'
 import { transformBackendPanels } from '../services/panels'
+import { SimulateModal } from '../components/modals/SimulateModal'
+import { SwapModal } from '../components/modals/SwapModal'
+import { BridgeModal } from '../components/modals/BridgeModal'
+import { getPolymarketMarkets } from '../services/predictions'
 
 function PersonaBadge({ p }: { p: Persona }) {
   const map = {
@@ -179,7 +178,24 @@ function MessageBubble({ m, onAction }: { m: AgentMessage; onAction: (a: AgentAc
         </div>
       )}
       <div className={`max-w-[72%] rounded-2xl p-4 shadow-sm ${isUser ? 'bg-primary-600 text-white' : 'bg-white border border-slate-200 text-slate-800'}`}>
-        <div className="text-sm leading-relaxed whitespace-pre-wrap">{m.text}</div>
+        {m.typing ? (
+          <div className="text-sm text-slate-500 flex items-center gap-2">
+            <span>Thinking</span>
+            <span className="inline-flex gap-1">
+              <span className="w-1.5 h-1.5 bg-slate-400 rounded-full animate-bounce [animation-delay:-0.2s]"></span>
+              <span className="w-1.5 h-1.5 bg-slate-400 rounded-full animate-bounce [animation-delay:-0.1s]"></span>
+              <span className="w-1.5 h-1.5 bg-slate-400 rounded-full animate-bounce"></span>
+            </span>
+          </div>
+        ) : (
+          <div className="text-sm leading-relaxed">
+            {isUser ? (
+              <span className="whitespace-pre-wrap">{m.text}</span>
+            ) : (
+              <MarkdownRenderer text={m.text} />
+            )}
+          </div>
+        )}
         {m.actions && m.actions.length > 0 && (
           <div className="mt-3 flex flex-wrap gap-2">
             {m.actions.map((a) => (
@@ -189,7 +205,14 @@ function MessageBubble({ m, onAction }: { m: AgentMessage; onAction: (a: AgentAc
             ))}
           </div>
         )}
-        {m.sources && <div className="mt-2 text-xs text-slate-500">Sources: {m.sources.join(', ')}</div>}
+        {m.sources && m.sources.length > 0 && (
+          <div className="mt-2 text-xs text-slate-500 flex flex-wrap items-center gap-2">
+            <span className="text-slate-600">Sources:</span>
+            {m.sources.map((s: any, i: number) => (
+              <SourceBadge key={i} src={s} />
+            ))}
+          </div>
+        )}
       </div>
       {isUser && (
         <div className="h-8 w-8 rounded-full bg-slate-100 border border-slate-200 flex items-center justify-center">
@@ -200,7 +223,75 @@ function MessageBubble({ m, onAction }: { m: AgentMessage; onAction: (a: AgentAc
   )
 }
 
-function RightPanel({ panels, highlight }: { panels: Panel[]; highlight?: string[] }) {
+function SourceBadge({ src }: { src: any }) {
+  let label = ''
+  let href: string | undefined
+  if (typeof src === 'string') {
+    href = src.startsWith('http') ? src : undefined
+    label = href ? new URL(src).hostname.replace(/^www\./, '') : src
+  } else if (src && typeof src === 'object') {
+    href = (src.url || src.href || src.link) as string | undefined
+    const name = (src.title || src.name || src.id || href) as string | undefined
+    label = name ? String(name) : href ? new URL(href).hostname.replace(/^www\./, '') : 'source'
+  }
+  return href ? (
+    <a href={href} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 rounded-full border border-slate-300 px-2 py-0.5 hover:bg-slate-50 text-slate-700">
+      <span className="truncate max-w-[140px]">{label}</span>
+    </a>
+  ) : (
+    <span className="inline-flex items-center gap-1 rounded-full border border-slate-300 px-2 py-0.5 text-slate-700">
+      <span className="truncate max-w-[160px]">{label || 'source'}</span>
+    </span>
+  )
+}
+
+function MarkdownRenderer({ text }: { text: string }) {
+  // Minimal markdown support: headings (#, ##, ###), bold **text**, and bullet lists (- )
+  const lines = text.split(/\n/)
+  const elements: React.ReactNode[] = []
+  let listBuffer: string[] = []
+
+  function flushList() {
+    if (listBuffer.length === 0) return
+    elements.push(
+      <ul key={`ul-${elements.length}`} className="list-disc pl-5 space-y-1">
+        {listBuffer.map((item, idx) => (
+          <li key={idx} dangerouslySetInnerHTML={{ __html: applyInline(item) }} />
+        ))}
+      </ul>,
+    )
+    listBuffer = []
+  }
+
+  function applyInline(s: string) {
+    // bold
+    return s.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+  }
+
+  for (const raw of lines) {
+    const line = raw.trimEnd()
+    if (line.startsWith('- ')) {
+      listBuffer.push(line.slice(2))
+      continue
+    }
+    flushList()
+    if (line.startsWith('### ')) {
+      elements.push(<h3 key={`h3-${elements.length}`} className="font-semibold text-slate-900 mt-2">{line.slice(4)}</h3>)
+    } else if (line.startsWith('## ')) {
+      elements.push(<h2 key={`h2-${elements.length}`} className="font-semibold text-slate-900 mt-3">{line.slice(3)}</h2>)
+    } else if (line.startsWith('# ')) {
+      elements.push(<h1 key={`h1-${elements.length}`} className="font-semibold text-slate-900 mt-4">{line.slice(2)}</h1>)
+    } else if (line.length === 0) {
+      elements.push(<div key={`sp-${elements.length}`} className="h-2" />)
+    } else {
+      elements.push(<p key={`p-${elements.length}`} className="text-slate-800" dangerouslySetInnerHTML={{ __html: applyInline(line) }} />)
+    }
+  }
+  flushList()
+  return <div className="space-y-1">{elements}</div>
+}
+
+function RightPanel({ panels, highlight, walletAddress }: { panels: Panel[]; highlight?: string[]; walletAddress?: string }) {
   const ordered = useMemo(() => {
     if (!highlight || highlight.length === 0) return panels
     const map = new Map(panels.map((p) => [p.id, p] as const))
@@ -218,7 +309,7 @@ function RightPanel({ panels, highlight }: { panels: Panel[]; highlight?: string
             <CardTitle className="text-sm flex items-center gap-2">
               {p.kind === 'chart' && <BarChart3 className="h-4 w-4" />}
               {p.kind === 'portfolio' && <Wallet className="h-4 w-4" />}
-              {p.kind === 'governance' && <BookOpen className="h-4 w-4" />}
+              {p.kind === 'prediction' && <TrendingUp className="h-4 w-4" />}
               {p.title}
             </CardTitle>
           </CardHeader>
@@ -230,25 +321,73 @@ function RightPanel({ panels, highlight }: { panels: Panel[]; highlight?: string
                 ))}
               </div>
             )}
-            {p.kind === 'portfolio' && (
-              <div className="space-y-3 text-sm">
-                <div className="font-semibold text-slate-900">Total: ${p.payload.totalUsd.toLocaleString()}</div>
-                <div className="grid grid-cols-3 gap-3">
-                  {p.payload.positions.map((pos: any) => (
-                    <div key={pos.sym} className="rounded-xl border border-slate-200 bg-white p-3">
-                      <div className="text-xs text-slate-700 tracking-wide">{pos.sym}</div>
-                      <div className="text-sm font-semibold text-slate-900">${pos.usd.toLocaleString()}</div>
-                    </div>
-                  ))}
+            {p.kind === 'portfolio' && (() => {
+              const total = Number(p.payload?.totalUsd ?? 0)
+              const positions = Array.isArray(p.payload?.positions) ? p.payload.positions : []
+              const hasData = (Number.isFinite(total) && total > 0) || positions.length > 0
+              if (!hasData) {
+                if (!walletAddress) {
+                  return <div className="text-sm text-slate-500">Connect your wallet to load portfolio data.</div>
+                }
+                return <div className="text-sm text-slate-500">Loading portfolio…</div>
+              }
+              return (
+                <div className="space-y-3 text-sm">
+                  <div className="font-semibold text-slate-900">Total: ${Number.isFinite(total) ? total.toLocaleString() : '—'}</div>
+                  <div className="grid grid-cols-3 gap-3">
+                    {positions.map((pos: any) => (
+                      <div key={pos.sym} className="rounded-xl border border-slate-200 bg-white p-3">
+                        <div className="text-xs text-slate-700 tracking-wide">{pos.sym}</div>
+                        <div className="text-sm font-semibold text-slate-900">${Number(pos.usd || 0).toLocaleString()}</div>
+                      </div>
+                    ))}
+                  </div>
                 </div>
-              </div>
-            )}
+              )
+            })()}
             {/* governance panel de-scoped */}
             {p.kind === 'card' && <div className="text-sm text-slate-400">{JSON.stringify(p.payload)}</div>}
+            {p.kind === 'prediction' && (
+              <div className="space-y-2">
+                {(p.payload?.markets || []).map((m: any) => (
+                  <div key={m.id} className="flex items-center justify-between rounded-xl border border-slate-200 bg-white p-3">
+                    <div className="text-sm text-slate-900">{m.question}</div>
+                    <div className="flex items-center gap-3 text-xs text-slate-600">
+                      <span>Yes {Math.round((m.yesPrice || 0) * 100)}%</span>
+                      <span>No {Math.round((m.noPrice || 0) * 100)}%</span>
+                      <a href={m.url} target="_blank" rel="noreferrer" className="text-primary-600 hover:underline">Open</a>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
           </CardContent>
         </Card>
       ))}
     </div>
+  )
+}
+
+function PredictionsShortcut({ onLoad }: { onLoad: (panel: Panel) => void }) {
+  const [loading, setLoading] = useState(false)
+  return (
+    <Button
+      variant="secondary"
+      className="justify-start"
+      onClick={async () => {
+        if (loading) return
+        setLoading(true)
+        try {
+          const markets = await getPolymarketMarkets('', 5)
+          const panel: Panel = { id: 'polymarket_markets', kind: 'prediction', title: 'Prediction Markets', payload: { markets } }
+          onLoad(panel)
+        } finally {
+          setLoading(false)
+        }
+      }}
+    >
+      <TrendingUp className="h-4 w-4 mr-2" />{loading ? 'Loading…' : 'Prediction Markets'}
+    </Button>
   )
 }
 
@@ -280,13 +419,18 @@ function PersonaDropdown({ persona, setPersona }: { persona: Persona; setPersona
   )
 }
 
-export default function DeFiChatAdaptiveUI({ persona, setPersona, walletAddress }: { persona: Persona; setPersona: (p: Persona) => void; walletAddress?: string }) {
+type WalletStatus = 'connecting' | 'reconnecting' | 'connected' | 'disconnected' | undefined
+
+export default function DeFiChatAdaptiveUI({ persona, setPersona, walletAddress, walletStatus }: { persona: Persona; setPersona: (p: Persona) => void; walletAddress?: string; walletStatus?: WalletStatus }) {
   const [messages, setMessages] = useState<AgentMessage[]>(seedIntro)
   const [panels, setPanels] = useState<Panel[]>(seedPanels)
   const [highlight, setHighlight] = useState<string[] | undefined>(undefined)
   const [input, setInput] = useState('')
   const [pro, setPro] = useState(false)
   const scrollRef = useRef<HTMLDivElement>(null)
+  const [showSim, setShowSim] = useState<{ from?: string; to?: string } | null>(null)
+  const [showSwap, setShowSwap] = useState<{ from?: string; to?: string } | null>(null)
+  const [showBridge, setShowBridge] = useState<boolean>(false)
 
   // Load TVL chart from backend DefiLlama tool (if available)
   useEffect(() => {
@@ -302,7 +446,11 @@ export default function DeFiChatAdaptiveUI({ persona, setPersona, walletAddress 
 
   // Load portfolio panel when wallet address is available
   useEffect(() => {
-    if (!walletAddress) return
+    if (!walletAddress) {
+      // Remove portfolio panel when wallet disconnects
+      setPanels((prev) => prev.filter((p) => p.id !== 'portfolio_overview'))
+      return
+    }
     api
       .portfolio(walletAddress)
       .then((res) => {
@@ -315,6 +463,7 @@ export default function DeFiChatAdaptiveUI({ persona, setPersona, walletAddress 
             const others = prev.filter((p) => p.id !== 'portfolio_overview')
             return [panel, ...others]
           })
+          setHighlight(['portfolio_overview'])
         }
       })
       .catch(() => {})
@@ -324,7 +473,8 @@ export default function DeFiChatAdaptiveUI({ persona, setPersona, walletAddress 
     const q = input.trim()
     if (!q) return
     const userMsg: AgentMessage = { id: uid('msg'), role: 'user', text: q }
-    setMessages((m) => [...m, userMsg])
+    const typingId = uid('msg')
+    setMessages((m) => [...m, userMsg, { id: typingId, role: 'assistant', text: '', typing: true }])
     setInput('')
     try {
       const payload = {
@@ -338,10 +488,10 @@ export default function DeFiChatAdaptiveUI({ persona, setPersona, walletAddress 
         setPanels((prev) => mergePanelsLocal(prev, newPanels))
         setHighlight(newPanels.map((p) => p.id))
       }
-      const assistantMsg: AgentMessage = { id: uid('msg'), role: 'assistant', text: res.reply || 'Done.', sources: (res.sources || []).map(String) }
-      setMessages((m) => [...m, assistantMsg])
+      const assistantMsg: AgentMessage = { id: uid('msg'), role: 'assistant', text: res.reply || 'Done.', sources: (res.sources || []) as any }
+      setMessages((m) => m.filter((mm) => mm.id !== typingId).concat(assistantMsg))
     } catch (e: any) {
-      setMessages((m) => [...m, { id: uid('msg'), role: 'assistant', text: `Sorry, I hit an error contacting the API. ${e?.message || ''}` }])
+      setMessages((m) => m.filter((mm) => !(mm as any).typing).concat({ id: uid('msg'), role: 'assistant', text: `Sorry, I hit an error contacting the API. ${e?.message || ''}` }))
     } finally {
       setTimeout(() => scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: 'smooth' }), 0)
     }
@@ -369,48 +519,24 @@ export default function DeFiChatAdaptiveUI({ persona, setPersona, walletAddress 
 
     switch (a.type) {
       case 'show_panel': {
+        if (a.params?.panel_id === 'portfolio_overview' && !walletAddress) {
+          setMessages((m) => [...m, { id: uid('msg'), role: 'assistant', text: 'Please connect your wallet to view your portfolio.' }])
+          break
+        }
         setHighlight([a.params?.panel_id])
         setMessages((m) => [...m, { id: uid('msg'), role: 'assistant', text: `Opened panel: ${a.params?.panel_id}` }])
         break
       }
       case 'simulate': {
-        const pct = a.params?.pct ?? 25
-        setMessages((m) => [
-          ...m,
-          {
-            id: uid('msg'),
-            role: 'assistant',
-            text: `Simulated swap: ${pct}% ETH → USDC. Est. fee $2.14. Proceed?`,
-            actions: [
-              { id: uid('act'), label: 'Proceed swap', type: 'swap', params: a.params },
-              { id: uid('act'), label: 'Adjust amount', type: 'swap', params: a.params },
-            ],
-          },
-        ])
+        setShowSim({ from: a.params?.from, to: a.params?.to })
         break
       }
       case 'swap': {
-        setMessages((m) => [
-          ...m,
-          {
-            id: uid('msg'),
-            role: 'assistant',
-            text: 'Swap flow opened. Connect your wallet to continue.',
-            actions: [{ id: uid('act'), label: 'Connect Wallet', type: 'bridge' }],
-          },
-        ])
+        setShowSwap({ from: a.params?.from, to: a.params?.to })
         break
       }
       case 'bridge': {
-        setMessages((m) => [
-          ...m,
-          {
-            id: uid('msg'),
-            role: 'assistant',
-            text: 'Bridge flow opened. Select networks and amount.',
-            actions: [{ id: uid('act'), label: 'Start Bridge', type: 'bridge' }],
-          },
-        ])
+        setShowBridge(true)
         break
       }
       case 'explain': {
@@ -525,8 +651,42 @@ export default function DeFiChatAdaptiveUI({ persona, setPersona, walletAddress 
 
       {/* Right panel */}
       <div className="col-span-12 xl:col-span-3">
-        <RightPanel panels={panels} highlight={highlight} />
+        <RightPanel panels={panels} highlight={highlight} walletAddress={walletAddress} />
       </div>
+
+      {/* Modals */}
+      {showSim && (
+        <SimulateModal
+          from={showSim.from}
+          to={showSim.to}
+          onClose={() => setShowSim(null)}
+          onConfirm={(pct, amount) => {
+            setShowSim(null)
+            const txt = pct != null ? `Simulated swap: ${pct}% ${showSim.from || 'ETH'} → ${showSim.to || 'USDC'}. Est. fee $2.14.` : `Simulated swap: ${amount ?? 0} ${showSim.from || 'ETH'} → ${showSim.to || 'USDC'}.`
+            setMessages((m) => [...m, { id: uid('msg'), role: 'assistant', text: txt, actions: [{ id: uid('act'), label: 'Proceed swap', type: 'swap', params: { from: showSim.from, to: showSim.to } }] }])
+          }}
+        />
+      )}
+      {showSwap && (
+        <SwapModal
+          from={showSwap.from}
+          to={showSwap.to}
+          onClose={() => setShowSwap(null)}
+          onConfirm={(params) => {
+            setShowSwap(null)
+            setMessages((m) => [...m, { id: uid('msg'), role: 'assistant', text: `Opening wallet to swap ${params.amount ?? ''} ${params.from} → ${params.to}.` }])
+          }}
+        />
+      )}
+      {showBridge && (
+        <BridgeModal
+          onClose={() => setShowBridge(false)}
+          onConfirm={(params) => {
+            setShowBridge(false)
+            setMessages((m) => [...m, { id: uid('msg'), role: 'assistant', text: `Bridge setup: ${params.fromChain} → ${params.toChain}${params.amount ? `, amount ${params.amount}` : ''}.` }])
+          }}
+        />
+      )}
     </div>
   )
 }

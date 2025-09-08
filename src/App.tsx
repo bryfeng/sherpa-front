@@ -18,7 +18,7 @@ export function App() {
   const [health, setHealth] = useState<string>('checking…')
   const [walletAddress, setWalletAddress] = useState<string | null>(null)
   const [portfolio, setPortfolio] = useState<PortfolioData | null>(null)
-  const { address, isConnected } = useAccount()
+  const { address, isConnected, status } = useAccount()
   const { disconnect } = useDisconnect()
   const hasModal = Boolean(import.meta.env.VITE_WALLETCONNECT_PROJECT_ID)
   useEffect(() => {
@@ -102,7 +102,7 @@ export function App() {
 
       <main className="flex-1">
         <div className="mx-auto max-w-7xl">
-          <DeFiChatAdaptiveUI persona={persona as any} setPersona={setPersona as any} walletAddress={walletAddress || undefined} />
+          <DeFiChatAdaptiveUI persona={persona as any} setPersona={setPersona as any} walletAddress={walletAddress || undefined} walletStatus={status as any} />
         </div>
       </main>
     </div>
