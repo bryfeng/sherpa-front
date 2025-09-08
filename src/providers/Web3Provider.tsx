@@ -1,0 +1,58 @@
+import { ReactNode, useMemo } from 'react'
+import { WagmiConfig, http, createConfig } from 'wagmi'
+import { mainnet, polygon, arbitrum, optimism, base } from 'wagmi/chains'
+import { createAppKit } from '@reown/appkit/react'
+import { WagmiAdapter } from '@reown/appkit-adapter-wagmi'
+
+const projectId = (import.meta as any).env?.VITE_WALLETCONNECT_PROJECT_ID as string | undefined
+const isTestEnv = ((import.meta as any).env?.MODE || '').toLowerCase() === 'test'
+
+const wagmiChains = [mainnet, base, arbitrum, optimism, polygon] as const
+const networks = [...wagmiChains] as any
+
+const metadata = {
+  name: 'Agentic Wallet',
+  description: 'DeFi-focused chat interface',
+  url: 'http://localhost:5173',
+  icons: ['https://avatars.githubusercontent.com/u/37784886?s=200&v=4']
+}
+
+let wagmiConfig = createConfig({
+  chains: wagmiChains,
+  transports: {
+    [mainnet.id]: http(),
+    [base.id]: http(),
+    [arbitrum.id]: http(),
+    [optimism.id]: http(),
+    [polygon.id]: http(),
+  },
+})
+
+if (projectId && !isTestEnv) {
+  const wagmiAdapter = new WagmiAdapter({
+    projectId,
+    networks,
+    transports: {
+      [mainnet.id]: http(),
+      [base.id]: http(),
+      [arbitrum.id]: http(),
+      [optimism.id]: http(),
+      [polygon.id]: http(),
+    },
+    ssr: false,
+  })
+
+  createAppKit({
+    adapters: [wagmiAdapter],
+    projectId,
+    metadata,
+    networks,
+  })
+
+  wagmiConfig = wagmiAdapter.wagmiConfig as any
+}
+
+export function Web3Provider({ children }: { children: ReactNode }) {
+  const cfg = useMemo(() => wagmiConfig, [])
+  return <WagmiConfig config={cfg}>{children}</WagmiConfig>
+}
