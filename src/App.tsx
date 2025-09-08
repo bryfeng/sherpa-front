@@ -5,7 +5,8 @@ import { useEffect, useMemo, useState } from 'react'
 // import { PanelManager } from './components/panels/PanelManager'
 import { api } from './services/api'
 import type { PortfolioData } from './types/portfolio'
-import { useAccount, useDisconnect } from 'wagmi'
+import { useAccount, useDisconnect, useReconnect } from 'wagmi'
+import { useAppKitAccount } from '@reown/appkit/react'
 import { truncateAddress } from './services/wallet'
 import { AppKitButton } from '@reown/appkit/react'
 import DeFiChatAdaptiveUI from './pages/DeFiChatAdaptiveUI'
@@ -19,6 +20,8 @@ export function App() {
   const [walletAddress, setWalletAddress] = useState<string | null>(null)
   const [portfolio, setPortfolio] = useState<PortfolioData | null>(null)
   const { address, isConnected, status } = useAccount()
+  const { reconnectAsync } = useReconnect()
+  const { address: akAddress, isConnected: akConnected } = useAppKitAccount()
   const { disconnect } = useDisconnect()
   const hasModal = Boolean(import.meta.env.VITE_WALLETCONNECT_PROJECT_ID)
   useEffect(() => {
@@ -34,6 +37,11 @@ export function App() {
     )
   }, [isTestEnv])
 
+  // Attempt to reconnect wagmi on mount (helps after refresh)
+  useEffect(() => {
+    reconnectAsync().catch(() => {})
+  }, [reconnectAsync])
+
   const totalUsd = useMemo(() => {
     if (!portfolio) return null
     const v = typeof portfolio.total_value_usd === 'string' ? parseFloat(portfolio.total_value_usd) : portfolio.total_value_usd
@@ -42,10 +50,12 @@ export function App() {
   }, [portfolio])
 
   useEffect(() => {
-    if (isConnected && address) {
-      setWalletAddress(address)
+    const a = address || akAddress || null
+    const connected = isConnected || akConnected
+    if (connected && a) {
+      setWalletAddress(a)
       api
-        .portfolio(address)
+        .portfolio(a)
         .then((res) => {
           if (res.success && res.portfolio) setPortfolio(res.portfolio)
         })
@@ -54,7 +64,7 @@ export function App() {
       setWalletAddress(null)
       setPortfolio(null)
     }
-  }, [isConnected, address])
+  }, [isConnected, address, akAddress, akConnected])
 
   return (
     <div className="min-h-screen flex flex-col">
