@@ -564,9 +564,9 @@ export default function DeFiChatAdaptiveUI({ persona, setPersona, walletAddress,
   }
 
   return (
-    <div className="h-[calc(100vh-64px)] w-full grid grid-cols-12 gap-4 p-4">
+    <div className="h-[calc(100vh-64px)] w-full grid grid-cols-12 gap-4 p-4 overflow-hidden">
       {/* Left rail */}
-      <div className="col-span-2 hidden xl:flex flex-col gap-3">
+      <div className="col-span-2 hidden xl:flex flex-col gap-3 min-h-0 overflow-y-auto pr-2">
         <Card>
           <CardHeader className="pb-2">
             <CardTitle className="text-sm">Session</CardTitle>
@@ -604,7 +604,7 @@ export default function DeFiChatAdaptiveUI({ persona, setPersona, walletAddress,
       </div>
 
       {/* Center chat */}
-      <div className="col-span-12 xl:col-span-7 flex flex-col">
+      <div className="col-span-12 xl:col-span-7 flex flex-col min-h-0">
         <div ref={scrollRef} className="flex-1 overflow-y-auto space-y-4 pr-2">
           <AnimatePresence>
             {messages.map((m) => (
@@ -650,8 +650,10 @@ export default function DeFiChatAdaptiveUI({ persona, setPersona, walletAddress,
       </div>
 
       {/* Right panel */}
-      <div className="col-span-12 xl:col-span-3">
-        <RightPanel panels={panels} highlight={highlight} walletAddress={walletAddress} />
+      <div className="col-span-12 xl:col-span-3 flex flex-col min-h-0">
+        <div className="flex-1 overflow-y-auto pr-2">
+          <RightPanel panels={panels} highlight={highlight} walletAddress={walletAddress} />
+        </div>
       </div>
 
       {/* Modals */}
