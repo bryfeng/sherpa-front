@@ -16,6 +16,7 @@ export type PersonaId = 'friendly' | 'technical' | 'professional' | 'educational
 export function App() {
   const isTestEnv = ((import.meta as any).env?.MODE || '').toLowerCase() === 'test'
   const [persona, setPersona] = useState<PersonaId>('friendly')
+  const [theme, setTheme] = useState<'default' | 'snow'>(() => (localStorage.getItem('theme') as any) || 'snow')
   const [health, setHealth] = useState<string>('checking…')
   const [walletAddress, setWalletAddress] = useState<string | null>(null)
   const [portfolio, setPortfolio] = useState<PortfolioData | null>(null)
@@ -36,6 +37,14 @@ export function App() {
         .catch(() => setHealth('offline')),
     )
   }, [isTestEnv])
+
+  // Apply theme class on root for CSS-driven theming
+  useEffect(() => {
+    const root = document.documentElement
+    if (theme === 'snow') root.classList.add('theme-snow')
+    else root.classList.remove('theme-snow')
+    localStorage.setItem('theme', theme)
+  }, [theme])
 
   // Attempt to reconnect wagmi on mount (helps after refresh)
   useEffect(() => {
@@ -68,22 +77,29 @@ export function App() {
 
   return (
     <div className="min-h-screen flex flex-col">
-      <header className="sticky top-0 z-30 border-b border-slate-200 bg-white/90 backdrop-blur">
+      <header className="sticky top-0 z-30 border-b border-slate-200 bg-white sherpa-surface">
         <div className="mx-auto max-w-7xl px-4 py-3 flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <div className="h-8 w-8 rounded-xl bg-gradient-to-br from-primary-500 to-primary-600" />
+            <div className="h-8 w-8 rounded-xl bg-gradient-to-br from-glacier-500 to-glacier-600 shadow-sm ring-1 ring-white/40 sherpa-surface" />
             <h1 className="text-lg font-semibold text-slate-900">Sherpa AI</h1>
           </div>
-          <div className="text-xs text-slate-600 flex items-center gap-3">
+          <div className="text-xs text-slate-600 flex items-center gap-3 flex-wrap">
             <span className={`inline-block w-2 h-2 rounded-full ${health === 'healthy' ? 'bg-green-500' : 'bg-yellow-500'}`} />
             <span className="capitalize">{health}</span>
             <code className="px-1 rounded bg-slate-50 border border-slate-200 text-slate-700">{import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000'}</code>
             <div className="w-px h-5 bg-slate-200" />
+            <button
+              onClick={() => setTheme((t) => (t === 'snow' ? 'default' : 'snow'))}
+              className="rounded-lg px-2 py-1 bg-white border border-slate-200 text-slate-700 hover:bg-slate-50 sherpa-surface"
+              title="Toggle theme"
+            >
+              {theme === 'snow' ? 'Theme: Snow' : 'Theme: Default'}
+            </button>
             {walletAddress ? (
               <div className="flex items-center gap-2">
-                <span className="px-2 py-1 rounded-lg bg-white border border-slate-200 text-slate-700">{truncateAddress(walletAddress)}</span>
-                {totalUsd && <span className="px-2 py-1 rounded-lg bg-white border border-slate-200 text-slate-700">{totalUsd}</span>}
-                <button onClick={() => disconnect()} className="rounded-lg px-3 py-1.5 bg-white border border-slate-200 text-slate-700 hover:bg-slate-50">Disconnect</button>
+                <span className="px-2 py-1 rounded-lg bg-white border border-slate-200 text-slate-700 sherpa-surface">{truncateAddress(walletAddress)}</span>
+                {totalUsd && <span className="px-2 py-1 rounded-lg bg-white border border-slate-200 text-slate-700 sherpa-surface">{totalUsd}</span>}
+                <button onClick={() => disconnect()} className="rounded-lg px-3 py-1.5 bg-white border border-slate-200 text-slate-700 hover:bg-slate-50 sherpa-surface">Disconnect</button>
               </div>
             ) : (
               hasModal && !isTestEnv ? (
@@ -100,7 +116,7 @@ export function App() {
                       } catch {}
                     }
                   }}
-                  className="rounded-lg px-3 py-1.5 text-white bg-primary-600 hover:opacity-95"
+                  className="rounded-lg px-3 py-1.5 text-white bg-gradient-to-r from-glacier-600 to-primary-600 hover:opacity-95 shadow-sm ring-1 ring-white/40 sherpa-surface"
                 >
                   Use Address
                 </button>

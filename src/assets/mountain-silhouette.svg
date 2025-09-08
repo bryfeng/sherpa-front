@@ -1,0 +1,15 @@
+<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 1600 300' width='1600' height='300'>
+  <defs>
+    <linearGradient id='fade' x1='0' x2='0' y1='0' y2='1'>
+      <stop offset='0' stop-color='#ffffff' stop-opacity='0.55'/>
+      <stop offset='1' stop-color='#ffffff' stop-opacity='0'/>
+    </linearGradient>
+  </defs>
+  <!-- Far ridge -->
+  <path d='M0 210 L180 150 L320 185 L430 140 L600 180 L740 120 L880 175 L1020 150 L1180 195 L1360 160 L1600 210 L1600 300 L0 300 Z' fill='url(#fade)'/>
+  <!-- Mid ridge -->
+  <path d='M0 230 L160 170 L300 200 L420 165 L560 205 L700 150 L840 205 L980 175 L1140 220 L1320 185 L1600 230 L1600 300 L0 300 Z' fill='url(#fade)'/>
+  <!-- Near ridge (lighter) -->
+  <path d='M0 250 L140 200 L280 225 L420 200 L560 230 L700 190 L840 235 L1000 205 L1180 245 L1380 215 L1600 250 L1600 300 L0 300 Z' fill='url(#fade)'/>
+</svg>
+

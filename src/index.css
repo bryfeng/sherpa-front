@@ -8,7 +8,8 @@ html, body, #root {
 
 @layer base {
   html, body {
-    @apply bg-white text-slate-900;
+    @apply text-slate-900;
+    background: #ffffff;
   }
 }
 
@@ -18,6 +19,46 @@ html, body, #root {
 
 body {
   font-family: Inter, ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica Neue, Arial, Noto Sans, Apple Color Emoji, Segoe UI Emoji, Segoe UI Symbol;
+}
+
+/* Subtle skylight overlay for depth */
+.theme-snow body::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  background:
+    radial-gradient(1200px 600px at 50% -200px, rgba(255,255,255,0.55), transparent 70%),
+    radial-gradient(1000px 500px at 10% -100px, rgba(255,255,255,0.35), transparent 70%),
+    radial-gradient(900px 450px at 90% -120px, rgba(255,255,255,0.35), transparent 70%);
+}
+
+/* Faint mountain silhouette at the bottom */
+.theme-snow body::after {
+  content: '';
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: -2px;
+  height: 260px;
+  pointer-events: none;
+  /* Use relative path so Vite resolves at build & dev */
+  background: url('assets/mountain-silhouette.svg') center bottom / 120% 100% no-repeat;
+  opacity: 0.22;
+}
+
+/* Apply snow background only when theme-snow is active */
+.theme-snow html, .theme-snow body {
+  background: linear-gradient(180deg, #EAF2FB 0%, #F8FBFF 60%, #FFFFFF 100%);
+}
+
+/* Frosted surfaces when theme-snow is active */
+.theme-snow .sherpa-surface {
+  background-color: rgba(255, 255, 255, 0.6) !important;
+  border-color: rgba(255, 255, 255, 0.4) !important;
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  box-shadow: 0 2px 12px rgba(15, 23, 42, 0.06);
 }
 
 .gradient-user {

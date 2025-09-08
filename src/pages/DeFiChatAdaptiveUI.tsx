@@ -51,7 +51,7 @@ function Button({
 
 function Card({ children, className = '' }: React.PropsWithChildren<{ className?: string }>) {
   return (
-    <div className={`rounded-2xl border border-slate-200 bg-slate-50 ${className}`}>{children}</div>
+    <div className={`rounded-2xl border border-slate-200 bg-white ${className} sherpa-surface`}>{children}</div>
   )
 }
 
@@ -177,7 +177,7 @@ function MessageBubble({ m, onAction }: { m: AgentMessage; onAction: (a: AgentAc
           <Bot className="h-4 w-4 text-slate-700" />
         </div>
       )}
-      <div className={`max-w-[72%] rounded-2xl p-4 shadow-sm ${isUser ? 'bg-primary-600 text-white' : 'bg-white border border-slate-200 text-slate-800'}`}>
+      <div className={`max-w-[72%] rounded-2xl p-4 shadow-sm ${isUser ? 'bg-primary-600 text-white' : 'bg-white border border-slate-200 text-slate-800 sherpa-surface'}`}>
         {m.typing ? (
           <div className="text-sm text-slate-500 flex items-center gap-2">
             <span>Thinking</span>
@@ -321,30 +321,9 @@ function RightPanel({ panels, highlight, walletAddress }: { panels: Panel[]; hig
                 ))}
               </div>
             )}
-            {p.kind === 'portfolio' && (() => {
-              const total = Number(p.payload?.totalUsd ?? 0)
-              const positions = Array.isArray(p.payload?.positions) ? p.payload.positions : []
-              const hasData = (Number.isFinite(total) && total > 0) || positions.length > 0
-              if (!hasData) {
-                if (!walletAddress) {
-                  return <div className="text-sm text-slate-500">Connect your wallet to load portfolio data.</div>
-                }
-                return <div className="text-sm text-slate-500">Loading portfolio…</div>
-              }
-              return (
-                <div className="space-y-3 text-sm">
-                  <div className="font-semibold text-slate-900">Total: ${Number.isFinite(total) ? total.toLocaleString() : '—'}</div>
-                  <div className="grid grid-cols-3 gap-3">
-                    {positions.map((pos: any) => (
-                      <div key={pos.sym} className="rounded-xl border border-slate-200 bg-white p-3">
-                        <div className="text-xs text-slate-700 tracking-wide">{pos.sym}</div>
-                        <div className="text-sm font-semibold text-slate-900">${Number(pos.usd || 0).toLocaleString()}</div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )
-            })()}
+            {p.kind === 'portfolio' && (
+              <PortfolioOverview payload={p.payload} walletAddress={walletAddress} />
+            )}
             {/* governance panel de-scoped */}
             {p.kind === 'card' && <div className="text-sm text-slate-400">{JSON.stringify(p.payload)}</div>}
             {p.kind === 'prediction' && (
@@ -457,8 +436,12 @@ export default function DeFiChatAdaptiveUI({ persona, setPersona, walletAddress,
         if (res.success && res.portfolio) {
           const data = res.portfolio
           const totalUsd = Number(data.total_value_usd || 0)
-          const positions = (data.tokens || []).slice(0, 6).map((t: any) => ({ sym: t.symbol || t.name || 'TOK', usd: Number(t.value_usd || 0) }))
-          const panel: Panel = { id: 'portfolio_overview', kind: 'portfolio', title: 'Your Portfolio Snapshot', payload: { totalUsd, positions } }
+          const sorted = (data.tokens || [])
+            .filter((t: any) => Number(t.value_usd || 0) > 0)
+            .sort((a: any, b: any) => Number(b.value_usd || 0) - Number(a.value_usd || 0))
+          const allPositions = sorted.map((t: any) => ({ sym: t.symbol || t.name || 'TOK', usd: Number(t.value_usd || 0) }))
+          const positions = allPositions.slice(0, 6)
+          const panel: Panel = { id: 'portfolio_overview', kind: 'portfolio', title: 'Your Portfolio Snapshot', payload: { totalUsd, positions, allPositions } }
           setPanels((prev) => {
             const others = prev.filter((p) => p.id !== 'portfolio_overview')
             return [panel, ...others]
@@ -616,7 +599,7 @@ export default function DeFiChatAdaptiveUI({ persona, setPersona, walletAddress,
         </div>
         <div className="mt-3">
           <div className="w-full flex items-center">
-            <div className="w-full flex items-center gap-2 border border-slate-300 bg-white rounded-2xl p-2">
+            <div className="w-full flex items-center gap-2 border border-slate-300 bg-white rounded-2xl p-2 sherpa-surface">
               <Textarea
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
@@ -688,6 +671,70 @@ export default function DeFiChatAdaptiveUI({ persona, setPersona, walletAddress,
             setMessages((m) => [...m, { id: uid('msg'), role: 'assistant', text: `Bridge setup: ${params.fromChain} → ${params.toChain}${params.amount ? `, amount ${params.amount}` : ''}.` }])
           }}
         />
+      )}
+    </div>
+  )
+}
+
+function PortfolioOverview({ payload, walletAddress }: { payload: any; walletAddress?: string }) {
+  const [expanded, setExpanded] = React.useState(false)
+  const [hideDust, setHideDust] = React.useState(true)
+  const total = Number(payload?.totalUsd ?? 0)
+  const basePositions = Array.isArray(payload?.allPositions) ? payload.allPositions : Array.isArray(payload?.positions) ? payload.positions : []
+  const hasData = (Number.isFinite(total) && total > 0) || basePositions.length > 0
+
+  if (!hasData) {
+    if (!walletAddress) return <div className="text-sm text-slate-500">Connect your wallet to load portfolio data.</div>
+    return <div className="text-sm text-slate-500">Loading portfolio…</div>
+  }
+
+  const threshold = 1 // USD
+  const full = hideDust ? basePositions.filter((p: any) => Number(p.usd || 0) >= threshold) : basePositions
+  const collapsedCount = 10
+  const shown = expanded ? full : full.slice(0, collapsedCount)
+
+  return (
+    <div className="space-y-3 text-sm">
+      <div className="flex items-center justify-between gap-2">
+        <div className="font-semibold text-slate-900">Total: ${Number.isFinite(total) ? total.toLocaleString() : '—'}</div>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => setHideDust((v) => !v)}
+            className={`px-2 py-1 rounded-lg border text-xs ${hideDust ? 'bg-slate-100 border-slate-200 text-slate-700' : 'bg-white border-slate-200 text-slate-700'} sherpa-surface`}
+            title="Hide tokens under $1"
+          >
+            {hideDust ? 'Dust hidden' : 'Show dust'}
+          </button>
+          <button
+            onClick={() => setExpanded((v) => !v)}
+            className="px-2 py-1 rounded-lg border border-slate-200 text-xs text-slate-700 bg-white sherpa-surface"
+          >
+            {expanded ? 'Show top 6' : `Show all (${full.length})`}
+          </button>
+        </div>
+      </div>
+      <div className="space-y-2">
+        {shown.map((pos: any, idx: number) => {
+          const usd = Number(pos.usd || 0)
+          const pct = total > 0 ? Math.max(0, Math.min(100, (usd / total) * 100)) : 0
+          return (
+            <div key={(pos.sym || 'TOK') + String(idx) + String(pos.usd)} className="rounded-xl border border-slate-200 bg-white p-3">
+              <div className="flex items-center justify-between">
+                <div className="text-sm font-medium text-slate-900">{pos.sym}</div>
+                <div className="flex items-center gap-2">
+                  <span className="text-xs text-slate-600">{pct.toFixed(1)}%</span>
+                  <span className="text-sm font-semibold text-slate-900">${usd.toLocaleString()}</span>
+                </div>
+              </div>
+              <div className="mt-2 h-1.5 w-full rounded bg-slate-100">
+                <div className="h-1.5 rounded bg-primary-600" style={{ width: `${pct}%` }} />
+              </div>
+            </div>
+          )
+        })}
+      </div>
+      {!expanded && full.length > collapsedCount && (
+        <div className="text-xs text-slate-500">Showing top {collapsedCount} of {full.length}</div>
       )}
     </div>
   )
