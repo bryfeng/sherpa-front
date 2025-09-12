@@ -23,3 +23,14 @@ export async function getUniswapTVL(range: '7d' | '30d' = '7d'): Promise<TVLPoin
   }
 }
 
+export async function getCurrentUniswapTVL(): Promise<TVLPoint | null> {
+  try {
+    const { data } = await axios.get(`${BASE}/tools/defillama/current`, { params: { protocol: 'uniswap' } })
+    const time = Number(data?.timestamp)
+    const tvl = Number(data?.tvl)
+    if (!Number.isFinite(time) || !Number.isFinite(tvl)) return null
+    return { time, tvl }
+  } catch {
+    return null
+  }
+}

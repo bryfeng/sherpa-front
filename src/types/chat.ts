@@ -14,11 +14,12 @@ export interface ChatRequest {
   messages: Array<{ role: string; content: string }>
   address?: string
   chain?: string
+  conversation_id?: string
 }
 
 export interface ChatResponse {
   reply: string
   panels: Record<string, any>
   sources: any[]
+  conversation_id?: string
 }
-

@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
   ChevronDown,
@@ -93,7 +94,47 @@ function Badge({ children, className = '', variant = 'solid' }: React.PropsWithC
 // -----------------------
 // Minimal types
 // -----------------------
-export type Persona = 'friendly' | 'technical' | 'advisor' | 'teacher'
+import type { PersonaId as Persona } from '../types/persona'
+
+// Centralized style map for persona theming
+const personaStyles: Record<Persona, { label: string; badge: string; text: string; dot: string; hover: string; border: string; ring: string }> = {
+  friendly: {
+    label: 'Friendly',
+    badge: 'bg-emerald-100 text-emerald-700',
+    text: 'text-emerald-700',
+    dot: 'bg-emerald-500',
+    hover: 'hover:bg-emerald-50',
+    border: 'border-emerald-300',
+    ring: 'focus:ring-emerald-200',
+  },
+  technical: {
+    label: 'Technical',
+    badge: 'bg-violet-100 text-violet-700',
+    text: 'text-violet-700',
+    dot: 'bg-violet-500',
+    hover: 'hover:bg-violet-50',
+    border: 'border-violet-300',
+    ring: 'focus:ring-violet-200',
+  },
+  professional: {
+    label: 'Professional',
+    badge: 'bg-slate-100 text-slate-700',
+    text: 'text-slate-700',
+    dot: 'bg-slate-500',
+    hover: 'hover:bg-slate-50',
+    border: 'border-slate-300',
+    ring: 'focus:ring-slate-200',
+  },
+  educational: {
+    label: 'Educational',
+    badge: 'bg-amber-100 text-amber-700',
+    text: 'text-amber-700',
+    dot: 'bg-amber-500',
+    hover: 'hover:bg-amber-50',
+    border: 'border-amber-300',
+    ring: 'focus:ring-amber-200',
+  },
+}
 
 type ActionType = 'show_panel' | 'swap' | 'bridge' | 'explain' | 'subscribe' | 'simulate'
 
@@ -107,7 +148,7 @@ export type AgentAction = {
 
 export type Panel = {
   id: string
-  kind: 'chart' | 'table' | 'card' | 'portfolio' | 'prediction'
+  kind: 'chart' | 'table' | 'card' | 'portfolio' | 'prediction' | 'prices'
   title: string
   payload?: any
 }
@@ -125,24 +166,7 @@ export type AgentMessage = {
 // -----------------------
 // Mock data helpers
 // -----------------------
-const seedPanels: Panel[] = [
-  {
-    id: 'uniswap_tvl_chart',
-    kind: 'chart',
-    title: 'Uniswap TVL (7d)',
-    payload: {
-      points: (() => {
-        const vals = [12.1, 12.3, 12.7, 12.5, 12.9, 13.4, 13.6]
-        const now = Date.now()
-        const step = 24 * 60 * 60 * 1000
-        const start = now - (vals.length - 1) * step
-        return vals.map((v, i) => ({ time: start + i * step, tvl: v }))
-      })(),
-      unit: 'USD',
-      source: { name: 'DefiLlama', url: 'https://defillama.com/protocol/uniswap' },
-    },
-  },
-]
+const seedPanels: Panel[] = []
 
 const seedIntro: AgentMessage[] = [
   {
@@ -151,7 +175,7 @@ const seedIntro: AgentMessage[] = [
     text: 'Hey! I can analyze tokens, protocols, and your portfolio. What do you want to look at today?',
     actions: [
       { id: 'a1', label: 'Show my portfolio', type: 'show_panel', params: { panel_id: 'portfolio_overview' } },
-      { id: 'a2', label: 'Uniswap this week', type: 'show_panel', params: { panel_id: 'uniswap_tvl_chart' } },
+      { id: 'a2', label: 'Top coins today', type: 'show_panel', params: { panel_id: 'top_coins' } },
     ],
   },
 ]
@@ -169,16 +193,13 @@ import { BridgeModal } from '../components/modals/BridgeModal'
 import { getPolymarketMarkets } from '../services/predictions'
 import type { TVLPoint } from '../services/defi'
 import { getUniswapTVL } from '../services/defi'
+import { getSwapQuote } from '../services/quotes'
+import { getTopPrices } from '../services/prices'
 import { ResponsiveContainer, AreaChart, Area, XAxis, YAxis, Tooltip, CartesianGrid } from 'recharts'
 
 function PersonaBadge({ p }: { p: Persona }) {
-  const map = {
-    friendly: { label: 'Friendly', color: 'bg-emerald-100 text-emerald-700' },
-    technical: { label: 'Technical', color: 'bg-sky-100 text-sky-700' },
-    advisor: { label: 'Advisor', color: 'bg-fuchsia-100 text-fuchsia-700' },
-    teacher: { label: 'Teacher', color: 'bg-amber-100 text-amber-700' },
-  } as const
-  return <Badge className={`rounded-full ${map[p].color}`}>{map[p].label}</Badge>
+  const s = personaStyles[p]
+  return <Badge className={`rounded-full ${s.badge}`}>{s.label}</Badge>
 }
 
 function MessageBubble({ m, onAction }: { m: AgentMessage; onAction: (a: AgentAction) => void }) {
@@ -312,6 +333,7 @@ function ChartPanel({ p }: { p: Panel }) {
   const [points, setPoints] = React.useState<TVLPoint[]>(normalizeChartPoints(p.payload))
   const unit = p.payload?.unit
   const source = p.payload?.source
+  const current: TVLPoint | undefined = p.payload?.current
 
   React.useEffect(() => {
     setPoints(normalizeChartPoints(p.payload))
@@ -327,6 +349,25 @@ function ChartPanel({ p }: { p: Panel }) {
     } finally {
       loadingRef.current = false
     }
+  }
+
+  const hasSeries = Array.isArray(points) && points.length >= 2
+  if (!hasSeries && current) {
+    return (
+      <div className="w-full">
+        <div className="flex items-center justify-between mb-1 text-xs text-slate-500">
+          <span>Latest</span>
+          <a href={source?.url || 'https://defillama.com'} target="_blank" rel="noreferrer" className="text-slate-500 hover:text-slate-700 hover:underline">Source: {source?.name || 'DefiLlama'}</a>
+        </div>
+        <div className="rounded-xl border border-slate-200 bg-white p-4 flex items-center justify-between">
+          <div>
+            <div className="text-xs text-slate-500">TVL</div>
+            <div className="text-2xl font-semibold text-slate-900">{formatCompact(current.tvl, unit)}</div>
+          </div>
+          <div className="text-xs text-slate-500">{new Date(current.time).toLocaleDateString()}</div>
+        </div>
+      </div>
+    )
   }
 
   return (
@@ -462,6 +503,7 @@ function RightPanel({ panels, highlight, walletAddress }: { panels: Panel[]; hig
             )}
             {/* governance panel de-scoped */}
             {p.kind === 'card' && <div className="text-sm text-slate-400">{JSON.stringify(p.payload)}</div>}
+            {p.kind === 'prices' && <TopCoinsPanel payload={p.payload} />}
             {p.kind === 'prediction' && (
               <div className="space-y-2">
                 {(p.payload?.markets || []).map((m: any) => (
@@ -479,6 +521,30 @@ function RightPanel({ panels, highlight, walletAddress }: { panels: Panel[]; hig
           </CardContent>
         </Card>
       ))}
+    </div>
+  )
+}
+
+function TopCoinsPanel({ payload }: { payload: any }) {
+  const coins = Array.isArray(payload?.coins) ? payload.coins : []
+  if (!coins.length) return <div className="text-sm text-slate-500">No data available.</div>
+  return (
+    <div className="space-y-2">
+      {coins.map((c: any) => (
+        <div key={c.id || c.symbol} className="flex items-center justify-between rounded-xl border border-slate-200 bg-white p-3">
+          <div className="flex items-baseline gap-2">
+            <div className="text-sm font-medium text-slate-900">{c.name}</div>
+            <div className="text-xs text-slate-500">{String(c.symbol || '').toUpperCase()}</div>
+          </div>
+          <div className="flex items-center gap-3">
+            <div className="text-sm font-semibold text-slate-900">${Number(c.price_usd || 0).toLocaleString(undefined, { maximumFractionDigits: 2 })}</div>
+            {typeof c.change_24h === 'number' && (
+              <div className={`text-xs ${c.change_24h >= 0 ? 'text-emerald-600' : 'text-rose-600'}`}>{c.change_24h.toFixed(2)}%</div>
+            )}
+          </div>
+        </div>
+      ))}
+      <div className="text-[11px] text-slate-500">Source: CoinGecko</div>
     </div>
   )
 }
@@ -508,28 +574,74 @@ function PredictionsShortcut({ onLoad }: { onLoad: (panel: Panel) => void }) {
 
 function PersonaDropdown({ persona, setPersona }: { persona: Persona; setPersona: (p: Persona) => void }) {
   const [open, setOpen] = useState(false)
+  const [coords, setCoords] = useState<{ top: number; left: number; width: number }>({ top: 0, left: 0, width: 224 })
+  const wrapRef = useRef<HTMLDivElement | null>(null)
+
+  useEffect(() => {
+    if (!open) return
+    function updatePosition() {
+      const r = wrapRef.current?.getBoundingClientRect()
+      if (!r) return
+      setCoords({ top: r.bottom + window.scrollY + 8, left: r.left + window.scrollX, width: Math.max(224, r.width) })
+    }
+    updatePosition()
+    window.addEventListener('resize', updatePosition)
+    window.addEventListener('scroll', updatePosition, true)
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setOpen(false)
+    }
+    window.addEventListener('keydown', onKey)
+    return () => {
+      window.removeEventListener('resize', updatePosition)
+      window.removeEventListener('scroll', updatePosition, true)
+      window.removeEventListener('keydown', onKey)
+    }
+  }, [open])
+
   return (
-    <div className="relative">
-      <Button variant="outline" className="rounded-full" onClick={() => setOpen((v) => !v)}>
-        <Sparkles className="h-4 w-4 mr-2" />Persona <ChevronDown className="h-4 w-4 ml-2" />
+    <div className="relative" ref={wrapRef}>
+      <Button
+        variant="outline"
+        className={`rounded-full bg-white text-slate-900 ${personaStyles[persona].border} ${personaStyles[persona].hover} focus:ring-2 ${personaStyles[persona].ring}`}
+        onClick={() => setOpen((v) => !v)}
+        aria-haspopup="menu"
+        aria-expanded={open}
+        aria-label="Choose persona"
+      >
+        <Sparkles className="h-4 w-4 mr-2 text-slate-700" />
+        <span className={`inline-flex h-2.5 w-2.5 rounded-full mr-2 ${personaStyles[persona].dot}`} />
+        <span className={`capitalize font-medium ${personaStyles[persona].text}`}>{persona}</span>
+        <ChevronDown className="h-4 w-4 ml-2 text-slate-600" />
       </Button>
-      {open && (
-        <div className="absolute z-20 mt-2 w-56 rounded-xl border border-slate-200 bg-white p-2 shadow-xl">
-          <div className="px-2 py-1 text-xs text-slate-600">Choose persona</div>
-          {(['friendly', 'technical', 'advisor', 'teacher'] as Persona[]).map((p) => (
-            <button
-              key={p}
-              onClick={() => {
-                setPersona(p)
-                setOpen(false)
-              }}
-              className="w-full text-left px-2 py-2 rounded-lg hover:bg-slate-50 flex items-center gap-2"
+      {open &&
+        createPortal(
+          <>
+            <div className="fixed inset-0 z-40" onClick={() => setOpen(false)} aria-hidden="true" />
+            <div
+              className="fixed z-50 rounded-xl border border-slate-200 bg-white p-2 shadow-2xl ring-1 ring-black/5"
+              style={{ top: `${coords.top}px`, left: `${coords.left}px`, width: `${coords.width}px` }}
+              role="menu"
             >
-              <PersonaBadge p={p} /> <span className="capitalize">{p}</span>
-            </button>
-          ))}
-        </div>
-      )}
+              <div className="px-2 py-1 text-[11px] uppercase tracking-wide text-slate-500">Choose persona</div>
+              {(['friendly', 'technical', 'professional', 'educational'] as Persona[]).map((p) => (
+                <button
+                  key={p}
+                  onClick={() => {
+                    setPersona(p)
+                    setOpen(false)
+                  }}
+                  className={`w-full text-left px-2 py-2 rounded-lg flex items-center gap-2 ${personaStyles[p].hover}`}
+                  role="menuitem"
+                >
+                  <span className={`inline-flex h-2.5 w-2.5 rounded-full ${personaStyles[p].dot}`} />
+                  <span className={`capitalize font-medium ${personaStyles[p].text}`}>{p}</span>
+                  {persona === p && <span className={`ml-auto text-xs ${personaStyles[p].text}`}>Current</span>}
+                </button>
+              ))}
+            </div>
+          </>,
+          document.body,
+        )}
     </div>
   )
 }
@@ -542,24 +654,56 @@ export default function DeFiChatAdaptiveUI({ persona, setPersona, walletAddress,
   const [highlight, setHighlight] = useState<string[] | undefined>(undefined)
   const [input, setInput] = useState('')
   const [pro, setPro] = useState(false)
+  const [conversationId, setConversationId] = useState<string | undefined>(() => {
+    try {
+      const stored = localStorage.getItem('sherpa.conversation_id')
+      return stored || undefined
+    } catch {
+      return undefined
+    }
+  })
   const scrollRef = useRef<HTMLDivElement>(null)
   const [showSim, setShowSim] = useState<{ from?: string; to?: string } | null>(null)
   const [showSwap, setShowSwap] = useState<{ from?: string; to?: string } | null>(null)
   const [showBridge, setShowBridge] = useState<boolean>(false)
 
-  // Load TVL chart from backend DefiLlama tool (if available)
-  useEffect(() => {
-    import('../services/defi').then(({ getUniswapTVL }) =>
-      getUniswapTVL('7d')
-        .then((points) => {
-          if (!points) return
-          setPanels((prev) =>
-            prev.map((p) => (p.id === 'uniswap_tvl_chart' ? { ...p, payload: { ...(p.payload || {}), points } } : p)),
-          )
+  async function loadPortfolioPanel(addr: string) {
+    try {
+      const res = await api.portfolio(addr)
+      if (res.success && res.portfolio) {
+        const data = res.portfolio
+        const totalUsd = Number(data.total_value_usd || 0)
+        const sorted = (data.tokens || [])
+          .filter((t: any) => Number(t.value_usd || 0) > 0)
+          .sort((a: any, b: any) => Number(b.value_usd || 0) - Number(a.value_usd || 0))
+        const allPositions = sorted.map((t: any) => ({ sym: t.symbol || t.name || 'TOK', usd: Number(t.value_usd || 0) }))
+        const positions = allPositions.slice(0, 6)
+        const panel: Panel = { id: 'portfolio_overview', kind: 'portfolio', title: 'Your Portfolio Snapshot', payload: { totalUsd, positions, allPositions } }
+        setPanels((prev) => {
+          const others = prev.filter((p) => p.id !== 'portfolio_overview')
+          return [panel, ...others]
         })
-        .catch(() => {})
-    )
-  }, [])
+        setHighlight(['portfolio_overview'])
+      }
+    } catch {}
+  }
+
+  // Uniswap TVL removed in favor of a simple Top Coins panel
+
+  async function loadTopCoinsPanel() {
+    const coins = await getTopPrices(5)
+    const panel: Panel = {
+      id: 'top_coins',
+      kind: 'prices',
+      title: 'Top Coins (excl. stablecoins)',
+      payload: { coins },
+    }
+    setPanels((prev) => {
+      const others = prev.filter((p) => p.id !== 'top_coins')
+      return [panel, ...others]
+    })
+    setHighlight(['top_coins'])
+  }
 
   // Load portfolio panel when wallet address is available
   useEffect(() => {
@@ -568,26 +712,7 @@ export default function DeFiChatAdaptiveUI({ persona, setPersona, walletAddress,
       setPanels((prev) => prev.filter((p) => p.id !== 'portfolio_overview'))
       return
     }
-    api
-      .portfolio(walletAddress)
-      .then((res) => {
-        if (res.success && res.portfolio) {
-          const data = res.portfolio
-          const totalUsd = Number(data.total_value_usd || 0)
-          const sorted = (data.tokens || [])
-            .filter((t: any) => Number(t.value_usd || 0) > 0)
-            .sort((a: any, b: any) => Number(b.value_usd || 0) - Number(a.value_usd || 0))
-          const allPositions = sorted.map((t: any) => ({ sym: t.symbol || t.name || 'TOK', usd: Number(t.value_usd || 0) }))
-          const positions = allPositions.slice(0, 6)
-          const panel: Panel = { id: 'portfolio_overview', kind: 'portfolio', title: 'Your Portfolio Snapshot', payload: { totalUsd, positions, allPositions } }
-          setPanels((prev) => {
-            const others = prev.filter((p) => p.id !== 'portfolio_overview')
-            return [panel, ...others]
-          })
-          setHighlight(['portfolio_overview'])
-        }
-      })
-      .catch(() => {})
+    loadPortfolioPanel(walletAddress).catch(() => {})
   }, [walletAddress])
 
   const send = async () => {
@@ -602,8 +727,13 @@ export default function DeFiChatAdaptiveUI({ persona, setPersona, walletAddress,
         messages: [{ role: 'user', content: q }],
         address: walletAddress,
         chain: 'ethereum',
+        conversation_id: conversationId,
       }
       const res = await api.chat(payload)
+      if (res?.conversation_id && res.conversation_id !== conversationId) {
+        setConversationId(res.conversation_id)
+        try { localStorage.setItem('sherpa.conversation_id', res.conversation_id) } catch {}
+      }
       const newPanels = transformBackendPanels(res.panels)
       if (newPanels.length) {
         setPanels((prev) => mergePanelsLocal(prev, newPanels))
@@ -644,8 +774,15 @@ export default function DeFiChatAdaptiveUI({ persona, setPersona, walletAddress,
           setMessages((m) => [...m, { id: uid('msg'), role: 'assistant', text: 'Please connect your wallet to view your portfolio.' }])
           break
         }
-        setHighlight([a.params?.panel_id])
-        setMessages((m) => [...m, { id: uid('msg'), role: 'assistant', text: `Opened panel: ${a.params?.panel_id}` }])
+        if (a.params?.panel_id === 'top_coins') {
+          loadTopCoinsPanel().catch(() => {})
+          break
+        }
+        if (a.params?.panel_id === 'portfolio_overview' && walletAddress) {
+          loadPortfolioPanel(walletAddress).catch(() => {})
+        }
+        setHighlight(a.params?.panel_id ? [a.params?.panel_id] : undefined)
+        if (a.params?.panel_id) setMessages((m) => [...m, { id: uid('msg'), role: 'assistant', text: `Opened: ${a.params?.panel_id}` }])
         break
       }
       case 'simulate': {
@@ -708,6 +845,9 @@ export default function DeFiChatAdaptiveUI({ persona, setPersona, walletAddress,
             <CardTitle className="text-sm">Shortcuts</CardTitle>
           </CardHeader>
           <CardContent className="flex flex-col gap-2">
+            <Button variant="secondary" className="justify-start" onClick={() => loadTopCoinsPanel()}>
+              <BarChart3 className="h-4 w-4 mr-2" />Top Coins
+            </Button>
             <Button variant="secondary" className="justify-start">
               <BarChart3 className="h-4 w-4 mr-2" />Market Overview
             </Button>
@@ -783,10 +923,22 @@ export default function DeFiChatAdaptiveUI({ persona, setPersona, walletAddress,
           from={showSim.from}
           to={showSim.to}
           onClose={() => setShowSim(null)}
-          onConfirm={(pct, amount) => {
+          onConfirm={async (pct, amount) => {
+            const fromSym = showSim.from || 'ETH'
+            const toSym = showSim.to || 'USDC'
+            const amt = amount && amount > 0 ? amount : 1 // Fallback to 1 unit for MVP
             setShowSim(null)
-            const txt = pct != null ? `Simulated swap: ${pct}% ${showSim.from || 'ETH'} → ${showSim.to || 'USDC'}. Est. fee $2.14.` : `Simulated swap: ${amount ?? 0} ${showSim.from || 'ETH'} → ${showSim.to || 'USDC'}.`
-            setMessages((m) => [...m, { id: uid('msg'), role: 'assistant', text: txt, actions: [{ id: uid('act'), label: 'Proceed swap', type: 'swap', params: { from: showSim.from, to: showSim.to } }] }])
+            const quote = await getSwapQuote({ token_in: fromSym, token_out: toSym, amount_in: amt, slippage_bps: 50 })
+            const feeStr = quote ? `$${quote.fee_est.toFixed(2)} est. fee` : 'fee est. unavailable'
+            const outStr = quote ? `${quote.amount_out_est.toFixed(6)} ${toSym}` : '—'
+            const slipStr = quote ? `${quote.slippage_bps} bps slippage reserve` : ''
+            const basis = amount && amount > 0 ? '' : ' (based on 1 unit)'
+            const warn = quote && quote.warnings?.length ? `\nNote: ${quote.warnings.join('; ')}` : ''
+            const txt = `Simulated swap: ${amt} ${fromSym} → ~${outStr}.${basis}\n${feeStr}; ${slipStr}.${warn}`
+            setMessages((m) => [
+              ...m,
+              { id: uid('msg'), role: 'assistant', text: txt, actions: [{ id: uid('act'), label: 'Proceed swap', type: 'swap', params: { from: fromSym, to: toSym, amount: amt } }] },
+            ])
           }}
         />
       )}
@@ -810,6 +962,7 @@ export default function DeFiChatAdaptiveUI({ persona, setPersona, walletAddress,
           }}
         />
       )}
+      {/* No overlay for Top Coins; rendered as a right-panel card */}
     </div>
   )
 }
