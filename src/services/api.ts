@@ -21,4 +21,37 @@ export const api = {
     })
     return data
   },
+
+  async listConversations(address: string) {
+    const { data } = await axios.get(`${BASE}/conversations`, { params: { address } })
+    return data as Array<{ conversation_id: string; title?: string | null; last_activity: string; message_count: number; archived: boolean }>
+  },
+
+  async createConversation(address: string, title?: string) {
+    const { data } = await axios.post(`${BASE}/conversations`, { address, title })
+    return data as { conversation_id: string; title?: string | null }
+  },
+
+  async updateConversation(conversation_id: string, payload: { title?: string; archived?: boolean }) {
+    const { data } = await axios.patch(`${BASE}/conversations/${conversation_id}`, payload)
+    return data as { conversation_id: string; title?: string | null; last_activity: string; message_count: number; archived: boolean }
+  },
+
+  async getConversation(conversation_id: string) {
+    const { data } = await axios.get(`${BASE}/conversations/${conversation_id}`)
+    return data as {
+      conversation_id: string
+      owner_address?: string | null
+      title?: string | null
+      archived: boolean
+      created_at: string
+      last_activity: string
+      total_tokens: number
+      message_count: number
+      compressed_history?: string | null
+      episodic_focus?: Record<string, any> | null
+      portfolio_context?: Record<string, any> | null
+      messages: Array<{ id: string; role: string; content: string; timestamp: string; metadata?: any; tokens?: number | null }>
+    }
+  },
 }

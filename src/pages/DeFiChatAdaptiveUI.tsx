@@ -15,6 +15,10 @@ import {
   ArrowLeftRight,
   Star,
   TrendingUp,
+  Maximize2,
+  Minimize2,
+  GripVertical,
+  ChevronUp,
 } from 'lucide-react'
 
 // Local, minimal UI primitives (Tailwind styled)
@@ -50,9 +54,12 @@ function Button({
   )
 }
 
-function Card({ children, className = '' }: React.PropsWithChildren<{ className?: string }>) {
+function Card(
+  { children, className = '', ...rest }:
+  React.PropsWithChildren<{ className?: string } & React.HTMLAttributes<HTMLDivElement>>,
+) {
   return (
-    <div className={`rounded-2xl border border-slate-200 bg-white ${className} sherpa-surface`}>{children}</div>
+    <div {...rest} className={`rounded-2xl border border-slate-200 bg-white ${className} sherpa-surface`}>{children}</div>
   )
 }
 
@@ -190,6 +197,7 @@ import { transformBackendPanels } from '../services/panels'
 import { SimulateModal } from '../components/modals/SimulateModal'
 import { SwapModal } from '../components/modals/SwapModal'
 import { BridgeModal } from '../components/modals/BridgeModal'
+import { BungeeQuoteModal } from '../components/modals/BungeeQuoteModal'
 import { getPolymarketMarkets } from '../services/predictions'
 import type { TVLPoint } from '../services/defi'
 import { getUniswapTVL } from '../services/defi'
@@ -328,6 +336,23 @@ function MarkdownRenderer({ text }: { text: string }) {
 // -----------------------
 // Chart helpers
 // -----------------------
+function formatRelativeTime(iso: string): string {
+  try {
+    const d = new Date(iso)
+    const diff = Date.now() - d.getTime()
+    const s = Math.floor(diff / 1000)
+    if (s < 60) return `${s}s ago`
+    const m = Math.floor(s / 60)
+    if (m < 60) return `${m}m ago`
+    const h = Math.floor(m / 60)
+    if (h < 24) return `${h}h ago`
+    const days = Math.floor(h / 24)
+    return `${days}d ago`
+  } catch {
+    return ''
+  }
+}
+
 function ChartPanel({ p }: { p: Panel }) {
   const [range, setRange] = React.useState<'7d' | '30d'>('7d')
   const [points, setPoints] = React.useState<TVLPoint[]>(normalizeChartPoints(p.payload))
@@ -474,7 +499,7 @@ function formatCompact(v: number, unit?: string, withUnit: boolean = true): stri
   return withUnit ? `${base}${suffix}${u}` : `${base}${suffix}`
 }
 
-function RightPanel({ panels, highlight, walletAddress }: { panels: Panel[]; highlight?: string[]; walletAddress?: string }) {
+function RightPanel({ panels, highlight, walletAddress, panelUI, onToggleCollapse, onExpand, onReorder }: { panels: Panel[]; highlight?: string[]; walletAddress?: string; panelUI: Record<string, { collapsed?: boolean }>; onToggleCollapse: (id: string) => void; onExpand: (id: string) => void; onReorder: (dragId: string, dropId: string) => void }) {
   const ordered = useMemo(() => {
     if (!highlight || highlight.length === 0) return panels
     const map = new Map(panels.map((p) => [p.id, p] as const))
@@ -487,7 +512,25 @@ function RightPanel({ panels, highlight, walletAddress }: { panels: Panel[]; hig
   return (
     <div className="space-y-3">
       {ordered.map((p) => (
-        <Card key={p.id} className="rounded-2xl">
+        <Card
+          key={p.id}
+          className="rounded-2xl"
+          draggable
+          onDragStart={(e: React.DragEvent<HTMLDivElement>) => {
+            e.dataTransfer.effectAllowed = 'move'
+            e.dataTransfer.setData('text/x-panel-id', p.id)
+          }}
+          onDragOver={(e: React.DragEvent<HTMLDivElement>) => {
+            if (e.dataTransfer.types.includes('text/x-panel-id')) {
+              e.preventDefault()
+              e.dataTransfer.dropEffect = 'move'
+            }
+          }}
+          onDrop={(e: React.DragEvent<HTMLDivElement>) => {
+            const dragId = e.dataTransfer.getData('text/x-panel-id')
+            if (dragId) onReorder(dragId, p.id)
+          }}
+        >
           <CardHeader className="pb-2">
             <CardTitle className="text-sm flex items-center gap-2">
               {p.kind === 'chart' && <BarChart3 className="h-4 w-4" />}
@@ -495,30 +538,42 @@ function RightPanel({ panels, highlight, walletAddress }: { panels: Panel[]; hig
               {p.kind === 'prediction' && <TrendingUp className="h-4 w-4" />}
               {p.title}
             </CardTitle>
+            <div className="ml-auto flex items-center gap-1">
+              <button className="h-8 w-8 rounded-lg hover:bg-slate-100 text-slate-600" title="Reorder">
+                <GripVertical className="h-4 w-4 mx-auto" />
+              </button>
+              <button onClick={() => onToggleCollapse(p.id)} className="h-8 w-8 rounded-lg hover:bg-slate-100 text-slate-600" title={panelUI[p.id]?.collapsed ? 'Expand' : 'Minimize'}>
+                {panelUI[p.id]?.collapsed ? <ChevronDown className="h-4 w-4 mx-auto" /> : <ChevronUp className="h-4 w-4 mx-auto" />}
+              </button>
+              <button onClick={() => onExpand(p.id)} className="h-8 w-8 rounded-lg hover:bg-slate-100 text-slate-600" title="Expand">
+                <Maximize2 className="h-4 w-4 mx-auto" />
+              </button>
+            </div>
           </CardHeader>
-          <CardContent>
-            {p.kind === 'chart' && <ChartPanel p={p} />}
-            {p.kind === 'portfolio' && (
-              <PortfolioOverview payload={p.payload} walletAddress={walletAddress} />
-            )}
-            {/* governance panel de-scoped */}
-            {p.kind === 'card' && <div className="text-sm text-slate-400">{JSON.stringify(p.payload)}</div>}
-            {p.kind === 'prices' && <TopCoinsPanel payload={p.payload} />}
-            {p.kind === 'prediction' && (
-              <div className="space-y-2">
-                {(p.payload?.markets || []).map((m: any) => (
-                  <div key={m.id} className="flex items-center justify-between rounded-xl border border-slate-200 bg-white p-3">
-                    <div className="text-sm text-slate-900">{m.question}</div>
-                    <div className="flex items-center gap-3 text-xs text-slate-600">
-                      <span>Yes {Math.round((m.yesPrice || 0) * 100)}%</span>
-                      <span>No {Math.round((m.noPrice || 0) * 100)}%</span>
-                      <a href={m.url} target="_blank" rel="noreferrer" className="text-primary-600 hover:underline">Open</a>
+          {!panelUI[p.id]?.collapsed && (
+            <CardContent>
+              {p.kind === 'chart' && <ChartPanel p={p} />}
+              {p.kind === 'portfolio' && (
+                <PortfolioOverview payload={p.payload} walletAddress={walletAddress} />
+              )}
+              {p.kind === 'card' && <div className="text-sm text-slate-400">{JSON.stringify(p.payload)}</div>}
+              {p.kind === 'prices' && <TopCoinsPanel payload={p.payload} />}
+              {p.kind === 'prediction' && (
+                <div className="space-y-2">
+                  {(p.payload?.markets || []).map((m: any) => (
+                    <div key={m.id} className="flex items-center justify-between rounded-xl border border-slate-200 bg-white p-3">
+                      <div className="text-sm text-slate-900">{m.question}</div>
+                      <div className="flex items-center gap-3 text-xs text-slate-600">
+                        <span>Yes {Math.round((m.yesPrice || 0) * 100)}%</span>
+                        <span>No {Math.round((m.noPrice || 0) * 100)}%</span>
+                        <a href={m.url} target="_blank" rel="noreferrer" className="text-primary-600 hover:underline">Open</a>
+                      </div>
                     </div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </CardContent>
+                  ))}
+                </div>
+              )}
+            </CardContent>
+          )}
         </Card>
       ))}
     </div>
@@ -545,6 +600,42 @@ function TopCoinsPanel({ payload }: { payload: any }) {
         </div>
       ))}
       <div className="text-[11px] text-slate-500">Source: CoinGecko</div>
+    </div>
+  )
+}
+
+function ExpandedPanelModal({ panel, onClose, walletAddress }: { panel?: Panel; onClose: () => void; walletAddress?: string }) {
+  if (!panel) return null
+  return (
+    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/30 p-3">
+      <div className="w-full max-w-3xl rounded-2xl bg-white shadow-xl border border-slate-200">
+        <div className="px-4 py-3 border-b border-slate-200 flex items-center justify-between">
+          <div className="font-semibold text-slate-900">{panel.title}</div>
+          <button onClick={onClose} className="h-8 w-8 rounded-lg hover:bg-slate-100 text-slate-600" title="Close">
+            <Minimize2 className="h-4 w-4 mx-auto" />
+          </button>
+        </div>
+        <div className="p-4">
+          {panel.kind === 'chart' && <ChartPanel p={panel} />}
+          {panel.kind === 'portfolio' && <PortfolioOverview payload={panel.payload} walletAddress={walletAddress} />}
+          {panel.kind === 'card' && <div className="text-sm text-slate-700">{JSON.stringify(panel.payload)}</div>}
+          {panel.kind === 'prices' && <TopCoinsPanel payload={panel.payload} />}
+          {panel.kind === 'prediction' && (
+            <div className="space-y-2">
+              {(panel.payload?.markets || []).map((m: any) => (
+                <div key={m.id} className="flex items-center justify-between rounded-xl border border-slate-200 bg-white p-3">
+                  <div className="text-sm text-slate-900">{m.question}</div>
+                  <div className="flex items-center gap-3 text-xs text-slate-600">
+                    <span>Yes {Math.round((m.yesPrice || 0) * 100)}%</span>
+                    <span>No {Math.round((m.noPrice || 0) * 100)}%</span>
+                    <a href={m.url} target="_blank" rel="noreferrer" className="text-primary-600 hover:underline">Open</a>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
     </div>
   )
 }
@@ -654,9 +745,14 @@ export default function DeFiChatAdaptiveUI({ persona, setPersona, walletAddress,
   const [highlight, setHighlight] = useState<string[] | undefined>(undefined)
   const [input, setInput] = useState('')
   const [pro, setPro] = useState(false)
+  const [panelUI, setPanelUI] = useState<Record<string, { collapsed?: boolean }>>({})
+  const [expandedPanelId, setExpandedPanelId] = useState<string | null>(null)
+  const [recentChats, setRecentChats] = useState<Array<{ conversation_id: string; title?: string | null; last_activity: string; message_count: number; archived: boolean }>>([])
+  const storageKey = (addr?: string | null) => (addr ? `sherpa.conversation_id:${addr.toLowerCase()}` : 'sherpa.conversation_id:guest')
   const [conversationId, setConversationId] = useState<string | undefined>(() => {
     try {
-      const stored = localStorage.getItem('sherpa.conversation_id')
+      const key = storageKey(walletAddress || null)
+      const stored = localStorage.getItem(key)
       return stored || undefined
     } catch {
       return undefined
@@ -666,6 +762,7 @@ export default function DeFiChatAdaptiveUI({ persona, setPersona, walletAddress,
   const [showSim, setShowSim] = useState<{ from?: string; to?: string } | null>(null)
   const [showSwap, setShowSwap] = useState<{ from?: string; to?: string } | null>(null)
   const [showBridge, setShowBridge] = useState<boolean>(false)
+  const [showBungee, setShowBungee] = useState<boolean>(false)
 
   async function loadPortfolioPanel(addr: string) {
     try {
@@ -715,6 +812,29 @@ export default function DeFiChatAdaptiveUI({ persona, setPersona, walletAddress,
     loadPortfolioPanel(walletAddress).catch(() => {})
   }, [walletAddress])
 
+  // Load the stored conversation id when wallet changes
+  useEffect(() => {
+    try {
+      const key = storageKey(walletAddress || null)
+      const stored = localStorage.getItem(key) || undefined
+      setConversationId(stored)
+    } catch {
+      setConversationId(undefined)
+    }
+  }, [walletAddress])
+
+  // Load recent chats when wallet changes
+  useEffect(() => {
+    if (!walletAddress) {
+      setRecentChats([])
+      return
+    }
+    api
+      .listConversations(walletAddress)
+      .then((items) => setRecentChats(items || []))
+      .catch(() => setRecentChats([]))
+  }, [walletAddress])
+
   const send = async () => {
     const q = input.trim()
     if (!q) return
@@ -732,7 +852,7 @@ export default function DeFiChatAdaptiveUI({ persona, setPersona, walletAddress,
       const res = await api.chat(payload)
       if (res?.conversation_id && res.conversation_id !== conversationId) {
         setConversationId(res.conversation_id)
-        try { localStorage.setItem('sherpa.conversation_id', res.conversation_id) } catch {}
+        try { localStorage.setItem(storageKey(walletAddress || null), res.conversation_id) } catch {}
       }
       const newPanels = transformBackendPanels(res.panels)
       if (newPanels.length) {
@@ -752,6 +872,23 @@ export default function DeFiChatAdaptiveUI({ persona, setPersona, walletAddress,
     const byId = new Map(current.map((p) => [p.id, p] as const))
     for (const p of incoming) byId.set(p.id, { ...(byId.get(p.id) || {} as any), ...p })
     return Array.from(byId.values())
+  }
+
+  function reorderPanels(dragId: string, dropId: string) {
+    if (dragId === dropId) return
+    setPanels((prev) => {
+      const idxA = prev.findIndex((p) => p.id === dragId)
+      const idxB = prev.findIndex((p) => p.id === dropId)
+      if (idxA < 0 || idxB < 0) return prev
+      const next = prev.slice()
+      const [moved] = next.splice(idxA, 1)
+      next.splice(idxB, 0, moved)
+      return next
+    })
+  }
+
+  function toggleCollapse(id: string) {
+    setPanelUI((u) => ({ ...u, [id]: { ...u[id], collapsed: !u[id]?.collapsed } }))
   }
 
   const handleAction = (a: AgentAction) => {
@@ -835,9 +972,148 @@ export default function DeFiChatAdaptiveUI({ persona, setPersona, walletAddress,
               <span className="text-xs text-slate-400">Current persona</span>
             </div>
             <PersonaDropdown persona={persona} setPersona={setPersona} />
+            <Button
+              variant="secondary"
+              className="w-full"
+              onClick={async () => {
+                // Create a new conversation explicitly (if address), else clear guest
+                try {
+                  if (walletAddress) {
+                    const res = await api.createConversation(walletAddress)
+                    const newId = res?.conversation_id
+                    if (newId) {
+                      setConversationId(newId)
+                      try { localStorage.setItem(storageKey(walletAddress), newId) } catch {}
+                    }
+                  } else {
+                    // Guest session: clear any existing id
+                    setConversationId(undefined)
+                    try { localStorage.removeItem(storageKey(null)) } catch {}
+                  }
+                } catch {
+                  // Fallback: just clear local state
+                  setConversationId(undefined)
+                }
+                // Reset UI conversation state
+                setMessages(seedIntro)
+                setPanels(seedPanels)
+              }}
+            >
+              <Sparkles className="h-4 w-4 mr-2" />New Chat
+            </Button>
+            {(import.meta as any).env?.DEV || (import.meta as any).env?.VITE_ENABLE_DEBUG_TOOLS === 'true' ? (
+              <div className="flex flex-col gap-2">
+                <Button
+                  variant="outline"
+                  className="w-full"
+                  onClick={async () => {
+                    // Frontend-only export (no server call)
+                    try {
+                      const payload = {
+                        exported_at: new Date().toISOString(),
+                        persona,
+                        wallet_address: walletAddress || null,
+                        conversation_id: conversationId || null,
+                        ui: {
+                          panels,
+                          highlight: highlight || [],
+                          panelUI,
+                          expandedPanelId,
+                          pro,
+                        },
+                        messages: messages.map((m) => ({
+                          id: m.id,
+                          role: m.role,
+                          text: m.text,
+                          actions: m.actions || [],
+                          panels: m.panels || [],
+                          sources: m.sources || [],
+                          typing: Boolean(m.typing),
+                        })),
+                      }
+                      const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' })
+                      const url = URL.createObjectURL(blob)
+                      const a = document.createElement('a')
+                      a.href = url
+                      a.download = `ui-conversation-${conversationId || 'guest'}.json`
+                      document.body.appendChild(a)
+                      a.click()
+                      a.remove()
+                      URL.revokeObjectURL(url)
+                    } catch (e: any) {
+                      console.error('Export(UI) failed', e)
+                      setMessages((m) => [...m, { id: uid('msg'), role: 'assistant', text: 'Failed to export UI conversation JSON.' }])
+                    }
+                  }}
+                >
+                  <BarChart3 className="h-4 w-4 mr-2" />Export UI Log JSON
+                </Button>
+                <Button
+                  variant="outline"
+                  className="w-full"
+                  onClick={async () => {
+                    // Server snapshot export (uses backend route)
+                    if (!conversationId) {
+                      setMessages((m) => [...m, { id: uid('msg'), role: 'assistant', text: 'No active conversation to export.' }])
+                      return
+                    }
+                    try {
+                      const data = await api.getConversation(conversationId)
+                      const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' })
+                      const url = URL.createObjectURL(blob)
+                      const a = document.createElement('a')
+                      a.href = url
+                      a.download = `conversation-${conversationId}.json`
+                      document.body.appendChild(a)
+                      a.click()
+                      a.remove()
+                      URL.revokeObjectURL(url)
+                    } catch (e: any) {
+                      console.error('Export(server) failed', e)
+                      setMessages((m) => [...m, { id: uid('msg'), role: 'assistant', text: 'Failed to export server conversation JSON.' }])
+                    }
+                  }}
+                >
+                  <BarChart3 className="h-4 w-4 mr-2" />Export Server JSON
+                </Button>
+              </div>
+            ) : null}
             <Button variant="outline" className="w-full">
               <Settings className="h-4 w-4 mr-2" />Settings
             </Button>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm">Recent Chats</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-2">
+            {walletAddress ? (
+              recentChats.length > 0 ? (
+                recentChats.map((c) => (
+                  <button
+                    key={c.conversation_id}
+                    className={`w-full text-left px-3 py-2 rounded-lg border text-xs ${
+                      c.conversation_id === conversationId ? 'bg-primary-50 border-primary-200 text-primary-800' : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-50'
+                    } sherpa-surface`}
+                    onClick={() => {
+                      setConversationId(c.conversation_id)
+                      try { localStorage.setItem(storageKey(walletAddress), c.conversation_id) } catch {}
+                    }}
+                    title={c.title || c.conversation_id}
+                  >
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="truncate">{c.title || c.conversation_id.slice(0, 18)}{c.title ? '' : '…'}</span>
+                      <span className="text-[10px] text-slate-400">{formatRelativeTime(c.last_activity)}</span>
+                    </div>
+                  </button>
+                ))
+              ) : (
+                <div className="text-xs text-slate-500">No recent chats yet.</div>
+              )
+            ) : (
+              <div className="text-xs text-slate-500">Connect a wallet to see chats.</div>
+            )}
           </CardContent>
         </Card>
         <Card>
@@ -851,8 +1127,8 @@ export default function DeFiChatAdaptiveUI({ persona, setPersona, walletAddress,
             <Button variant="secondary" className="justify-start">
               <BarChart3 className="h-4 w-4 mr-2" />Market Overview
             </Button>
-            <Button variant="secondary" className="justify-start">
-              <Repeat className="h-4 w-4 mr-2" />Bridging
+            <Button variant="secondary" className="justify-start" onClick={() => setShowBungee(true)}>
+              <Repeat className="h-4 w-4 mr-2" />Bridging (POC)
             </Button>
             <Button variant="secondary" className="justify-start">
               <ArrowLeftRight className="h-4 w-4 mr-2" />Swaps
@@ -913,7 +1189,15 @@ export default function DeFiChatAdaptiveUI({ persona, setPersona, walletAddress,
       {/* Right panel */}
       <div className="col-span-12 xl:col-span-3 flex flex-col min-h-0">
         <div className="flex-1 overflow-y-auto pr-2">
-          <RightPanel panels={panels} highlight={highlight} walletAddress={walletAddress} />
+          <RightPanel
+            panels={panels}
+            highlight={highlight}
+            walletAddress={walletAddress}
+            panelUI={panelUI}
+            onToggleCollapse={(id) => toggleCollapse(id)}
+            onExpand={(id) => setExpandedPanelId(id)}
+            onReorder={(from, to) => reorderPanels(from, to)}
+          />
         </div>
       </div>
 
@@ -960,6 +1244,16 @@ export default function DeFiChatAdaptiveUI({ persona, setPersona, walletAddress,
             setShowBridge(false)
             setMessages((m) => [...m, { id: uid('msg'), role: 'assistant', text: `Bridge setup: ${params.fromChain} → ${params.toChain}${params.amount ? `, amount ${params.amount}` : ''}.` }])
           }}
+        />
+      )}
+      {showBungee && (
+        <BungeeQuoteModal onClose={() => setShowBungee(false)} />
+      )}
+      {expandedPanelId && (
+        <ExpandedPanelModal
+          panel={panels.find((p) => p.id === expandedPanelId)}
+          onClose={() => setExpandedPanelId(null)}
+          walletAddress={walletAddress}
         />
       )}
       {/* No overlay for Top Coins; rendered as a right-panel card */}

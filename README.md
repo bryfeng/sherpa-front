@@ -18,6 +18,12 @@ Notes
   - `GET /healthz` for health status
 - CORS is enabled in the backend (`app.main`).
 
+Conversation IDs
+
+- The app persists chat sessions per wallet address.
+- localStorage key: `sherpa.conversation_id:{address.toLowerCase()}`. Guests use `sherpa.conversation_id:guest`.
+- On wallet connect/switch, the stored ID for that address is loaded; `/chat` responses always echo `conversation_id` which is saved back under the address key.
+
 Wallets
 
 - When `VITE_WALLETCONNECT_PROJECT_ID` is set, the app shows a WalletConnect modal with multiple EVM wallets.
