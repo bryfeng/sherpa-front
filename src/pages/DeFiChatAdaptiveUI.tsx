@@ -1,6 +1,7 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react'
+/* eslint-disable react/prop-types */
+import React, { useEffect, useMemo, useRef, useState, useId } from 'react'
 import { createPortal } from 'react-dom'
-import { motion, AnimatePresence } from 'framer-motion'
+import { motion, AnimatePresence, useReducedMotion } from 'framer-motion'
 import {
   ChevronDown,
   Send,
@@ -19,25 +20,19 @@ import {
   Minimize2,
   GripVertical,
   ChevronUp,
+  X,
+  ExternalLink,
 } from 'lucide-react'
 
 // Local, minimal UI primitives (Tailwind styled)
-function Button({
-  children,
-  onClick,
-  className = '',
-  variant = 'default',
-  size = 'md',
-  type = 'button',
-}: React.PropsWithChildren<{
-  onClick?: () => void
-  className?: string
+type ButtonProps = React.ButtonHTMLAttributes<HTMLButtonElement> & {
   variant?: 'default' | 'outline' | 'secondary'
   size?: 'sm' | 'md'
-  type?: 'button' | 'submit'
-}>) {
-  const base =
-    'inline-flex items-center justify-center rounded-xl transition shadow-sm border'
+}
+
+const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(function Button(props, ref) {
+  const { children, className = '', variant = 'default', size = 'md', type = 'button', ...rest } = props
+  const base = 'inline-flex items-center justify-center rounded-xl transition shadow-sm border'
   const variants: Record<string, string> = {
     default: 'bg-primary-600 border-primary-500 text-white hover:opacity-95',
     outline: 'bg-transparent border-slate-300 text-slate-700 hover:bg-slate-50',
@@ -48,11 +43,13 @@ function Button({
     md: 'text-sm px-4 py-2',
   }
   return (
-    <button type={type} onClick={onClick} className={`${base} ${variants[variant]} ${sizes[size]} ${className}`}>
+    <button ref={ref} type={type} className={`${base} ${variants[variant]} ${sizes[size]} ${className}`} {...rest}>
       {children}
     </button>
   )
-}
+})
+
+Button.displayName = 'Button'
 
 function Card(
   { children, className = '', ...rest }:
@@ -143,6 +140,8 @@ const personaStyles: Record<Persona, { label: string; badge: string; text: strin
   },
 }
 
+const personaOrder: Persona[] = ['friendly', 'technical', 'professional', 'educational']
+
 type ActionType = 'show_panel' | 'swap' | 'bridge' | 'explain' | 'subscribe' | 'simulate'
 
 export type AgentAction = {
@@ -153,11 +152,22 @@ export type AgentAction = {
   gated?: 'pro' | 'token'
 }
 
+export type PanelSource = {
+  id?: string
+  name?: string
+  title?: string
+  url?: string
+  href?: string
+  description?: string
+}
+
 export type Panel = {
   id: string
   kind: 'chart' | 'table' | 'card' | 'portfolio' | 'prediction' | 'prices'
   title: string
   payload?: any
+  sources?: PanelSource[]
+  metadata?: Record<string, any>
 }
 
 export type AgentMessage = {
@@ -198,11 +208,12 @@ import { SimulateModal } from '../components/modals/SimulateModal'
 import { SwapModal } from '../components/modals/SwapModal'
 import { BridgeModal } from '../components/modals/BridgeModal'
 import { BungeeQuoteModal } from '../components/modals/BungeeQuoteModal'
-import { getPolymarketMarkets } from '../services/predictions'
 import type { TVLPoint } from '../services/defi'
 import { getUniswapTVL } from '../services/defi'
 import { getSwapQuote } from '../services/quotes'
 import { getTopPrices } from '../services/prices'
+import { truncateAddress } from '../services/wallet'
+import type { EntitlementSnapshot } from '../types/entitlement'
 import { ResponsiveContainer, AreaChart, Area, XAxis, YAxis, Tooltip, CartesianGrid } from 'recharts'
 
 function PersonaBadge({ p }: { p: Persona }) {
@@ -212,6 +223,45 @@ function PersonaBadge({ p }: { p: Persona }) {
 
 function MessageBubble({ m, onAction }: { m: AgentMessage; onAction: (a: AgentAction) => void }) {
   const isUser = m.role === 'user'
+  const actions = m.actions || []
+  const actionRefs = useRef<Array<HTMLButtonElement | null>>([])
+
+  useEffect(() => {
+    actionRefs.current = actionRefs.current.slice(0, actions.length)
+  }, [actions.length])
+
+  const focusAction = (index: number) => {
+    if (!actions.length) return
+    const normalized = (index + actions.length) % actions.length
+    const el = actionRefs.current[normalized]
+    el?.focus()
+  }
+
+  const handleActionKeyDown = (event: React.KeyboardEvent<HTMLButtonElement>, index: number) => {
+    switch (event.key) {
+      case 'ArrowRight':
+      case 'ArrowDown':
+        event.preventDefault()
+        focusAction(index + 1)
+        break
+      case 'ArrowLeft':
+      case 'ArrowUp':
+        event.preventDefault()
+        focusAction(index - 1)
+        break
+      case 'Home':
+        event.preventDefault()
+        focusAction(0)
+        break
+      case 'End':
+        event.preventDefault()
+        focusAction(actions.length - 1)
+        break
+      default:
+        break
+    }
+  }
+
   return (
     <div className={`flex gap-3 ${isUser ? 'justify-end' : 'justify-start'}`}>
       {!isUser && (
@@ -238,10 +288,20 @@ function MessageBubble({ m, onAction }: { m: AgentMessage; onAction: (a: AgentAc
             )}
           </div>
         )}
-        {m.actions && m.actions.length > 0 && (
-          <div className="mt-3 flex flex-wrap gap-2">
-            {m.actions.map((a) => (
-              <Button key={a.id} size="sm" variant={isUser ? 'secondary' : 'default'} onClick={() => onAction(a)} className="rounded-full">
+        {actions.length > 0 && (
+          <div className="mt-3 flex flex-wrap gap-2" role="group" aria-label="Assistant suggestions">
+            {actions.map((a, index) => (
+              <Button
+                key={a.id}
+                ref={(el) => {
+                  actionRefs.current[index] = el
+                }}
+                size="sm"
+                variant={isUser ? 'secondary' : 'default'}
+                onClick={() => onAction(a)}
+                onKeyDown={(event) => handleActionKeyDown(event, index)}
+                className="rounded-full"
+              >
                 {a.label}
               </Button>
             ))}
@@ -268,22 +328,63 @@ function MessageBubble({ m, onAction }: { m: AgentMessage; onAction: (a: AgentAc
 function SourceBadge({ src }: { src: any }) {
   let label = ''
   let href: string | undefined
+  let title: string | undefined
   if (typeof src === 'string') {
     href = src.startsWith('http') ? src : undefined
-    label = href ? new URL(src).hostname.replace(/^www\./, '') : src
+    if (href) {
+      try {
+        const url = new URL(src)
+        label = url.hostname.replace(/^www\./, '')
+        title = src
+      } catch {
+        label = src
+      }
+    } else {
+      label = src
+    }
   } else if (src && typeof src === 'object') {
     href = (src.url || src.href || src.link) as string | undefined
-    const name = (src.title || src.name || src.id || href) as string | undefined
-    label = name ? String(name) : href ? new URL(href).hostname.replace(/^www\./, '') : 'source'
+    title = (src.description || src.summary) as string | undefined
+    const name = (src.title || src.name || src.id || src.label || href) as string | undefined
+    if (name) label = String(name)
+    else if (href) {
+      try {
+        const url = new URL(href)
+        label = url.hostname.replace(/^www\./, '')
+      } catch {
+        label = href
+      }
+    } else {
+      label = 'source'
+    }
   }
   return href ? (
-    <a href={href} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 rounded-full border border-slate-300 px-2 py-0.5 hover:bg-slate-50 text-slate-700">
+    <a
+      href={href}
+      target="_blank"
+      rel="noreferrer"
+      title={title || `Open ${label}`}
+      className="inline-flex items-center gap-1 rounded-full border border-slate-300 px-2 py-0.5 hover:bg-slate-50 text-slate-700"
+    >
       <span className="truncate max-w-[140px]">{label}</span>
+      <ExternalLink className="h-3 w-3 shrink-0 text-slate-500" aria-hidden="true" />
     </a>
   ) : (
     <span className="inline-flex items-center gap-1 rounded-full border border-slate-300 px-2 py-0.5 text-slate-700">
       <span className="truncate max-w-[160px]">{label || 'source'}</span>
     </span>
+  )
+}
+
+function PanelSources({ sources }: { sources?: PanelSource[] }) {
+  if (!sources || sources.length === 0) return null
+  return (
+    <div className="mt-3 flex flex-wrap items-center gap-2 text-xs text-slate-500">
+      <span className="text-slate-600">Sources:</span>
+      {sources.map((s, idx) => (
+        <SourceBadge key={String(s?.id || s?.url || s?.href || s?.name || idx)} src={s} />
+      ))}
+    </div>
   )
 }
 
@@ -357,7 +458,6 @@ function ChartPanel({ p }: { p: Panel }) {
   const [range, setRange] = React.useState<'7d' | '30d'>('7d')
   const [points, setPoints] = React.useState<TVLPoint[]>(normalizeChartPoints(p.payload))
   const unit = p.payload?.unit
-  const source = p.payload?.source
   const current: TVLPoint | undefined = p.payload?.current
 
   React.useEffect(() => {
@@ -380,10 +480,6 @@ function ChartPanel({ p }: { p: Panel }) {
   if (!hasSeries && current) {
     return (
       <div className="w-full">
-        <div className="flex items-center justify-between mb-1 text-xs text-slate-500">
-          <span>Latest</span>
-          <a href={source?.url || 'https://defillama.com'} target="_blank" rel="noreferrer" className="text-slate-500 hover:text-slate-700 hover:underline">Source: {source?.name || 'DefiLlama'}</a>
-        </div>
         <div className="rounded-xl border border-slate-200 bg-white p-4 flex items-center justify-between">
           <div>
             <div className="text-xs text-slate-500">TVL</div>
@@ -394,6 +490,8 @@ function ChartPanel({ p }: { p: Panel }) {
       </div>
     )
   }
+
+  const lastPoint = hasSeries ? points[points.length - 1] : undefined
 
   return (
     <div className="w-full">
@@ -441,16 +539,8 @@ function ChartPanel({ p }: { p: Panel }) {
         </ResponsiveContainer>
       </div>
       <div className="mt-2 flex items-center justify-between text-xs text-slate-500">
-        <span>{range === '7d' ? '7-day' : '30-day'}</span>
-        <a
-          href={source?.url || 'https://defillama.com'}
-          target="_blank"
-          rel="noreferrer"
-          className="text-slate-500 hover:text-slate-700 hover:underline"
-          title="Open DefiLlama"
-        >
-          Source: {source?.name || 'DefiLlama'}
-        </a>
+        <span>{range === '7d' ? '7-day window' : '30-day window'}</span>
+        {lastPoint && <span>{new Date(lastPoint.time).toLocaleDateString()}</span>}
       </div>
     </div>
   )
@@ -572,6 +662,7 @@ function RightPanel({ panels, highlight, walletAddress, panelUI, onToggleCollaps
                   ))}
                 </div>
               )}
+              <PanelSources sources={p.sources} />
             </CardContent>
           )}
         </Card>
@@ -599,7 +690,6 @@ function TopCoinsPanel({ payload }: { payload: any }) {
           </div>
         </div>
       ))}
-      <div className="text-[11px] text-slate-500">Source: CoinGecko</div>
     </div>
   )
 }
@@ -634,32 +724,10 @@ function ExpandedPanelModal({ panel, onClose, walletAddress }: { panel?: Panel; 
               ))}
             </div>
           )}
+          <PanelSources sources={panel.sources} />
         </div>
       </div>
     </div>
-  )
-}
-
-function PredictionsShortcut({ onLoad }: { onLoad: (panel: Panel) => void }) {
-  const [loading, setLoading] = useState(false)
-  return (
-    <Button
-      variant="secondary"
-      className="justify-start"
-      onClick={async () => {
-        if (loading) return
-        setLoading(true)
-        try {
-          const markets = await getPolymarketMarkets('', 5)
-          const panel: Panel = { id: 'polymarket_markets', kind: 'prediction', title: 'Prediction Markets', payload: { markets } }
-          onLoad(panel)
-        } finally {
-          setLoading(false)
-        }
-      }}
-    >
-      <TrendingUp className="h-4 w-4 mr-2" />{loading ? 'Loading…' : 'Prediction Markets'}
-    </Button>
   )
 }
 
@@ -667,6 +735,8 @@ function PersonaDropdown({ persona, setPersona }: { persona: Persona; setPersona
   const [open, setOpen] = useState(false)
   const [coords, setCoords] = useState<{ top: number; left: number; width: number }>({ top: 0, left: 0, width: 224 })
   const wrapRef = useRef<HTMLDivElement | null>(null)
+  const itemRefs = useRef<Array<HTMLButtonElement | null>>([])
+  const menuId = useId()
 
   useEffect(() => {
     if (!open) return
@@ -679,15 +749,79 @@ function PersonaDropdown({ persona, setPersona }: { persona: Persona; setPersona
     window.addEventListener('resize', updatePosition)
     window.addEventListener('scroll', updatePosition, true)
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') setOpen(false)
+      if (e.key === 'Escape') {
+        e.preventDefault()
+        setOpen(false)
+        const trigger = wrapRef.current?.querySelector('button') as HTMLButtonElement | null
+        trigger?.focus()
+      }
     }
     window.addEventListener('keydown', onKey)
+    const raf = window.requestAnimationFrame(() => {
+      const currentIndex = Math.max(personaOrder.indexOf(persona), 0)
+      const target = itemRefs.current[currentIndex] || itemRefs.current[0]
+      target?.focus()
+    })
     return () => {
       window.removeEventListener('resize', updatePosition)
       window.removeEventListener('scroll', updatePosition, true)
       window.removeEventListener('keydown', onKey)
+      window.cancelAnimationFrame(raf)
+      itemRefs.current = []
     }
-  }, [open])
+  }, [open, persona])
+
+  const focusOption = React.useCallback((index: number) => {
+    if (!personaOrder.length) return
+    const normalized = (index + personaOrder.length) % personaOrder.length
+    const el = itemRefs.current[normalized]
+    el?.focus()
+  }, [])
+
+  const handlePersonaKey = (event: React.KeyboardEvent<HTMLButtonElement>, index: number, option: Persona) => {
+    switch (event.key) {
+      case 'ArrowDown':
+      case 'ArrowRight':
+        event.preventDefault()
+        focusOption(index + 1)
+        break
+      case 'ArrowUp':
+      case 'ArrowLeft':
+        event.preventDefault()
+        focusOption(index - 1)
+        break
+      case 'Home':
+        event.preventDefault()
+        focusOption(0)
+        break
+      case 'End':
+        event.preventDefault()
+        focusOption(personaOrder.length - 1)
+        break
+      case 'Enter':
+      case ' ': 
+      case 'Spacebar': {
+        event.preventDefault()
+        setPersona(option)
+        setOpen(false)
+        const trigger = wrapRef.current?.querySelector('button') as HTMLButtonElement | null
+        trigger?.focus()
+        break
+      }
+      case 'Escape': {
+        event.preventDefault()
+        setOpen(false)
+        const trigger = wrapRef.current?.querySelector('button') as HTMLButtonElement | null
+        trigger?.focus()
+        break
+      }
+      case 'Tab':
+        setOpen(false)
+        break
+      default:
+        break
+    }
+  }
 
   return (
     <div className="relative" ref={wrapRef}>
@@ -698,6 +832,7 @@ function PersonaDropdown({ persona, setPersona }: { persona: Persona; setPersona
         aria-haspopup="menu"
         aria-expanded={open}
         aria-label="Choose persona"
+        aria-controls={open ? menuId : undefined}
       >
         <Sparkles className="h-4 w-4 mr-2 text-slate-700" />
         <span className={`inline-flex h-2.5 w-2.5 rounded-full mr-2 ${personaStyles[persona].dot}`} />
@@ -712,17 +847,25 @@ function PersonaDropdown({ persona, setPersona }: { persona: Persona; setPersona
               className="fixed z-50 rounded-xl border border-slate-200 bg-white p-2 shadow-2xl ring-1 ring-black/5"
               style={{ top: `${coords.top}px`, left: `${coords.left}px`, width: `${coords.width}px` }}
               role="menu"
+              id={menuId}
+              aria-orientation="vertical"
             >
               <div className="px-2 py-1 text-[11px] uppercase tracking-wide text-slate-500">Choose persona</div>
-              {(['friendly', 'technical', 'professional', 'educational'] as Persona[]).map((p) => (
+              {personaOrder.map((p, idx) => (
                 <button
                   key={p}
+                  ref={(el) => {
+                    itemRefs.current[idx] = el
+                  }}
                   onClick={() => {
                     setPersona(p)
                     setOpen(false)
                   }}
+                  onKeyDown={(event) => handlePersonaKey(event, idx, p)}
                   className={`w-full text-left px-2 py-2 rounded-lg flex items-center gap-2 ${personaStyles[p].hover}`}
-                  role="menuitem"
+                  role="menuitemradio"
+                  aria-checked={persona === p}
+                  tabIndex={persona === p ? 0 : -1}
                 >
                   <span className={`inline-flex h-2.5 w-2.5 rounded-full ${personaStyles[p].dot}`} />
                   <span className={`capitalize font-medium ${personaStyles[p].text}`}>{p}</span>
@@ -737,17 +880,69 @@ function PersonaDropdown({ persona, setPersona }: { persona: Persona; setPersona
   )
 }
 
-type WalletStatus = 'connecting' | 'reconnecting' | 'connected' | 'disconnected' | undefined
+function getExplorerUrl(chain: string | null | undefined, address: string | null | undefined) {
+  if (!address) return undefined
+  const target = address
+  const network = (chain || 'ethereum').toLowerCase()
+  switch (network) {
+    case 'ethereum':
+    case 'mainnet':
+      return `https://etherscan.io/address/${target}`
+    case 'sepolia':
+      return `https://sepolia.etherscan.io/address/${target}`
+    case 'goerli':
+      return `https://goerli.etherscan.io/address/${target}`
+    case 'polygon':
+    case 'polygon-mainnet':
+    case 'matic':
+      return `https://polygonscan.com/address/${target}`
+    default:
+      return undefined
+  }
+}
 
-export default function DeFiChatAdaptiveUI({ persona, setPersona, walletAddress, walletStatus }: { persona: Persona; setPersona: (p: Persona) => void; walletAddress?: string; walletStatus?: WalletStatus }) {
+export default function DeFiChatAdaptiveUI({
+  persona,
+  setPersona,
+  walletAddress,
+  pro,
+  entitlement,
+  onRequestPro,
+  allowManualUnlock,
+  onManualUnlock,
+}: {
+  persona: Persona
+  setPersona: (p: Persona) => void
+  walletAddress?: string
+  pro: boolean
+  entitlement: EntitlementSnapshot
+  onRequestPro: (source: 'cta' | 'action') => void
+  allowManualUnlock?: boolean
+  onManualUnlock?: () => void
+}) {
   const [messages, setMessages] = useState<AgentMessage[]>(seedIntro)
   const [panels, setPanels] = useState<Panel[]>(seedPanels)
   const [highlight, setHighlight] = useState<string[] | undefined>(undefined)
   const [input, setInput] = useState('')
-  const [pro, setPro] = useState(false)
   const [panelUI, setPanelUI] = useState<Record<string, { collapsed?: boolean }>>({})
   const [expandedPanelId, setExpandedPanelId] = useState<string | null>(null)
   const [recentChats, setRecentChats] = useState<Array<{ conversation_id: string; title?: string | null; last_activity: string; message_count: number; archived: boolean }>>([])
+  const proBadgeLabel = pro ? 'Pro' : entitlement.gating === 'token' ? 'Pro Locked' : 'Pro Preview'
+  const manualUnlockAvailable = Boolean(!pro && allowManualUnlock && onManualUnlock)
+  const [showProInfo, setShowProInfo] = useState(false)
+  const [copiedToken, setCopiedToken] = useState(false)
+  const proTokenAddress = entitlement.tokenAddress || null
+  const proRequirement = React.useMemo(() => {
+    if (pro) return 'Pro access is active.'
+    if (entitlement.reason) return entitlement.reason
+    if (entitlement.gating === 'token') {
+      return 'Hold the Sherpa Pro token to unlock.'
+    }
+    if (entitlement.status === 'error') return 'Entitlement service is unavailable right now.'
+    if (entitlement.status === 'disabled') return 'Pro gating is disabled in this environment.'
+    return 'Upgrade to Sherpa Pro for deeper strategy, alerts, and fee rebates.'
+  }, [pro, entitlement])
+  const proExplorerUrl = React.useMemo(() => getExplorerUrl(entitlement.chain ?? null, proTokenAddress), [entitlement.chain, proTokenAddress])
   const storageKey = (addr?: string | null) => (addr ? `sherpa.conversation_id:${addr.toLowerCase()}` : 'sherpa.conversation_id:guest')
   const [conversationId, setConversationId] = useState<string | undefined>(() => {
     try {
@@ -758,11 +953,69 @@ export default function DeFiChatAdaptiveUI({ persona, setPersona, walletAddress,
       return undefined
     }
   })
+  const prefersReducedMotion = useReducedMotion()
   const scrollRef = useRef<HTMLDivElement>(null)
+  const scheduleScrollToBottom = React.useCallback(() => {
+    window.setTimeout(() => {
+      const el = scrollRef.current
+      if (!el) return
+      const behavior: ScrollBehavior = prefersReducedMotion ? 'auto' : 'smooth'
+      el.scrollTo({ top: el.scrollHeight, behavior })
+    }, 0)
+  }, [prefersReducedMotion])
+
   const [showSim, setShowSim] = useState<{ from?: string; to?: string } | null>(null)
   const [showSwap, setShowSwap] = useState<{ from?: string; to?: string } | null>(null)
   const [showBridge, setShowBridge] = useState<boolean>(false)
   const [showBungee, setShowBungee] = useState<boolean>(false)
+  const copyInfoTimeout = useRef<number | undefined>(undefined)
+  const isAssistantTyping = useMemo(() => messages.some((msg) => msg.typing), [messages])
+  const [ariaAnnouncement, setAriaAnnouncement] = useState('')
+  const lastAnnouncedId = useRef<string | null>(null)
+
+  function handleProUpsell(source: 'cta' | 'action') {
+    onRequestPro(source)
+    setShowProInfo(true)
+    setCopiedToken(false)
+  }
+
+  const proContractDisplay = proTokenAddress ? truncateAddress(proTokenAddress, 6) : null
+
+  async function handleCopyToken() {
+    if (!proTokenAddress) return
+    try {
+      await navigator.clipboard.writeText(proTokenAddress)
+      setCopiedToken(true)
+      if (copyInfoTimeout.current) window.clearTimeout(copyInfoTimeout.current)
+      copyInfoTimeout.current = window.setTimeout(() => setCopiedToken(false), 2000)
+    } catch {
+      setCopiedToken(false)
+    }
+  }
+
+  useEffect(() => {
+    return () => {
+      if (copyInfoTimeout.current) window.clearTimeout(copyInfoTimeout.current)
+    }
+  }, [])
+
+  useEffect(() => {
+    if (pro) {
+      setShowProInfo(false)
+      setCopiedToken(false)
+    }
+  }, [pro])
+
+  useEffect(() => {
+    const latestAssistant = [...messages]
+      .reverse()
+      .find((msg) => msg.role === 'assistant' && !msg.typing)
+    if (latestAssistant && latestAssistant.id !== lastAnnouncedId.current) {
+      const text = latestAssistant.text.replace(/\s+/g, ' ').trim()
+      setAriaAnnouncement(text)
+      lastAnnouncedId.current = latestAssistant.id
+    }
+  }, [messages])
 
   async function loadPortfolioPanel(addr: string) {
     try {
@@ -775,7 +1028,13 @@ export default function DeFiChatAdaptiveUI({ persona, setPersona, walletAddress,
           .sort((a: any, b: any) => Number(b.value_usd || 0) - Number(a.value_usd || 0))
         const allPositions = sorted.map((t: any) => ({ sym: t.symbol || t.name || 'TOK', usd: Number(t.value_usd || 0) }))
         const positions = allPositions.slice(0, 6)
-        const panel: Panel = { id: 'portfolio_overview', kind: 'portfolio', title: 'Your Portfolio Snapshot', payload: { totalUsd, positions, allPositions } }
+        const panel: Panel = {
+          id: 'portfolio_overview',
+          kind: 'portfolio',
+          title: 'Your Portfolio Snapshot',
+          payload: { totalUsd, positions, allPositions },
+          sources: Array.isArray(res.sources) ? res.sources : undefined,
+        }
         setPanels((prev) => {
           const others = prev.filter((p) => p.id !== 'portfolio_overview')
           return [panel, ...others]
@@ -794,6 +1053,7 @@ export default function DeFiChatAdaptiveUI({ persona, setPersona, walletAddress,
       kind: 'prices',
       title: 'Top Coins (excl. stablecoins)',
       payload: { coins },
+      sources: [{ name: 'CoinGecko', url: 'https://www.coingecko.com' }],
     }
     setPanels((prev) => {
       const others = prev.filter((p) => p.id !== 'top_coins')
@@ -854,17 +1114,35 @@ export default function DeFiChatAdaptiveUI({ persona, setPersona, walletAddress,
         setConversationId(res.conversation_id)
         try { localStorage.setItem(storageKey(walletAddress || null), res.conversation_id) } catch {}
       }
+      // Normalize panels from backend and dedupe portfolio views.
       const newPanels = transformBackendPanels(res.panels)
-      if (newPanels.length) {
-        setPanels((prev) => mergePanelsLocal(prev, newPanels))
-        setHighlight(newPanels.map((p) => p.id))
+      const portfolioPanels = newPanels.filter((p) => p.kind === 'portfolio')
+      const nonPortfolioPanels = newPanels.filter((p) => p.kind !== 'portfolio')
+
+      // If backend requested a portfolio panel, prefer our canonical portfolio_overview panel.
+      if (portfolioPanels.length) {
+        if (!walletAddress) {
+          setMessages((m) => [
+            ...m.filter((mm) => mm.id !== typingId),
+            { id: uid('msg'), role: 'assistant', text: 'Please connect your wallet to view your portfolio.' },
+          ])
+        } else {
+          // Load canonical portfolio panel and highlight it
+          loadPortfolioPanel(walletAddress).catch(() => {})
+          setHighlight(['portfolio_overview'])
+        }
+      }
+
+      if (nonPortfolioPanels.length) {
+        setPanels((prev) => mergePanelsLocal(prev, nonPortfolioPanels))
+        setHighlight(nonPortfolioPanels.map((p) => p.id))
       }
       const assistantMsg: AgentMessage = { id: uid('msg'), role: 'assistant', text: res.reply || 'Done.', sources: (res.sources || []) as any }
       setMessages((m) => m.filter((mm) => mm.id !== typingId).concat(assistantMsg))
     } catch (e: any) {
       setMessages((m) => m.filter((mm) => !(mm as any).typing).concat({ id: uid('msg'), role: 'assistant', text: `Sorry, I hit an error contacting the API. ${e?.message || ''}` }))
     } finally {
-      setTimeout(() => scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: 'smooth' }), 0)
+      scheduleScrollToBottom()
     }
   }
 
@@ -893,13 +1171,16 @@ export default function DeFiChatAdaptiveUI({ persona, setPersona, walletAddress,
 
   const handleAction = (a: AgentAction) => {
     if (a.gated === 'pro' && !pro) {
+      handleProUpsell('action')
+      const contractLine = proTokenAddress ? `Contract: ${proTokenAddress}` : ''
+      const info = [proRequirement, contractLine].filter(Boolean).join('\n')
       setMessages((m) => [
         ...m,
         {
           id: uid('msg'),
           role: 'assistant',
-          text: 'This is a Pro feature. Subscribe to unlock deeper dives.',
-          actions: [{ id: uid('act'), label: 'Subscribe Pro ($12/mo)', type: 'subscribe' }],
+          text: info || 'Sherpa Pro is token-gated. Hold the entitlement asset to unlock.',
+          actions: [{ id: uid('act'), label: 'View Pro requirements', type: 'subscribe' }],
         },
       ])
       return
@@ -942,20 +1223,22 @@ export default function DeFiChatAdaptiveUI({ persona, setPersona, walletAddress,
         break
       }
       case 'subscribe': {
-        setPro(true)
+        handleProUpsell('action')
+        const contractLine = proTokenAddress ? `Contract: ${proTokenAddress}` : ''
+        const info = [proRequirement, contractLine].filter(Boolean).join('\n')
         setMessages((m) => [
           ...m,
           {
             id: uid('msg'),
             role: 'assistant',
-            text: 'Pro activated. You now have access to deep dives and fee rebates.',
+            text: info || 'Sherpa Pro is token-gated. Hold the entitlement asset to unlock.',
           },
         ])
         break
       }
     }
 
-    setTimeout(() => scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: 'smooth' }), 0)
+    scheduleScrollToBottom()
   }
 
   return (
@@ -1142,14 +1425,31 @@ export default function DeFiChatAdaptiveUI({ persona, setPersona, walletAddress,
 
       {/* Center chat */}
       <div className="col-span-12 xl:col-span-7 flex flex-col min-h-0">
-        <div ref={scrollRef} className="flex-1 overflow-y-auto space-y-4 pr-2">
+        <div
+          ref={scrollRef}
+          className="flex-1 overflow-y-auto space-y-4 pr-2"
+          role="log"
+          aria-live="polite"
+          aria-relevant="additions text"
+          aria-busy={isAssistantTyping}
+          tabIndex={0}
+        >
           <AnimatePresence>
             {messages.map((m) => (
-              <motion.div key={m.id} initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -6 }}>
+              <motion.div
+                key={m.id}
+                initial={prefersReducedMotion ? false : { opacity: 0, y: 6 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={prefersReducedMotion ? undefined : { opacity: 0, y: -6 }}
+                transition={prefersReducedMotion ? { duration: 0 } : undefined}
+              >
                 <MessageBubble m={m} onAction={handleAction} />
               </motion.div>
             ))}
           </AnimatePresence>
+        </div>
+        <div className="sr-only" aria-live="polite" aria-atomic="false">
+          {ariaAnnouncement}
         </div>
         <div className="mt-3">
           <div className="w-full flex items-center">
@@ -1174,15 +1474,72 @@ export default function DeFiChatAdaptiveUI({ persona, setPersona, walletAddress,
           </div>
           <div className="flex items-center justify-between mt-2">
             <div className="flex items-center gap-2 text-xs text-slate-600">
-              <Badge variant="outline" className="rounded-full">{pro ? 'Pro' : 'Free'}</Badge>
+              <Badge variant="outline" className="rounded-full">{proBadgeLabel}</Badge>
               <span>Adaptive CTAs are generated by the agent.</span>
             </div>
             {!pro && (
-              <Button size="sm" variant="outline" onClick={() => setPro(true)} className="rounded-full">
-                <Star className="h-3 w-3 mr-1" />Upgrade to Pro
-              </Button>
+              <div className="flex items-center gap-2">
+                <Button size="sm" variant="outline" onClick={() => handleProUpsell('cta')} className="rounded-full">
+                  <Star className="h-3 w-3 mr-1" />Upgrade to Pro
+                </Button>
+                {manualUnlockAvailable && (
+                  <Button size="sm" variant="secondary" onClick={onManualUnlock} className="rounded-full">
+                    <Sparkles className="h-3 w-3 mr-1" />Dev Unlock
+                  </Button>
+                )}
+              </div>
             )}
           </div>
+          {showProInfo && !pro && (
+            <div className="mt-3">
+              <div className="rounded-2xl border border-primary-200/80 bg-primary-50/80 p-4 text-xs text-primary-900 shadow-sm">
+                <div className="flex items-start gap-3">
+                  <div className="mt-[2px] rounded-full bg-white/60 p-1 border border-primary-200">
+                    <Star className="h-3.5 w-3.5 text-primary-600" />
+                  </div>
+                  <div className="flex-1 space-y-2">
+                    <div className="flex items-start justify-between gap-2">
+                      <div>
+                        <p className="text-sm font-semibold text-primary-900">Unlock Sherpa Pro</p>
+                        <p className="mt-1 text-[11px] leading-relaxed text-primary-900/80">{proRequirement}</p>
+                      </div>
+                      <button
+                        onClick={() => {
+                          setShowProInfo(false)
+                          setCopiedToken(false)
+                        }}
+                        className="rounded-full p-1 text-primary-700 hover:bg-primary-100"
+                        aria-label="Dismiss Pro info"
+                      >
+                        <X className="h-4 w-4" />
+                      </button>
+                    </div>
+                    {proTokenAddress && (
+                      <div className="flex flex-wrap items-center gap-2 text-[11px] text-primary-900">
+                        <code className="rounded-lg border border-primary-200 bg-white/80 px-2 py-1 font-mono text-[11px] tracking-tight">{proContractDisplay}</code>
+                        <Button size="sm" variant="secondary" onClick={handleCopyToken} className="rounded-full px-3 py-1 text-[11px]">
+                          {copiedToken ? 'Copied' : 'Copy contract'}
+                        </Button>
+                        {proExplorerUrl && (
+                          <a
+                            href={proExplorerUrl}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="inline-flex items-center gap-1 rounded-full border border-primary-200 px-2 py-1 text-[11px] text-primary-800 hover:bg-primary-100"
+                          >
+                            View explorer
+                          </a>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                </div>
+                <div className="mt-3 text-[11px] text-primary-900/70">
+                  <span className="font-medium text-primary-900">Pro perks:</span> deeper simulations, fee benchmarking, and guided DeFi workflows tailored to your wallet state.
+                </div>
+              </div>
+            </div>
+          )}
         </div>
       </div>
 

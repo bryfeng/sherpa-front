@@ -1,5 +1,6 @@
 import axios from 'axios'
 import type { ChatRequest, ChatResponse } from '../types/chat'
+import type { EntitlementResponse } from '../types/entitlement'
 import type { PortfolioAPIResponse } from '../types/portfolio'
 
 const BASE = (import.meta as any).env?.VITE_API_BASE_URL || 'http://localhost:8000'
@@ -53,5 +54,12 @@ export const api = {
       portfolio_context?: Record<string, any> | null
       messages: Array<{ id: string; role: string; content: string; timestamp: string; metadata?: any; tokens?: number | null }>
     }
+  },
+
+  async entitlement(address: string, chain?: string): Promise<EntitlementResponse> {
+    const { data } = await axios.get(`${BASE}/entitlement`, {
+      params: { address, chain },
+    })
+    return data as EntitlementResponse
   },
 }

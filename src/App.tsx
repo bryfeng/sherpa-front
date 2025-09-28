@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from 'react'
 // import { ChatContainer } from './components/chat/ChatContainer'
 // import { PanelManager } from './components/panels/PanelManager'
 import { api } from './services/api'
+import type { EntitlementSnapshot } from './types/entitlement'
 import type { PortfolioData } from './types/portfolio'
 import { useAccount, useDisconnect, useReconnect } from 'wagmi'
 import { useAppKitAccount } from '@reown/appkit/react'
@@ -20,7 +21,9 @@ export function App() {
   const [health, setHealth] = useState<string>('checking…')
   const [walletAddress, setWalletAddress] = useState<string | null>(null)
   const [portfolio, setPortfolio] = useState<PortfolioData | null>(null)
-  const { address, isConnected, status } = useAccount()
+  const [entitlement, setEntitlement] = useState<EntitlementSnapshot>({ status: 'idle', pro: false, chain: null })
+  const [proOverride, setProOverride] = useState(false)
+  const { address, isConnected } = useAccount()
   const { reconnectAsync } = useReconnect()
   const { address: akAddress, isConnected: akConnected } = useAppKitAccount()
   const { disconnect } = useDisconnect()
@@ -72,8 +75,63 @@ export function App() {
     } else {
       setWalletAddress(null)
       setPortfolio(null)
+      setEntitlement({ status: 'idle', pro: false, chain: null })
+      setProOverride(false)
     }
   }, [isConnected, address, akAddress, akConnected])
+
+  useEffect(() => {
+    if (!walletAddress) return
+
+    let cancelled = false
+    setEntitlement((prev) => ({ status: 'loading', pro: prev.pro && prev.status === 'ready', chain: prev.chain ?? null }))
+
+    api
+      .entitlement(walletAddress)
+      .then((res) => {
+        if (cancelled) return
+        const status: EntitlementSnapshot['status'] = res.gating === 'disabled' ? 'disabled' : 'ready'
+        setEntitlement({
+          status,
+          pro: Boolean(res.pro),
+          gating: res.gating,
+          chain: res.chain ?? null,
+          standard: res.standard ?? null,
+          tokenAddress: res.token_address ?? null,
+          tokenId: res.token_id ?? null,
+          reason: res.reason ?? null,
+          checkedAt: res.checked_at,
+          metadata: res.metadata ?? {},
+        })
+        if (res.pro) setProOverride(false)
+      })
+      .catch((err) => {
+        if (cancelled) return
+        setEntitlement({
+          status: 'error',
+          pro: false,
+          chain: null,
+          reason: err?.message || 'Failed to load entitlement.',
+        })
+      })
+
+    return () => {
+      cancelled = true
+    }
+  }, [walletAddress])
+
+  const gatingActive = entitlement.status === 'ready' && entitlement.gating === 'token'
+  const pro = entitlement.pro || (!gatingActive && proOverride)
+
+  const allowManualUnlock = !gatingActive
+
+  const handleProRequest = (source: 'cta' | 'action') => {
+    if (allowManualUnlock) {
+      setProOverride(true)
+    }
+    // Token-gated users handle upsell inside chat component
+    void source;
+  }
 
   return (
     <div className="min-h-screen flex flex-col">
@@ -128,7 +186,16 @@ export function App() {
 
       <main className="flex-1">
         <div className="mx-auto max-w-7xl">
-          <DeFiChatAdaptiveUI persona={persona as any} setPersona={setPersona as any} walletAddress={walletAddress || undefined} walletStatus={status as any} />
+          <DeFiChatAdaptiveUI
+            persona={persona as any}
+            setPersona={setPersona as any}
+            walletAddress={walletAddress || undefined}
+            pro={pro}
+            entitlement={entitlement}
+            onRequestPro={handleProRequest}
+            allowManualUnlock={allowManualUnlock}
+            onManualUnlock={() => setProOverride(true)}
+          />
         </div>
       </main>
     </div>

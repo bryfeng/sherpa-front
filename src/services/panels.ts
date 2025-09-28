@@ -1,4 +1,4 @@
-import type { Panel } from '../pages/DeFiChatAdaptiveUI'
+import type { Panel, PanelSource } from '../pages/DeFiChatAdaptiveUI'
 
 // Normalize various backend panel payload shapes into UI Panel[]
 export function transformBackendPanels(input: any): Panel[] {
@@ -27,7 +27,37 @@ function normalizeItem(item: any): Panel | null {
   const kind = (item.kind || item.type || 'card') as Panel['kind']
   const title = String(item.title || item.name || id)
   const payload = item.payload ?? item.data ?? item.content ?? {}
+  const metadata = item.metadata ?? item.meta ?? {}
+  const sources = normalizeSources(item)
   if (!id || !title) return null
-  return { id, kind, title, payload }
+  const panel: Panel = { id, kind, title, payload }
+  if (sources.length) panel.sources = sources
+  if (metadata && Object.keys(metadata).length > 0) panel.metadata = metadata
+  return panel
 }
 
+function normalizeSources(item: any): PanelSource[] {
+  const raw = item?.sources ?? item?.source ?? item?.payload?.sources
+  if (!raw) return []
+  const arr = Array.isArray(raw) ? raw : [raw]
+  return arr
+    .map((entry) => {
+      if (!entry) return null
+      if (typeof entry === 'string') {
+        if (entry.startsWith('http')) {
+          try {
+            const hostname = new URL(entry).hostname.replace(/^www\./, '')
+            return { name: hostname, url: entry }
+          } catch {
+            return { name: entry }
+          }
+        }
+        return { name: entry }
+      }
+      if (typeof entry === 'object') {
+        return entry as PanelSource
+      }
+      return null
+    })
+    .filter(Boolean) as PanelSource[]
+}
