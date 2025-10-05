@@ -4,6 +4,7 @@ import { createPortal } from 'react-dom'
 import { motion, AnimatePresence, useReducedMotion } from 'framer-motion'
 import {
   ChevronDown,
+  ChevronRight,
   Send,
   Bot,
   User,
@@ -22,6 +23,7 @@ import {
   ChevronUp,
   X,
   ExternalLink,
+  MessageSquarePlus,
 } from 'lucide-react'
 
 // Local, minimal UI primitives (Tailwind styled)
@@ -72,17 +74,20 @@ function CardContent({ children, className = '' }: React.PropsWithChildren<{ cla
   return <div className={`p-4 ${className}`}>{children}</div>
 }
 
-function Textarea(
-  props: React.TextareaHTMLAttributes<HTMLTextAreaElement> & { className?: string },
-) {
-  const { className = '', ...rest } = props
-  return (
-    <textarea
-      {...rest}
-      className={`min-h-[56px] w-full flex-1 rounded-2xl border border-slate-300 bg-slate-50 p-3 text-sm text-slate-900 placeholder:text-slate-500 outline-none focus:border-primary-400 focus:ring-2 focus:ring-primary-200 ${className}`}
-    />
-  )
-}
+const Textarea = React.forwardRef<HTMLTextAreaElement, React.TextareaHTMLAttributes<HTMLTextAreaElement> & { className?: string }>(
+  function Textarea(props, ref) {
+    const { className = '', ...rest } = props
+    return (
+      <textarea
+        {...rest}
+        ref={ref}
+        className={`min-h-[56px] w-full flex-1 rounded-2xl border border-slate-300 bg-slate-50 p-3 text-sm text-slate-900 placeholder:text-slate-500 outline-none focus:border-primary-400 focus:ring-2 focus:ring-primary-200 ${className}`}
+      />
+    )
+  },
+)
+
+Textarea.displayName = 'Textarea'
 
 function Badge({ children, className = '', variant = 'solid' }: React.PropsWithChildren<{ className?: string; variant?: 'solid' | 'outline' | 'secondary' }>) {
   const variants: Record<string, string> = {
@@ -141,6 +146,11 @@ const personaStyles: Record<Persona, { label: string; badge: string; text: strin
 }
 
 const personaOrder: Persona[] = ['friendly', 'technical', 'professional', 'educational']
+
+const WETH_ABI = [
+  { type: 'function', name: 'deposit', stateMutability: 'payable', inputs: [] },
+  { type: 'function', name: 'balanceOf', stateMutability: 'view', inputs: [{ name: 'account', type: 'address' }], outputs: [{ type: 'uint256' }] },
+]
 
 type ActionType = 'show_panel' | 'swap' | 'bridge' | 'explain' | 'subscribe' | 'simulate'
 
@@ -207,12 +217,14 @@ import { transformBackendPanels } from '../services/panels'
 import { SimulateModal } from '../components/modals/SimulateModal'
 import { SwapModal } from '../components/modals/SwapModal'
 import { BridgeModal } from '../components/modals/BridgeModal'
-import { BungeeQuoteModal } from '../components/modals/BungeeQuoteModal'
+import { RelayQuoteModal } from '../components/modals/RelayQuoteModal'
 import type { TVLPoint } from '../services/defi'
 import { getUniswapTVL } from '../services/defi'
 import { getSwapQuote } from '../services/quotes'
 import { getTopPrices } from '../services/prices'
 import { truncateAddress } from '../services/wallet'
+import { usePublicClient, useSwitchChain, useWalletClient } from 'wagmi'
+import { erc20Abi } from 'viem'
 import type { EntitlementSnapshot } from '../types/entitlement'
 import { ResponsiveContainer, AreaChart, Area, XAxis, YAxis, Tooltip, CartesianGrid } from 'recharts'
 
@@ -589,7 +601,31 @@ function formatCompact(v: number, unit?: string, withUnit: boolean = true): stri
   return withUnit ? `${base}${suffix}${u}` : `${base}${suffix}`
 }
 
-function RightPanel({ panels, highlight, walletAddress, panelUI, onToggleCollapse, onExpand, onReorder }: { panels: Panel[]; highlight?: string[]; walletAddress?: string; panelUI: Record<string, { collapsed?: boolean }>; onToggleCollapse: (id: string) => void; onExpand: (id: string) => void; onReorder: (dragId: string, dropId: string) => void }) {
+function RightPanel({
+  panels,
+  highlight,
+  walletAddress,
+  panelUI,
+  onToggleCollapse,
+  onExpand,
+  onReorder,
+  onBridge,
+  walletReady,
+  onRefreshBridgeQuote,
+  onInsertQuickPrompt,
+}: {
+  panels: Panel[]
+  highlight?: string[]
+  walletAddress?: string
+  panelUI: Record<string, { collapsed?: boolean }>
+  onToggleCollapse: (id: string) => void
+  onExpand: (id: string) => void
+  onReorder: (dragId: string, dropId: string) => void
+  onBridge?: (panel: Panel) => Promise<string | void>
+  walletReady?: boolean
+  onRefreshBridgeQuote?: () => Promise<void>
+  onInsertQuickPrompt?: (prompt: string) => void
+}) {
   const ordered = useMemo(() => {
     if (!highlight || highlight.length === 0) return panels
     const map = new Map(panels.map((p) => [p.id, p] as const))
@@ -646,7 +682,20 @@ function RightPanel({ panels, highlight, walletAddress, panelUI, onToggleCollaps
               {p.kind === 'portfolio' && (
                 <PortfolioOverview payload={p.payload} walletAddress={walletAddress} />
               )}
-              {p.kind === 'card' && <div className="text-sm text-slate-400">{JSON.stringify(p.payload)}</div>}
+              {p.kind === 'card' && (
+                p.id === 'relay_bridge_quote' ? (
+                  <RelayBridgeQuotePanel
+                    panel={p}
+                    walletAddress={walletAddress}
+                    walletReady={walletReady}
+                    onBridge={onBridge}
+                    onRefreshQuote={onRefreshBridgeQuote}
+                    onInsertQuickPrompt={onInsertQuickPrompt}
+                  />
+                ) : (
+                  <div className="text-sm text-slate-400">{JSON.stringify(p.payload)}</div>
+                )
+              )}
               {p.kind === 'prices' && <TopCoinsPanel payload={p.payload} />}
               {p.kind === 'prediction' && (
                 <div className="space-y-2">
@@ -667,6 +716,307 @@ function RightPanel({ panels, highlight, walletAddress, panelUI, onToggleCollaps
           )}
         </Card>
       ))}
+    </div>
+  )
+}
+
+type BridgePanelProps = {
+  panel: Panel
+  walletAddress?: string
+  walletReady?: boolean
+  onBridge?: (panel: Panel) => Promise<string | void>
+  onRefreshQuote?: () => Promise<void>
+  onInsertQuickPrompt?: (prompt: string) => void
+}
+
+function RelayBridgeQuotePanel({ panel, walletAddress, walletReady = false, onBridge, onRefreshQuote, onInsertQuickPrompt }: BridgePanelProps) {
+  const payload = panel.payload || {}
+  const breakdown = payload.breakdown || {}
+  const output = breakdown.output || {}
+  const fees = breakdown.fees || {}
+  const instructions: string[] = Array.isArray(payload.instructions)
+    ? payload.instructions.map((entry: any) => String(entry))
+    : []
+  const issues = Array.isArray(payload.issues) ? payload.issues : []
+  const actions = payload.actions && typeof payload.actions === 'object' ? payload.actions : null
+  const quickPrompts = actions
+    ? Object.entries(actions)
+        .map(([key, value]) => ({ key, label: String(value || '').trim() }))
+        .filter((entry) => entry.label.length > 0)
+    : []
+  const etaSeconds = typeof breakdown.eta_seconds === 'number' ? breakdown.eta_seconds : undefined
+  const quoteWallet = typeof payload.wallet?.address === 'string' ? payload.wallet.address : undefined
+
+  const [sending, setSending] = useState(false)
+  const [refreshing, setRefreshing] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const [txHash, setTxHash] = useState<string | null>(null)
+  const [showInstructions, setShowInstructions] = useState(false)
+  const [showQuickPrompts, setShowQuickPrompts] = useState(false)
+
+  const expiryRaw = payload.quote_expiry
+  let expiryMs: number | undefined
+  if (typeof expiryRaw === 'string') {
+    const parsed = Date.parse(expiryRaw)
+    if (!Number.isNaN(parsed)) expiryMs = parsed
+  } else if (expiryRaw) {
+    const isoCandidate = expiryRaw.iso || expiryRaw.ISO
+    if (isoCandidate) {
+      const parsed = Date.parse(String(isoCandidate))
+      if (!Number.isNaN(parsed)) expiryMs = parsed
+    }
+    if (typeof expiryMs === 'undefined') {
+      const epochCandidate = expiryRaw.epoch ?? expiryRaw.EPOCH
+      if (typeof epochCandidate !== 'undefined') {
+        const epochNum = Number(epochCandidate)
+        if (Number.isFinite(epochNum)) {
+          expiryMs = epochNum > 1e12 ? epochNum : epochNum * 1000
+        }
+      }
+    }
+  }
+
+  const expiryDate = typeof expiryMs === 'number' ? new Date(expiryMs) : undefined
+  const expired = typeof expiryMs === 'number' ? expiryMs <= Date.now() : false
+
+  const walletMismatch = Boolean(
+    walletAddress && quoteWallet && walletAddress.toLowerCase() !== quoteWallet.toLowerCase(),
+  )
+
+  const numeric = (value: any): number | undefined => {
+    if (typeof value === 'number') return value
+    if (typeof value === 'string' && value.trim().length) {
+      const parsed = Number(value)
+      if (Number.isFinite(parsed)) return parsed
+    }
+    return undefined
+  }
+
+  const formatUsd = (value: any): string => {
+    const num = numeric(value)
+    if (typeof num !== 'number') return '—'
+    const abs = Math.abs(num)
+    const options: Intl.NumberFormatOptions = abs >= 1
+      ? { minimumFractionDigits: 2, maximumFractionDigits: 2 }
+      : { minimumFractionDigits: 2, maximumFractionDigits: 4 }
+    return `$${num.toLocaleString(undefined, options)}`
+  }
+
+  const outputEstimate = (() => {
+    const amount = output.amount_estimate || output.amount || payload.output?.amount
+    const symbol = output.symbol || payload.output?.token?.symbol
+    if (!amount) return symbol ? `— ${symbol}` : '—'
+    const amountNum = numeric(amount)
+    const displayed = typeof amountNum === 'number'
+      ? amountNum.toLocaleString(undefined, { maximumFractionDigits: 6 })
+      : String(amount)
+    return symbol ? `${displayed} ${symbol}` : displayed
+  })()
+
+  const outputUsd = payload.usd_estimates?.output || output.value_usd
+  const gasUsd = payload.usd_estimates?.gas || fees.gas_usd
+
+  const formatEta = (seconds?: number) => {
+    if (!seconds || seconds <= 0) return '—'
+    if (seconds < 60) return `${Math.round(seconds)}s`
+    const minutes = Math.round(seconds / 60)
+    if (minutes < 60) return `${minutes} min`
+    const hours = Math.round(minutes / 60)
+    if (hours < 24) return `${hours} hr`
+    const days = Math.round(hours / 24)
+    return `${days} day${days > 1 ? 's' : ''}`
+  }
+
+  const formatExpiry = () => {
+    if (!expiryMs) return '—'
+    const delta = expiryMs - Date.now()
+    const abs = Math.abs(delta)
+    const direction = delta >= 0 ? 'in ' : ''
+    if (abs < 60_000) return delta >= 0 ? 'in under a minute' : 'expired just now'
+    const minutes = Math.round(abs / 60_000)
+    if (minutes < 60) return `${direction}${minutes} min${delta < 0 ? ' ago' : ''}`
+    const hours = Math.round(minutes / 60)
+    if (hours < 24) return `${direction}${hours} hr${delta < 0 ? ' ago' : ''}`
+    const days = Math.round(hours / 24)
+    return `${direction}${days} day${days > 1 ? 's' : ''}${delta < 0 ? ' ago' : ''}`
+  }
+
+  const disableReason = (() => {
+    if (!walletReady) return 'Connect a wallet to bridge.'
+    if (!payload.tx) return 'Quote did not include a prepared transaction.'
+    if (payload.status !== 'ok') return 'Quote is incomplete. Ask for a refresh.'
+    if (expired) return 'Quote expired. Refresh before bridging.'
+    if (walletMismatch) return 'Connect the wallet that requested this quote.'
+    return null
+  })()
+
+  const canBridge = !disableReason && Boolean(onBridge)
+
+  const handleBridgeClick = async () => {
+    if (!onBridge || !canBridge) return
+    setSending(true)
+    setError(null)
+    setTxHash(null)
+    try {
+      const result = await onBridge(panel)
+      if (typeof result === 'string' && result) setTxHash(result)
+    } catch (err: any) {
+      setError(err?.message || 'Bridge transaction failed.')
+    } finally {
+      setSending(false)
+    }
+  }
+
+  const handleRefresh = async () => {
+    if (!onRefreshQuote) return
+    setRefreshing(true)
+    setError(null)
+    try {
+      await onRefreshQuote()
+    } catch (err: any) {
+      setError(err?.message || 'Failed to refresh quote.')
+    } finally {
+      setRefreshing(false)
+    }
+  }
+
+  return (
+    <div className="space-y-4 text-sm text-slate-700">
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+        <div className="rounded-2xl border border-slate-200 bg-white p-3">
+          <div className="text-xs font-medium uppercase tracking-wide text-slate-500">Estimated Output</div>
+          <div className="mt-1 text-sm font-semibold text-slate-900">{outputEstimate}</div>
+          {outputUsd && <div className="text-xs text-slate-500">{formatUsd(outputUsd)}</div>}
+        </div>
+        <div className="rounded-2xl border border-slate-200 bg-white p-3">
+          <div className="text-xs font-medium uppercase tracking-wide text-slate-500">Fees</div>
+          <div className="mt-1 text-sm font-semibold text-slate-900">{formatUsd(gasUsd)}</div>
+          {typeof fees.slippage_percent !== 'undefined' && fees.slippage_percent !== null && (
+            <div className="text-xs text-slate-500">Slippage {fees.slippage_percent}%</div>
+          )}
+        </div>
+        <div className="rounded-2xl border border-slate-200 bg-white p-3">
+          <div className="text-xs font-medium uppercase tracking-wide text-slate-500">ETA</div>
+          <div className="mt-1 text-sm font-semibold text-slate-900">{formatEta(etaSeconds)}</div>
+        </div>
+        <div className={`rounded-2xl border ${expired ? 'border-rose-200 bg-rose-50' : 'border-slate-200 bg-white'} p-3`}>
+          <div className="text-xs font-medium uppercase tracking-wide text-slate-500">Quote Expiry</div>
+          <div className={`mt-1 text-sm font-semibold ${expired ? 'text-rose-600' : 'text-slate-900'}`}>
+            {expiryDate ? expiryDate.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' }) : '—'}
+          </div>
+          {expiryMs && <div className={`text-xs ${expired ? 'text-rose-600' : 'text-slate-500'}`}>{formatExpiry()}</div>}
+        </div>
+      </div>
+
+      <div className="rounded-2xl border border-slate-200 bg-white p-3">
+        <div className="text-xs font-medium uppercase tracking-wide text-slate-500">Destination Wallet</div>
+        <div className="mt-1 text-sm font-mono text-slate-900 break-all">{quoteWallet || '—'}</div>
+        {walletMismatch && (
+          <div className="mt-1 text-xs text-amber-600">Connected wallet differs from the quote wallet. Switch wallets before bridging.</div>
+        )}
+      </div>
+
+      {issues.length > 0 && (
+        <div className="rounded-2xl border border-amber-200 bg-amber-50/80 p-3 text-xs text-amber-800">
+          <div className="font-semibold">Needs attention</div>
+          <ul className="mt-2 list-disc pl-4 space-y-1">
+            {issues.map((issue: any, idx: number) => (
+              <li key={idx}>{String(issue)}</li>
+            ))}
+          </ul>
+        </div>
+      )}
+
+      {instructions.length > 0 && (
+        <div className="rounded-2xl border border-slate-200 bg-white p-3">
+          <div className="flex items-center justify-between gap-2">
+            <div className="text-xs font-medium uppercase tracking-wide text-slate-500">Instructions</div>
+            <button
+              type="button"
+              onClick={() => setShowInstructions((value) => !value)}
+              className="inline-flex items-center gap-1 rounded-full border border-slate-200 bg-slate-50 px-2 py-1 text-[11px] text-slate-600 hover:bg-slate-100"
+              aria-expanded={showInstructions}
+            >
+              {showInstructions ? <ChevronUp className="h-3.5 w-3.5" /> : <ChevronRight className="h-3.5 w-3.5" />}
+              {showInstructions ? 'Hide' : `${instructions.length}`}
+            </button>
+          </div>
+          {!showInstructions && instructions[0] && (
+            <div className="mt-2 text-xs text-slate-500 truncate">{instructions[0]}</div>
+          )}
+          {showInstructions && (
+            <ul className="mt-3 space-y-2 text-sm text-slate-700">
+              {instructions.map((item, idx) => (
+                <li key={idx} className="flex items-start gap-2">
+                  <span className="mt-1 h-1.5 w-1.5 rounded-full bg-slate-400" />
+                  <span>{item}</span>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      )}
+
+      {quickPrompts.length > 0 && (
+        <div className="rounded-2xl border border-slate-200 bg-white p-3">
+          <div className="flex items-center justify-between gap-2">
+            <div className="text-xs font-medium uppercase tracking-wide text-slate-500">Quick Prompts</div>
+            <button
+              type="button"
+              onClick={() => setShowQuickPrompts((value) => !value)}
+              className="inline-flex items-center gap-1 rounded-full border border-slate-200 bg-slate-50 px-2 py-1 text-[11px] text-slate-600 hover:bg-slate-100"
+              aria-expanded={showQuickPrompts}
+            >
+              {showQuickPrompts ? <ChevronUp className="h-3.5 w-3.5" /> : <ChevronRight className="h-3.5 w-3.5" />}
+              {showQuickPrompts ? 'Hide' : `${quickPrompts.length}`}
+            </button>
+          </div>
+          {!showQuickPrompts && quickPrompts[0] && (
+            <div className="mt-2 text-xs text-slate-500 truncate">{quickPrompts[0].label}</div>
+          )}
+          {showQuickPrompts && (
+              <div className="mt-3 flex flex-wrap gap-2">
+              {quickPrompts.map(({ key, label }) => (
+                <button
+                  key={key}
+                  type="button"
+                  onClick={() => {
+                    if (onInsertQuickPrompt) onInsertQuickPrompt(label)
+                  }}
+                  className="inline-flex items-center gap-1 overflow-hidden rounded-full border border-slate-200 bg-slate-50 px-3 py-1.5 text-xs text-slate-700 hover:bg-slate-100"
+                  title={label}
+                >
+                  <MessageSquarePlus className="h-3.5 w-3.5 text-slate-500 shrink-0" />
+                  <span className="truncate whitespace-nowrap max-w-[200px]">{label}</span>
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      <div className="flex flex-wrap items-center gap-2">
+        <Button onClick={handleBridgeClick} disabled={!canBridge || sending} className="rounded-xl px-4">
+          {sending ? 'Bridging…' : 'Bridge'}
+        </Button>
+        {onRefreshQuote && (
+          <Button variant="secondary" onClick={handleRefresh} disabled={refreshing} className="rounded-xl px-4">
+            {refreshing ? 'Refreshing…' : (
+              <span className="inline-flex items-center gap-2">
+                <Repeat className="h-4 w-4" />Refresh Quote
+              </span>
+            )}
+          </Button>
+        )}
+        {disableReason && <span className="text-xs text-slate-500">{disableReason}</span>}
+      </div>
+
+      {error && <div className="text-xs text-rose-600">{error}</div>}
+      {txHash && (
+        <div className="text-xs text-emerald-600 break-all">
+          Transaction submitted: <code>{txHash}</code>
+        </div>
+      )}
     </div>
   )
 }
@@ -694,7 +1044,23 @@ function TopCoinsPanel({ payload }: { payload: any }) {
   )
 }
 
-function ExpandedPanelModal({ panel, onClose, walletAddress }: { panel?: Panel; onClose: () => void; walletAddress?: string }) {
+function ExpandedPanelModal({
+  panel,
+  onClose,
+  walletAddress,
+  walletReady,
+  onBridge,
+  onRefreshBridgeQuote,
+  onInsertQuickPrompt,
+}: {
+  panel?: Panel
+  onClose: () => void
+  walletAddress?: string
+  walletReady?: boolean
+  onBridge?: (panel: Panel) => Promise<string | void>
+  onRefreshBridgeQuote?: () => Promise<void>
+  onInsertQuickPrompt?: (prompt: string) => void
+}) {
   if (!panel) return null
   return (
     <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/30 p-3">
@@ -708,7 +1074,20 @@ function ExpandedPanelModal({ panel, onClose, walletAddress }: { panel?: Panel; 
         <div className="p-4">
           {panel.kind === 'chart' && <ChartPanel p={panel} />}
           {panel.kind === 'portfolio' && <PortfolioOverview payload={panel.payload} walletAddress={walletAddress} />}
-          {panel.kind === 'card' && <div className="text-sm text-slate-700">{JSON.stringify(panel.payload)}</div>}
+          {panel.kind === 'card' && (
+            panel.id === 'relay_bridge_quote' ? (
+              <RelayBridgeQuotePanel
+                panel={panel}
+                walletAddress={walletAddress}
+                walletReady={walletReady}
+                onBridge={onBridge}
+                onRefreshQuote={onRefreshBridgeQuote}
+                onInsertQuickPrompt={onInsertQuickPrompt}
+              />
+            ) : (
+              <div className="text-sm text-slate-700">{JSON.stringify(panel.payload)}</div>
+            )
+          )}
           {panel.kind === 'prices' && <TopCoinsPanel payload={panel.payload} />}
           {panel.kind === 'prediction' && (
             <div className="space-y-2">
@@ -955,6 +1334,29 @@ export default function DeFiChatAdaptiveUI({
   })
   const prefersReducedMotion = useReducedMotion()
   const scrollRef = useRef<HTMLDivElement>(null)
+  const inputRef = useRef<HTMLTextAreaElement | null>(null)
+  const handleInsertQuickPrompt = React.useCallback((prompt: string) => {
+    const text = String(prompt ?? '').trim()
+    if (!text.length) return
+    setInput((prev) => {
+      const prevValue = prev || ''
+      if (!prevValue.trim()) return text
+      const separator = prevValue.endsWith('\n') ? '' : '\n'
+      return `${prevValue}${separator}${text}`
+    })
+    const focusInput = () => {
+      const el = inputRef.current
+      if (!el) return
+      el.focus()
+      const pos = el.value.length
+      el.setSelectionRange(pos, pos)
+    }
+    if (typeof window !== 'undefined' && typeof window.requestAnimationFrame === 'function') {
+      window.requestAnimationFrame(focusInput)
+    } else {
+      focusInput()
+    }
+  }, [])
   const scheduleScrollToBottom = React.useCallback(() => {
     window.setTimeout(() => {
       const el = scrollRef.current
@@ -967,11 +1369,15 @@ export default function DeFiChatAdaptiveUI({
   const [showSim, setShowSim] = useState<{ from?: string; to?: string } | null>(null)
   const [showSwap, setShowSwap] = useState<{ from?: string; to?: string } | null>(null)
   const [showBridge, setShowBridge] = useState<boolean>(false)
-  const [showBungee, setShowBungee] = useState<boolean>(false)
+  const [showRelay, setShowRelay] = useState<boolean>(false)
   const copyInfoTimeout = useRef<number | undefined>(undefined)
   const isAssistantTyping = useMemo(() => messages.some((msg) => msg.typing), [messages])
   const [ariaAnnouncement, setAriaAnnouncement] = useState('')
   const lastAnnouncedId = useRef<string | null>(null)
+  const { data: walletClient } = useWalletClient()
+  const publicClient = usePublicClient()
+  const { switchChainAsync } = useSwitchChain()
+  const walletReady = Boolean(walletClient)
 
   function handleProUpsell(source: 'cta' | 'action') {
     onRequestPro(source)
@@ -1095,13 +1501,12 @@ export default function DeFiChatAdaptiveUI({
       .catch(() => setRecentChats([]))
   }, [walletAddress])
 
-  const send = async () => {
-    const q = input.trim()
+  const sendPrompt = React.useCallback(async (raw: string) => {
+    const q = raw.trim()
     if (!q) return
     const userMsg: AgentMessage = { id: uid('msg'), role: 'user', text: q }
     const typingId = uid('msg')
     setMessages((m) => [...m, userMsg, { id: typingId, role: 'assistant', text: '', typing: true }])
-    setInput('')
     try {
       const payload = {
         messages: [{ role: 'user', content: q }],
@@ -1114,12 +1519,10 @@ export default function DeFiChatAdaptiveUI({
         setConversationId(res.conversation_id)
         try { localStorage.setItem(storageKey(walletAddress || null), res.conversation_id) } catch {}
       }
-      // Normalize panels from backend and dedupe portfolio views.
       const newPanels = transformBackendPanels(res.panels)
       const portfolioPanels = newPanels.filter((p) => p.kind === 'portfolio')
       const nonPortfolioPanels = newPanels.filter((p) => p.kind !== 'portfolio')
 
-      // If backend requested a portfolio panel, prefer our canonical portfolio_overview panel.
       if (portfolioPanels.length) {
         if (!walletAddress) {
           setMessages((m) => [
@@ -1127,7 +1530,6 @@ export default function DeFiChatAdaptiveUI({
             { id: uid('msg'), role: 'assistant', text: 'Please connect your wallet to view your portfolio.' },
           ])
         } else {
-          // Load canonical portfolio panel and highlight it
           loadPortfolioPanel(walletAddress).catch(() => {})
           setHighlight(['portfolio_overview'])
         }
@@ -1137,14 +1539,211 @@ export default function DeFiChatAdaptiveUI({
         setPanels((prev) => mergePanelsLocal(prev, nonPortfolioPanels))
         setHighlight(nonPortfolioPanels.map((p) => p.id))
       }
-      const assistantMsg: AgentMessage = { id: uid('msg'), role: 'assistant', text: res.reply || 'Done.', sources: (res.sources || []) as any }
+
+      const assistantMsg: AgentMessage = {
+        id: uid('msg'),
+        role: 'assistant',
+        text: res.reply || 'Done.',
+        sources: (res.sources || []) as any,
+      }
       setMessages((m) => m.filter((mm) => mm.id !== typingId).concat(assistantMsg))
+      return res
     } catch (e: any) {
-      setMessages((m) => m.filter((mm) => !(mm as any).typing).concat({ id: uid('msg'), role: 'assistant', text: `Sorry, I hit an error contacting the API. ${e?.message || ''}` }))
+      setMessages((m) => m.filter((mm) => !(mm as any).typing).concat({
+        id: uid('msg'),
+        role: 'assistant',
+        text: `Sorry, I hit an error contacting the API. ${e?.message || ''}`,
+      }))
+      throw e
     } finally {
       scheduleScrollToBottom()
     }
+  }, [conversationId, loadPortfolioPanel, mergePanelsLocal, scheduleScrollToBottom, setConversationId, setHighlight, setPanels, storageKey, walletAddress])
+
+  const send = async () => {
+    const q = input.trim()
+    if (!q) return
+    setInput('')
+    try {
+      await sendPrompt(q)
+    } catch {
+      // Error already surfaced in chat
+    }
   }
+
+  const requestBridgeQuoteRefresh = React.useCallback(async () => {
+    try {
+      await sendPrompt('refresh bridge quote')
+    } catch {
+      // Follow-up errors already rendered in chat
+    }
+  }, [sendPrompt])
+
+  const handleBridgeExecution = React.useCallback(async (panel: Panel) => {
+    if (!walletClient) {
+      throw new Error('Connect a wallet to bridge.')
+    }
+
+    const payload = panel.payload || {}
+    const tx = payload.tx
+    if (!tx) throw new Error('Bridge transaction not available; ask for a new quote.')
+
+    const quoteWallet: string | undefined = typeof payload.wallet?.address === 'string' ? payload.wallet.address : undefined
+    if (!quoteWallet) throw new Error('Quote is missing the wallet address.')
+    const accountAddress = (walletClient.account?.address ?? quoteWallet) as `0x${string}`
+
+    const resolveExpiryMs = (input: any): number | undefined => {
+      if (!input) return undefined
+      if (typeof input === 'string') {
+        const parsed = Date.parse(input)
+        return Number.isNaN(parsed) ? undefined : parsed
+      }
+      const iso = input.iso || input.ISO
+      if (iso) {
+        const parsed = Date.parse(String(iso))
+        if (!Number.isNaN(parsed)) return parsed
+      }
+      const epoch = input.epoch ?? input.EPOCH
+      if (typeof epoch !== 'undefined') {
+        const epochNum = Number(epoch)
+        if (Number.isFinite(epochNum)) {
+          return epochNum > 1e12 ? epochNum : epochNum * 1000
+        }
+      }
+      return undefined
+    }
+
+    const expiryMs = resolveExpiryMs(payload.quote_expiry)
+    if (typeof expiryMs === 'number' && expiryMs <= Date.now()) {
+      await requestBridgeQuoteRefresh()
+      throw new Error('Quote expired. Requested a fresh bridge quote.')
+    }
+
+    const connectedAddress = walletClient.account?.address
+    if (connectedAddress && connectedAddress.toLowerCase() !== quoteWallet.toLowerCase()) {
+      throw new Error('Connected wallet does not match the quote wallet.')
+    }
+
+    const ensureBigInt = (value: any): bigint | undefined => {
+      if (typeof value === 'bigint') return value
+      if (typeof value === 'string' && value.trim().length) {
+        try { return BigInt(value) } catch { return undefined }
+      }
+      if (typeof value === 'number' && Number.isFinite(value)) {
+        return BigInt(Math.trunc(value))
+      }
+      return undefined
+    }
+
+    const desiredChainId = typeof tx.chainId === 'number' ? tx.chainId : Number(tx.chainId ?? walletClient.chain?.id ?? 0)
+    if (desiredChainId && walletClient.chain && walletClient.chain.id !== desiredChainId && switchChainAsync) {
+      await switchChainAsync({ chainId: desiredChainId }).catch(() => {
+        throw new Error(`Switch your wallet to chain ID ${desiredChainId} to continue.`)
+      })
+    }
+
+    const inputAmountWei = ensureBigInt(payload.amounts?.input_amount_wei ?? tx.value ?? 0)
+    const inputTokenAddress: string | undefined = payload.breakdown?.input?.token_address
+    const inputTokenSymbol = typeof payload.breakdown?.input?.symbol === 'string'
+      ? payload.breakdown.input.symbol.toUpperCase()
+      : undefined
+
+    const request: any = {
+      account: walletClient.account ?? accountAddress,
+      to: tx.to,
+      data: tx.data,
+    }
+
+    if (!request.to || !request.data) throw new Error('Quote is missing transaction call data.')
+
+    const gasLike = tx.gas ?? tx.gasLimit
+    const gasValue = ensureBigInt(gasLike)
+    if (typeof gasValue !== 'undefined') request.gas = gasValue
+
+    const valueBig = ensureBigInt(tx.value)
+    if (typeof valueBig !== 'undefined') request.value = valueBig
+
+    if (typeof tx.chainId !== 'undefined' && tx.chainId !== null) {
+      request.chainId = Number(tx.chainId)
+    }
+
+    if (typeof tx.maxFeePerGas !== 'undefined') {
+      const parsed = ensureBigInt(tx.maxFeePerGas)
+      if (typeof parsed !== 'undefined') request.maxFeePerGas = parsed
+    }
+
+    if (typeof tx.maxPriorityFeePerGas !== 'undefined') {
+      const parsed = ensureBigInt(tx.maxPriorityFeePerGas)
+      if (typeof parsed !== 'undefined') request.maxPriorityFeePerGas = parsed
+    }
+
+    if (typeof tx.nonce !== 'undefined') {
+      request.nonce = tx.nonce
+    }
+
+    try {
+      if (inputTokenAddress && inputAmountWei && inputAmountWei > 0n) {
+        const wethLike = inputTokenSymbol === 'WETH'
+        if (wethLike) {
+          const executeWrap = async (value: bigint) => {
+            await walletClient.writeContract({
+              address: inputTokenAddress as `0x${string}`,
+              abi: WETH_ABI,
+              functionName: 'deposit',
+              args: [],
+              account: walletClient.account ?? accountAddress,
+              chain: walletClient.chain,
+              value,
+            })
+          }
+
+          if (publicClient) {
+            try {
+              const balance = await publicClient.readContract({
+                address: inputTokenAddress as `0x${string}`,
+                abi: erc20Abi,
+                functionName: 'balanceOf',
+                args: [accountAddress],
+              }) as bigint
+              const deficit = balance < inputAmountWei ? (inputAmountWei - balance) : 0n
+              if (deficit > 0n) {
+                await executeWrap(deficit)
+              }
+            } catch (wrapErr) {
+              console.warn('WETH balance check failed, attempting full wrap', wrapErr)
+              await executeWrap(inputAmountWei)
+            }
+          } else {
+            console.warn('Public client unavailable; wrapping full WETH amount without balance check')
+            await executeWrap(inputAmountWei)
+          }
+        }
+      }
+
+      const approvalData = payload.approval_data
+      if (approvalData) {
+        const approveAmount = ensureBigInt(approvalData.amount)
+        if (typeof approveAmount === 'undefined') {
+          throw new Error('Approval amount from bridge quote is invalid.')
+        }
+        await walletClient.writeContract({
+          address: approvalData.tokenAddress as `0x${string}`,
+          abi: erc20Abi,
+          functionName: 'approve',
+          args: [approvalData.spenderAddress as `0x${string}`, approveAmount],
+          account: walletClient.account ?? accountAddress,
+          chain: walletClient.chain,
+        })
+      }
+
+      const hash = await walletClient.sendTransaction(request)
+      return hash as string
+    } catch (err: any) {
+      await requestBridgeQuoteRefresh()
+      const message = err?.shortMessage || err?.message || 'Wallet rejected the bridge transaction.'
+      throw new Error(message)
+    }
+  }, [walletClient, publicClient, requestBridgeQuoteRefresh, switchChainAsync])
 
   function mergePanelsLocal(current: Panel[], incoming: Panel[]): Panel[] {
     const byId = new Map(current.map((p) => [p.id, p] as const))
@@ -1410,7 +2009,7 @@ export default function DeFiChatAdaptiveUI({
             <Button variant="secondary" className="justify-start">
               <BarChart3 className="h-4 w-4 mr-2" />Market Overview
             </Button>
-            <Button variant="secondary" className="justify-start" onClick={() => setShowBungee(true)}>
+            <Button variant="secondary" className="justify-start" onClick={() => setShowRelay(true)}>
               <Repeat className="h-4 w-4 mr-2" />Bridging (POC)
             </Button>
             <Button variant="secondary" className="justify-start">
@@ -1455,6 +2054,7 @@ export default function DeFiChatAdaptiveUI({
           <div className="w-full flex items-center">
             <div className="w-full flex items-center gap-2 border border-slate-300 bg-white rounded-2xl p-2 sherpa-surface">
               <Textarea
+                ref={inputRef}
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
                 onKeyDown={(e) => {
@@ -1554,6 +2154,10 @@ export default function DeFiChatAdaptiveUI({
             onToggleCollapse={(id) => toggleCollapse(id)}
             onExpand={(id) => setExpandedPanelId(id)}
             onReorder={(from, to) => reorderPanels(from, to)}
+            onBridge={handleBridgeExecution}
+            walletReady={walletReady}
+            onRefreshBridgeQuote={requestBridgeQuoteRefresh}
+            onInsertQuickPrompt={handleInsertQuickPrompt}
           />
         </div>
       </div>
@@ -1603,14 +2207,18 @@ export default function DeFiChatAdaptiveUI({
           }}
         />
       )}
-      {showBungee && (
-        <BungeeQuoteModal onClose={() => setShowBungee(false)} />
+      {showRelay && (
+        <RelayQuoteModal onClose={() => setShowRelay(false)} />
       )}
       {expandedPanelId && (
         <ExpandedPanelModal
           panel={panels.find((p) => p.id === expandedPanelId)}
           onClose={() => setExpandedPanelId(null)}
           walletAddress={walletAddress}
+          walletReady={walletReady}
+          onBridge={handleBridgeExecution}
+          onRefreshBridgeQuote={requestBridgeQuoteRefresh}
+          onInsertQuickPrompt={handleInsertQuickPrompt}
         />
       )}
       {/* No overlay for Top Coins; rendered as a right-panel card */}
