@@ -5,23 +5,10 @@ import { getTrendingTokens, type TrendingToken } from '../../services/trending'
 import { truncateAddress } from '../../services/wallet'
 import { getChainName } from '../../utils/chains'
 import { formatRelativeTime } from '../../utils/time'
+import { WidgetButton, WidgetCard, WidgetSection, WidgetHeader } from './widget-kit'
 
-const buttonBase = 'inline-flex items-center justify-center gap-2 rounded-full border text-xs transition focus:outline-none focus:ring-2 focus:ring-primary-200'
-const buttonVariants: Record<'primary' | 'secondary' | 'ghost', string> = {
-  primary: `${buttonBase} border-primary-500 bg-primary-600 px-3 py-1.5 text-white hover:opacity-95`,
-  secondary: `${buttonBase} border-slate-200 bg-white px-3 py-1.5 text-slate-700 hover:bg-slate-50`,
-  ghost: `${buttonBase} border-transparent bg-transparent px-2 py-1 text-slate-600 hover:bg-slate-100`,
-}
-
-type WidgetButtonProps = React.ButtonHTMLAttributes<HTMLButtonElement> & { variant?: 'primary' | 'secondary' | 'ghost' }
-
-function WidgetButton({ variant = 'primary', className = '', children, type = 'button', ...rest }: WidgetButtonProps) {
-  return (
-    <button type={type} className={`${buttonVariants[variant]} ${className}`} {...rest}>
-      {children}
-    </button>
-  )
-}
+const POSITIVE_ACCENT = 'text-[#0c6f56]'
+const NEGATIVE_ACCENT = 'text-[#d3355c]'
 
 type TrendingTokensListProps = {
   tokens: TrendingToken[]
@@ -84,8 +71,8 @@ export function TrendingTokensList({
         {fetchedAt && ` Updated ${formatRelativeTime(fetchedAt)}.`}
       </div>
       {hotspots.length > 0 && (
-        <div className="rounded-xl border border-primary-200 bg-primary-50/60 p-3 text-xs text-primary-900">
-          <div className="font-medium mb-2 flex items-center gap-2">
+        <WidgetSection tone="accent" className="text-xs">
+          <div className="mb-2 flex items-center gap-2 font-medium">
             <Sparkles className="h-3.5 w-3.5" /> Cross-chain hotspots
           </div>
           <div className="flex flex-wrap gap-2">
@@ -100,7 +87,7 @@ export function TrendingTokensList({
                   }
                 }}
                 disabled={!onInsertQuickPrompt}
-                className="border-primary-200 bg-white/70 text-primary-900 hover:bg-white disabled:cursor-not-allowed disabled:opacity-60"
+                className="border-primary-200 bg-white/70 text-primary-900 hover:bg-white"
               >
                 <TrendingUp className="h-3.5 w-3.5" aria-hidden="true" />
                 <span>{entry.name}</span>
@@ -108,13 +95,14 @@ export function TrendingTokensList({
               </WidgetButton>
             ))}
           </div>
-        </div>
+        </WidgetSection>
       )}
       <div className="space-y-3">
         {tokens.map((token) => {
           const chainName = getChainName(token.chain_id)
           const price = formatUsd(token.price_usd)
           const change = formatChange(token.change_24h)
+          const changeToneClass = change && change.startsWith('+') ? POSITIVE_ACCENT : NEGATIVE_ACCENT
           const volume = formatUsd(token.volume_24h, { maximumFractionDigits: 0 })
           const contract = token.contract_address && token.contract_address.startsWith('0x')
             ? truncateAddress(token.contract_address, 6)
@@ -133,9 +121,10 @@ export function TrendingTokensList({
             : `Bridge where needed so I can trade ${token.symbol?.toUpperCase() || token.name}.`
 
           return (
-            <div
+            <WidgetSection
               key={token.id || `${token.symbol}-${token.chain_id || 'unknown'}`}
-              className={`rounded-2xl border border-slate-200 bg-white p-3 shadow-sm ${compact ? 'space-y-2' : ''}`}
+              shadow
+              className={`${compact ? 'space-y-2' : ''}`}
             >
               <div className="flex flex-wrap items-start justify-between gap-3">
                 <div>
@@ -149,7 +138,7 @@ export function TrendingTokensList({
                 <div className="text-right">
                   <div className="text-sm font-semibold text-slate-900">{price}</div>
                   {change && (
-                    <div className={`text-xs ${change.startsWith('+') ? 'text-emerald-600' : 'text-rose-600'}`}>{change}</div>
+                    <div className={`text-xs font-semibold ${changeToneClass}`}>{change}</div>
                   )}
                 </div>
               </div>
@@ -174,7 +163,7 @@ export function TrendingTokensList({
                   <ArrowLeftRight className="h-3.5 w-3.5" />Plan bridge
                 </WidgetButton>
               </div>
-            </div>
+            </WidgetSection>
           )
         })}
       </div>
@@ -214,61 +203,65 @@ export function TrendingTokensBanner({
 
   if (!top.length) {
     return (
-      <div className="rounded-2xl bg-gradient-to-r from-primary-600 via-primary-500 to-indigo-500 p-4 text-white shadow-md">
-        <div className="flex flex-wrap items-center justify-between gap-3">
+      <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-[#1e66f5] via-[#36a2f5] to-[#9fd7ff] p-5 text-white shadow-xl">
+        <div className="pointer-events-none absolute inset-0 rounded-[inherit] border border-white/20" />
+        <div className="relative flex flex-wrap items-center justify-between gap-3">
           <div>
-            <div className="text-xs uppercase tracking-wide text-white/70">Trending signals</div>
+            <div className="text-xs uppercase tracking-[0.24em] text-white/80">Trending signals</div>
             <div className="text-lg font-semibold">No active tokens right now</div>
           </div>
           {onViewAll && (
             <WidgetButton
               variant="secondary"
               onClick={onViewAll}
-              className="border-transparent bg-white text-primary-700 hover:bg-white/90"
+              className="border-white/30 bg-white/90 px-4 py-2 text-[#0e4a88] hover:bg-white"
             >
               Ask Sherpa
             </WidgetButton>
           )}
         </div>
-        <div className="mt-3 text-sm text-white/80">Prompt Sherpa for a fresh scan to surface new opportunities.</div>
+        <div className="relative mt-3 text-sm text-white/85">
+          Prompt Sherpa for a fresh scan to surface new opportunities.
+        </div>
       </div>
     )
   }
 
   return (
-    <div className="rounded-2xl bg-gradient-to-r from-primary-600 via-primary-500 to-indigo-500 p-4 text-white shadow-md">
-      <div className="flex flex-wrap items-center justify-between gap-3">
+    <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-[#1e66f5] via-[#36a2f5] to-[#9fd7ff] p-5 text-white shadow-xl">
+      <div className="pointer-events-none absolute inset-0 rounded-[inherit] border border-white/20" />
+      <div className="relative flex flex-wrap items-center justify-between gap-3">
         <div>
-          <div className="text-xs uppercase tracking-wide text-white/70">Trending right now</div>
-          <div className="text-lg font-semibold">Relay-ready tokens</div>
+          <div className="text-xs uppercase tracking-[0.24em] text-white/80">Trending right now</div>
+          <div className="text-xl font-semibold leading-tight">Relay-ready tokens</div>
           {fetchedAt && (
-            <div className="text-[11px] text-white/70">Updated {formatRelativeTime(fetchedAt)}</div>
+            <div className="text-[11px] text-white/80">Updated {formatRelativeTime(fetchedAt)}</div>
           )}
         </div>
         <WidgetButton
           variant="secondary"
           onClick={onViewAll}
           disabled={!onViewAll}
-          className="border-transparent bg-white text-primary-700 hover:bg-white/90 disabled:opacity-60"
+          className="border-white/30 bg-white/90 px-4 py-2 text-[#0e4a88] hover:bg-white disabled:opacity-60"
         >
           View feed
         </WidgetButton>
       </div>
-      <div className="mt-3 flex flex-wrap gap-2">
+      <div className="relative mt-4 flex flex-wrap gap-2">
         {top.map((token) => {
           const change = formatChange(token.change_24h)
           const prompt = buildSwapPrompt(token)
-          const changeClass = change && change.startsWith('+') ? 'text-emerald-200' : 'text-rose-200'
+          const changeToneClass = change && change.startsWith('+') ? POSITIVE_ACCENT : NEGATIVE_ACCENT
           return (
             <WidgetButton
               key={`${token.id || token.symbol}-${token.chain_id || 'na'}`}
               variant="ghost"
               onClick={() => onInsertQuickPrompt && onInsertQuickPrompt(prompt)}
               disabled={!onInsertQuickPrompt}
-              className="border-white/30 bg-white/10 text-white hover:bg-white/20 disabled:cursor-not-allowed"
+              className="border-white/50 bg-white/15 px-4 py-2 text-white backdrop-blur-sm hover:bg-white/20 disabled:cursor-not-allowed"
             >
-              <span className="font-semibold">{token.symbol?.toUpperCase() || token.name}</span>
-              {change && <span className={`text-[11px] ${changeClass}`}>{change}</span>}
+              <span className="font-semibold tracking-wide text-white">{token.symbol?.toUpperCase() || token.name}</span>
+              {change && <span className={`text-[11px] font-semibold ${changeToneClass}`}>{change}</span>}
             </WidgetButton>
           )
         })}
@@ -344,16 +337,22 @@ export function TrendingTokensWidget({
   const showSkeleton = status === 'loading' && tokens.length === 0
 
   return (
-    <div className={`rounded-2xl border border-slate-200 bg-white p-4 shadow-sm ${className}`}>
-      <div className="flex items-center justify-between gap-2">
-        <div>
-          <div className="text-sm font-semibold text-slate-900">Trending Tokens</div>
-          <div className="text-xs text-slate-500">Relay-ready ideas surfaced by Sherpa</div>
-        </div>
-        <WidgetButton variant="ghost" onClick={() => load().catch(() => {})} title="Refresh" aria-label="Refresh trending tokens">
-          <Repeat className="h-4 w-4" />
-        </WidgetButton>
-      </div>
+    <WidgetCard className={`${className}`}>
+      <WidgetHeader
+        title="Trending Tokens"
+        subtitle="Relay-ready ideas surfaced by Sherpa"
+        actions={
+          <WidgetButton
+            variant="ghost"
+            size="sm"
+            onClick={() => load().catch(() => {})}
+            title="Refresh"
+            aria-label="Refresh trending tokens"
+          >
+            <Repeat className="h-4 w-4" />
+          </WidgetButton>
+        }
+      />
       <div className="mt-3">
         {showSkeleton ? (
           <div className="space-y-2">
@@ -376,6 +375,6 @@ export function TrendingTokensWidget({
           <div className="mt-2 text-xs text-rose-600">{error}</div>
         )}
       </div>
-    </div>
+    </WidgetCard>
   )
 }

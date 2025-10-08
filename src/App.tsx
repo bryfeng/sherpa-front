@@ -11,10 +11,11 @@ import { useAppKitAccount } from '@reown/appkit/react'
 import { truncateAddress } from './services/wallet'
 import { AppKitButton } from '@reown/appkit/react'
 import DeFiChatAdaptiveUI from './pages/DeFiChatAdaptiveUI'
+import WidgetPlayground from './pages/WidgetPlayground'
 
 export type PersonaId = 'friendly' | 'technical' | 'professional' | 'educational'
 
-export function App() {
+function MainApp() {
   const isTestEnv = ((import.meta as any).env?.MODE || '').toLowerCase() === 'test'
   const [persona, setPersona] = useState<PersonaId>('friendly')
   const [theme, setTheme] = useState<'default' | 'snow'>(() => (localStorage.getItem('theme') as any) || 'snow')
@@ -200,4 +201,12 @@ export function App() {
       </main>
     </div>
   )
+}
+
+export function App() {
+  const isPlaygroundRoute = typeof window !== 'undefined' && window.location.pathname.includes('widget-playground')
+  if (isPlaygroundRoute) {
+    return <WidgetPlayground />
+  }
+  return <MainApp />
 }
