@@ -1,12 +1,7 @@
 import React from 'react'
-import { ChevronRight, ChevronUp, MessageSquarePlus, Repeat } from 'lucide-react'
+import { ChevronDown, ChevronRight, ChevronUp, GripVertical, MessageSquarePlus, Maximize2, Repeat } from 'lucide-react'
 import type { Panel } from '../../pages/DeFiChatAdaptiveUI'
-import {
-  WidgetButton,
-  WidgetSection,
-  WidgetStat,
-  WidgetStatGrid,
-} from './widget-kit'
+import { relayQuoteThemes } from './relay-quote-theme'
 
 type RelayQuoteWidgetProps = {
   panel: Panel
@@ -15,6 +10,11 @@ type RelayQuoteWidgetProps = {
   onExecuteQuote?: (panel: Panel) => Promise<string | void>
   onRefreshQuote?: () => Promise<void>
   onInsertQuickPrompt?: (prompt: string) => void
+  controls?: {
+    collapsed: boolean
+    onToggleCollapse: () => void
+    onExpand: () => void
+  }
 }
 
 export function RelayQuoteWidget({
@@ -24,6 +24,7 @@ export function RelayQuoteWidget({
   onExecuteQuote,
   onRefreshQuote,
   onInsertQuickPrompt,
+  controls,
 }: RelayQuoteWidgetProps) {
   const payload = panel.payload || {}
   const breakdown = payload.breakdown || {}
@@ -186,165 +187,290 @@ export function RelayQuoteWidget({
     }
   }
 
+  const hopCount = Array.isArray(payload?.routes)
+    ? payload.routes.length
+    : Array.isArray(payload?.path)
+      ? payload.path.length
+      : undefined
+
+  const theme = relayQuoteThemes[isSwap ? 'swap' : 'bridge']
+  const collapsed = Boolean(controls?.collapsed)
+
+  const overlayElements = theme.overlays.map((cls, idx) => (
+    <div key={idx} className={`pointer-events-none ${cls}`} />
+  ))
+
+  const truncatedWallet = quoteWallet
+    ? `${quoteWallet.slice(0, 6)}…${quoteWallet.slice(-4)}`
+    : '—'
+
+  const StatCard = ({
+    label,
+    value,
+    helper,
+    tone = 'neutral',
+  }: {
+    label: React.ReactNode
+    value: React.ReactNode
+    helper?: React.ReactNode
+    tone?: 'neutral' | 'danger'
+  }) => (
+    <div className={theme.statCard}>
+      <div className={theme.statLabel}>{label}</div>
+      <div className={`${theme.statValue} ${tone === 'danger' ? theme.accent.negative : 'text-white'}`}>{value}</div>
+      {helper && (
+        <div className={`${theme.statHelper} ${tone === 'danger' ? theme.accent.negative : ''}`}>{helper}</div>
+      )}
+    </div>
+  )
+
+  const metaChips: Array<string> = []
+  if (isSwap) metaChips.push('Swap')
+  else metaChips.push('Bridge')
+  if (hopCount) metaChips.push(`${hopCount} hop${hopCount > 1 ? 's' : ''}`)
+  if (payload?.chain) metaChips.push(String(payload.chain))
+  else if (payload?.network) metaChips.push(String(payload.network))
+
   return (
-    <div className="space-y-4 text-sm text-slate-700">
-      <WidgetStatGrid columns={2}>
-        <WidgetStat
-          label="Estimated Output"
-          value={outputEstimate}
-          helper={outputUsd ? formatUsd(outputUsd) : undefined}
-          helperTone="default"
-        />
-        <WidgetStat
-          label="Fees"
-          value={formatUsd(gasUsd)}
-          helper={typeof fees.slippage_percent !== 'undefined' && fees.slippage_percent !== null ? `Slippage ${fees.slippage_percent}%` : undefined}
-        />
-        <WidgetStat label="ETA" value={formatEta(etaSeconds)} />
-        <WidgetStat
-          label="Quote Expiry"
-          value={
-            <span className={expired ? 'text-rose-600' : ''}>
-              {expiryDate ? expiryDate.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' }) : '—'}
-            </span>
-          }
-          helper={expiryMs ? (
-            <span className={expired ? 'text-rose-600' : ''}>{formatExpiry()}</span>
-          ) : undefined}
-          helperTone="default"
-          tone={expired ? 'danger' : 'default'}
-        />
-      </WidgetStatGrid>
-
-      <WidgetSection tone={walletMismatch ? 'warning' : 'default'}>
-        <div className="text-[11px] font-medium uppercase tracking-wide text-slate-500">Destination Wallet</div>
-        <div className="mt-1 break-all font-mono text-sm text-slate-900">{quoteWallet || '—'}</div>
-        {walletMismatch && (
-          <div className="mt-1 text-xs text-amber-700">Connected wallet differs from the quote wallet. Switch wallets before {actionGerund}.</div>
-        )}
-      </WidgetSection>
-
-      {issues.length > 0 && (
-        <WidgetSection tone="warning" className="text-xs">
-          <div className="font-semibold">Needs attention</div>
-          <ul className="mt-2 list-disc space-y-1 pl-4">
-            {issues.map((issue: any, idx: number) => (
-              <li key={idx}>{String(issue)}</li>
-            ))}
-          </ul>
-        </WidgetSection>
-      )}
-
-      {instructions.length > 0 && (
-        <WidgetSection>
-          <div className="flex items-center justify-between gap-2">
-            <div className="text-[11px] font-medium uppercase tracking-wide text-slate-500">Instructions</div>
-            <WidgetButton
-              variant="secondary"
-              size="sm"
-              className="bg-slate-50 px-2 py-1 text-[11px] text-slate-600 hover:bg-slate-100"
-              onClick={() => setShowInstructions((value) => !value)}
-              aria-expanded={showInstructions}
-            >
-              {showInstructions ? <ChevronUp className="h-3.5 w-3.5" /> : <ChevronRight className="h-3.5 w-3.5" />}
-              {showInstructions ? 'Hide' : `${instructions.length}`}
-            </WidgetButton>
+    <div className={`relative overflow-hidden ${theme.container}`}>
+      <div className={`pointer-events-none absolute inset-0 rounded-[inherit] border ${theme.border}`} />
+      {controls && (
+        <div className="absolute right-4 top-4 z-20 flex items-center gap-2">
+          <div className={`${theme.ghostAction} h-9 w-9 items-center justify-center`} title="Reorder">
+            <GripVertical className="h-4 w-4" />
           </div>
-          {!showInstructions && instructions[0] && (
-            <div className="mt-2 truncate text-xs text-slate-500">{instructions[0]}</div>
-          )}
-          {showInstructions && (
-            <ul className="mt-3 space-y-2 text-sm text-slate-700">
-              {instructions.map((item, idx) => (
-                <li key={idx} className="flex items-start gap-2">
-                  <span className="mt-1 h-1.5 w-1.5 rounded-full bg-slate-400" />
-                  <span>{item}</span>
-                </li>
-              ))}
-            </ul>
-          )}
-        </WidgetSection>
+          <button
+            type="button"
+            onClick={controls.onToggleCollapse}
+            className={`${theme.ghostAction} h-9 w-9 items-center justify-center`}
+            title={controls.collapsed ? 'Expand panel' : 'Minimize panel'}
+          >
+            {controls.collapsed ? <ChevronDown className="h-4 w-4" /> : <ChevronUp className="h-4 w-4" />}
+          </button>
+          <button
+            type="button"
+            onClick={controls.onExpand}
+            className={`${theme.ghostAction} h-9 w-9 items-center justify-center`}
+            title="Expand"
+          >
+            <Maximize2 className="h-4 w-4" />
+          </button>
+        </div>
       )}
-
-      {quickPrompts.length > 0 && (
-        <WidgetSection>
-          <div className="flex items-center justify-between gap-2">
-            <div className="text-[11px] font-medium uppercase tracking-wide text-slate-500">Quick Prompts</div>
-            <WidgetButton
-              variant="secondary"
-              size="sm"
-              className="bg-slate-50 px-2 py-1 text-[11px] text-slate-600 hover:bg-slate-100"
-              onClick={() => setShowQuickPrompts((value) => !value)}
-              aria-expanded={showQuickPrompts}
-            >
-              {showQuickPrompts ? <ChevronUp className="h-3.5 w-3.5" /> : <ChevronRight className="h-3.5 w-3.5" />}
-              {showQuickPrompts ? 'Hide' : `${quickPrompts.length}`}
-            </WidgetButton>
+      {overlayElements}
+      <div className="relative space-y-4 text-sm text-white/85">
+        <div className="flex flex-wrap items-start justify-between gap-4">
+          <div>
+            <div className={`text-[11px] uppercase tracking-[0.28em] ${theme.label}`}>
+              {isSwap ? 'Swap quote' : 'Bridge quote'}
+            </div>
+            <div className="mt-2 text-2xl font-semibold text-white">
+              {payload?.title || 'Relay execution summary'}
+            </div>
+            <div className={`mt-1 text-xs ${theme.helper}`}>
+              {payload?.description
+                || (isSwap
+                  ? 'Sherpa tuned a best-route swap path ready for Relay.'
+                  : 'Sherpa tuned a best-route bridge path ready for Relay.')}
+            </div>
           </div>
-          {!showQuickPrompts && quickPrompts[0] && (
-            <div className="mt-2 truncate text-xs text-slate-500">{quickPrompts[0].label}</div>
-          )}
-          {showQuickPrompts && (
-            <div className="mt-3 flex flex-wrap gap-2">
-              {quickPrompts.map(({ key, label }) => (
-                <WidgetButton
-                  key={key}
-                  variant="secondary"
-                  size="sm"
-                  className="max-w-[220px] truncate bg-slate-50 px-3 py-1.5 text-xs text-slate-700 hover:bg-slate-100"
-                  onClick={() => {
-                    if (onInsertQuickPrompt) onInsertQuickPrompt(label)
-                  }}
-                  title={label}
-                >
-                  <MessageSquarePlus className="h-3.5 w-3.5 text-slate-500" />
-                  <span className="truncate">{label}</span>
-                </WidgetButton>
+          {metaChips.length > 0 && (
+            <div className={`flex flex-wrap justify-end gap-2 ${collapsed ? 'opacity-80' : ''}`}>
+              {metaChips.map((chip, idx) => (
+                <span key={idx} className={theme.metaChip}>
+                  {chip}
+                </span>
               ))}
             </div>
           )}
-        </WidgetSection>
-      )}
+        </div>
 
-      <div className="flex flex-wrap items-center gap-2">
-        <WidgetButton
-          variant="primary"
-          size="md"
-          className="rounded-xl px-4"
-          onClick={handleExecuteClick}
-          disabled={!canExecute || sending}
-        >
-          {sending ? sendingLabel : actionVerbCapitalized}
-        </WidgetButton>
-        {onRefreshQuote && (
-          <WidgetButton
-            variant="secondary"
-            size="md"
-            className="rounded-xl px-4"
-            onClick={handleRefresh}
-            disabled={refreshing}
-          >
-            {refreshing ? 'Refreshing…' : (
-              <span className="inline-flex items-center gap-2">
-                <Repeat className="h-4 w-4" />
-                Refresh Quote
-              </span>
-            )}
-          </WidgetButton>
+        {collapsed ? (
+          <div className="grid gap-3 sm:grid-cols-2">
+            <StatCard label="Estimated Output" value={outputEstimate} helper={outputUsd ? formatUsd(outputUsd) : undefined} />
+            <StatCard
+              label="Quote Expiry"
+              value={expiryDate ? expiryDate.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' }) : '—'}
+              helper={expiryMs ? formatExpiry() : undefined}
+              tone={expired ? 'danger' : 'neutral'}
+            />
+          </div>
+        ) : (
+          <div className="grid gap-3 sm:grid-cols-2">
+            <StatCard label="Estimated Output" value={outputEstimate} helper={outputUsd ? formatUsd(outputUsd) : undefined} />
+            <StatCard
+              label="Fees"
+              value={formatUsd(gasUsd)}
+              helper={typeof fees.slippage_percent === 'number' ? `Slippage ${fees.slippage_percent}%` : undefined}
+            />
+            <StatCard
+              label="ETA"
+              value={formatEta(etaSeconds)}
+              helper={hopCount ? `${hopCount} step path` : undefined}
+            />
+            <StatCard
+              label="Quote Expiry"
+              value={expiryDate ? expiryDate.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' }) : '—'}
+              helper={expiryMs ? formatExpiry() : undefined}
+              tone={expired ? 'danger' : 'neutral'}
+            />
+          </div>
         )}
-        {disableReason && <span className="text-xs text-slate-500">{disableReason}</span>}
-      </div>
 
-      {error && (
-        <WidgetSection tone="danger" padding="sm" className="text-xs">
-          {error}
-        </WidgetSection>
-      )}
-      {txHash && (
-        <WidgetSection tone="accent" padding="sm" className="text-xs">
-          Transaction submitted: <code>{txHash}</code>
-        </WidgetSection>
-      )}
+        {collapsed ? (
+          <div className={`${theme.summaryCard} ${walletMismatch ? 'border-amber-400 bg-amber-300/25 text-amber-100' : ''}`}>
+            <div className={`${theme.statLabel} text-[10px]`}>Destination Wallet</div>
+            <div className={theme.summaryValue}>{truncatedWallet}</div>
+          </div>
+        ) : (
+          <div className={`${theme.section} ${walletMismatch ? 'border-amber-400 bg-amber-300/20 text-amber-100' : ''}`}>
+            <div className={`text-[11px] uppercase tracking-[0.2em] ${walletMismatch ? 'text-amber-100' : theme.label}`}>
+              Destination Wallet
+            </div>
+            <div className="mt-2 break-all font-mono text-sm text-white">{quoteWallet || '—'}</div>
+            {walletMismatch && (
+              <div className="mt-2 text-xs">
+                Connected wallet differs from the quote wallet. Switch wallets before {actionGerund}.
+              </div>
+            )}
+          </div>
+        )}
+
+        {collapsed && walletMismatch && (
+          <div className="text-[10px] text-amber-200/80">Switch wallets before {actionGerund}.</div>
+        )}
+
+        {collapsed && (instructions.length > 0 || quickPrompts.length > 0) && (
+          <div className="flex flex-wrap gap-2 text-[10px] text-white/75">
+            {instructions.length > 0 && (
+              <span className={theme.metaChip}>Instructions {instructions.length}</span>
+            )}
+            {quickPrompts.length > 0 && (
+              <span className={theme.metaChip}>Prompts {quickPrompts.length}</span>
+            )}
+          </div>
+        )}
+
+        {issues.length > 0 && (
+          <div className={theme.warningSection}>
+            <div className="font-semibold uppercase tracking-wide">Needs attention</div>
+            <ul className="mt-2 list-disc space-y-1 pl-4">
+              {issues.map((issue: any, idx: number) => (
+                <li key={idx}>{String(issue)}</li>
+              ))}
+            </ul>
+          </div>
+        )}
+
+        {!collapsed && instructions.length > 0 && (
+          <div className={`${theme.section} space-y-3`}>
+            <div className="flex items-center justify-between gap-2">
+              <div className={`text-[11px] uppercase tracking-[0.2em] ${theme.label}`}>Instructions</div>
+              <button
+                type="button"
+                onClick={() => setShowInstructions((value) => !value)}
+                className={`${theme.chip.base} ${showInstructions ? theme.chip.active : ''}`}
+                aria-expanded={showInstructions}
+              >
+                {showInstructions ? <ChevronUp className="h-3.5 w-3.5" /> : <ChevronRight className="h-3.5 w-3.5" />}
+                {showInstructions ? 'Hide' : `${instructions.length}`}
+              </button>
+            </div>
+            {!showInstructions && instructions[0] && (
+              <div className={`truncate text-xs ${theme.helper}`}>{instructions[0]}</div>
+            )}
+            {showInstructions && (
+              <ul className="space-y-2 text-sm text-white/90">
+                {instructions.map((item, idx) => (
+                  <li key={idx} className="flex items-start gap-2">
+                    <span className="mt-1 h-1.5 w-1.5 rounded-full bg-white/60" />
+                    <span>{item}</span>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+        )}
+
+        {!collapsed && quickPrompts.length > 0 && (
+          <div className={`${theme.section} space-y-3`}>
+            <div className="flex items-center justify-between gap-2">
+              <div className={`text-[11px] uppercase tracking-[0.2em] ${theme.label}`}>Quick prompts</div>
+              <button
+                type="button"
+                onClick={() => setShowQuickPrompts((value) => !value)}
+                className={`${theme.chip.base} ${showQuickPrompts ? theme.chip.active : ''}`}
+                aria-expanded={showQuickPrompts}
+              >
+                {showQuickPrompts ? <ChevronUp className="h-3.5 w-3.5" /> : <ChevronRight className="h-3.5 w-3.5" />}
+                {showQuickPrompts ? 'Hide' : `${quickPrompts.length}`}
+              </button>
+            </div>
+            {!showQuickPrompts && quickPrompts[0] && (
+              <div className={`truncate text-xs ${theme.helper}`}>{quickPrompts[0].label}</div>
+            )}
+            {showQuickPrompts && (
+              <div className="flex flex-wrap gap-2">
+                {quickPrompts.map(({ key, label }) => (
+                  <button
+                    key={key}
+                    type="button"
+                    className={`${theme.promptPill} max-w-[220px] truncate`}
+                    onClick={() => {
+                      if (onInsertQuickPrompt) onInsertQuickPrompt(label)
+                    }}
+                    title={label}
+                  >
+                    <MessageSquarePlus className="h-3.5 w-3.5" />
+                    <span className="truncate">{label}</span>
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+
+        {!collapsed && (
+          <div className="flex flex-wrap items-center gap-3">
+            <button
+              type="button"
+              className={theme.actionPrimary}
+              onClick={handleExecuteClick}
+              disabled={!canExecute || sending}
+            >
+              {sending ? sendingLabel : actionVerbCapitalized}
+            </button>
+            {onRefreshQuote && (
+              <button
+                type="button"
+                className={theme.actionSecondary}
+                onClick={handleRefresh}
+                disabled={refreshing}
+              >
+                {refreshing ? 'Refreshing…' : (
+                  <>
+                    <Repeat className="h-4 w-4" />
+                    Refresh Quote
+                  </>
+                )}
+              </button>
+            )}
+            {disableReason && <span className={`text-xs ${theme.helper}`}>{disableReason}</span>}
+          </div>
+        )}
+        {collapsed && disableReason && (
+          <div className={`text-xs ${theme.helper}`}>{disableReason}</div>
+        )}
+
+        {error && (
+          <div className={`${theme.section} text-xs ${theme.errorText}`}>{error}</div>
+        )}
+        {txHash && (
+          <div className={`${theme.section} text-xs ${theme.successText}`}>
+            Transaction submitted: <code className="font-mono">{txHash}</code>
+          </div>
+        )}
+      </div>
     </div>
   )
 }

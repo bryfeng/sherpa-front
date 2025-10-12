@@ -230,6 +230,7 @@ import type { EntitlementSnapshot } from '../types/entitlement'
 import { ResponsiveContainer, AreaChart, Area, XAxis, YAxis, Tooltip, CartesianGrid } from 'recharts'
 import { TrendingTokensBanner, TrendingTokensList } from '../components/widgets/TrendingTokensWidget'
 import { RelayQuoteWidget } from '../components/widgets/RelayQuoteWidget'
+import { portfolioTheme } from '../components/widgets/portfolio-theme'
 
 function PersonaBadge({ p }: { p: Persona }) {
   const s = personaStyles[p]
@@ -660,6 +661,89 @@ function RightPanel({
                 onInsertQuickPrompt={onInsertQuickPrompt}
                 onViewAll={() => onExpand(p.id)}
               />
+            </div>
+          )
+        }
+
+        const quoteTypeRaw = typeof p.payload?.quote_type === 'string' ? p.payload.quote_type : undefined
+        const isSwapQuotePanel = p.kind === 'card' && (quoteTypeRaw === 'swap' || p.id === 'relay_swap_quote')
+        const isBridgeQuotePanel = p.kind === 'card' && (quoteTypeRaw === 'bridge' || p.id === 'relay_bridge_quote')
+
+        if (isSwapQuotePanel || isBridgeQuotePanel) {
+          const collapsed = Boolean(panelUI[p.id]?.collapsed)
+          const executeFn = isSwapQuotePanel ? onSwap : onBridge
+          const refreshFn = isSwapQuotePanel ? onRefreshSwapQuote : onRefreshBridgeQuote
+          return (
+            <div
+              key={p.id}
+              className="rounded-3xl"
+              draggable
+              onDragStart={(e: React.DragEvent<HTMLDivElement>) => {
+                e.dataTransfer.effectAllowed = 'move'
+                e.dataTransfer.setData('text/x-panel-id', p.id)
+              }}
+              onDragOver={(e: React.DragEvent<HTMLDivElement>) => {
+                if (e.dataTransfer.types.includes('text/x-panel-id')) {
+                  e.preventDefault()
+                  e.dataTransfer.dropEffect = 'move'
+                }
+              }}
+              onDrop={(e: React.DragEvent<HTMLDivElement>) => {
+                const dragId = e.dataTransfer.getData('text/x-panel-id')
+                if (dragId) onReorder(dragId, p.id)
+              }}
+            >
+              <RelayQuoteWidget
+                panel={p}
+                walletAddress={walletAddress}
+                walletReady={walletReady}
+                onExecuteQuote={executeFn}
+                onRefreshQuote={refreshFn}
+                onInsertQuickPrompt={onInsertQuickPrompt}
+                controls={{
+                  collapsed,
+                  onToggleCollapse: () => onToggleCollapse(p.id),
+                  onExpand: () => onExpand(p.id),
+                }}
+              />
+              <PanelSources sources={p.sources} />
+            </div>
+          )
+        }
+
+        if (p.kind === 'portfolio') {
+          const isCollapsed = Boolean(panelUI[p.id]?.collapsed)
+          return (
+            <div
+              key={p.id}
+              className="rounded-3xl"
+              draggable
+              onDragStart={(e: React.DragEvent<HTMLDivElement>) => {
+                e.dataTransfer.effectAllowed = 'move'
+                e.dataTransfer.setData('text/x-panel-id', p.id)
+              }}
+              onDragOver={(e: React.DragEvent<HTMLDivElement>) => {
+                if (e.dataTransfer.types.includes('text/x-panel-id')) {
+                  e.preventDefault()
+                  e.dataTransfer.dropEffect = 'move'
+                }
+              }}
+              onDrop={(e: React.DragEvent<HTMLDivElement>) => {
+                const dragId = e.dataTransfer.getData('text/x-panel-id')
+                if (dragId) onReorder(dragId, p.id)
+              }}
+            >
+              <PortfolioOverview
+                payload={p.payload}
+                walletAddress={walletAddress}
+                collapsed={isCollapsed}
+                controls={{
+                  collapsed: isCollapsed,
+                  onToggleCollapse: () => onToggleCollapse(p.id),
+                  onExpand: () => onExpand(p.id),
+                }}
+              />
+              <PanelSources sources={p.sources} />
             </div>
           )
         }
@@ -2068,7 +2152,21 @@ export default function DeFiChatAdaptiveUI({
   )
 }
 
-function PortfolioOverview({ payload, walletAddress }: { payload: any; walletAddress?: string }) {
+function PortfolioOverview({
+  payload,
+  walletAddress,
+  collapsed = false,
+  controls,
+}: {
+  payload: any
+  walletAddress?: string
+  collapsed?: boolean
+  controls?: {
+    collapsed: boolean
+    onToggleCollapse: () => void
+    onExpand: () => void
+  }
+}) {
   const [expanded, setExpanded] = React.useState(false)
   const [hideDust, setHideDust] = React.useState(true)
   const total = Number(payload?.totalUsd ?? 0)
@@ -2086,48 +2184,133 @@ function PortfolioOverview({ payload, walletAddress }: { payload: any; walletAdd
   const shown = expanded ? full : full.slice(0, collapsedCount)
 
   return (
-    <div className="space-y-3 text-sm">
-      <div className="flex items-center justify-between gap-2">
-        <div className="font-semibold text-slate-900">Total: ${Number.isFinite(total) ? total.toLocaleString() : '—'}</div>
-        <div className="flex items-center gap-2">
+    <div className={`relative overflow-hidden ${portfolioTheme.card} ${portfolioTheme.gradient}`}>
+      <div className={`pointer-events-none absolute inset-0 rounded-[inherit] border ${portfolioTheme.cardBorder}`} />
+      <div className="pointer-events-none absolute -left-20 top-16 h-56 w-56 rounded-full bg-white/10 blur-3xl" />
+      <div className="pointer-events-none absolute right-[-60px] top-8 h-56 w-56 rounded-full bg-[#6cc6ff]/20 blur-2xl" />
+      <div className="pointer-events-none absolute bottom-[-80px] left-12 h-72 w-72 rounded-full bg-[#0c4a7d]/30 blur-3xl" />
+
+      {controls && (
+        <div className="absolute right-4 top-4 z-20 flex items-center gap-2">
+          <div className="h-9 w-9 rounded-full border border-white/15 bg-white/10 text-white backdrop-blur-md flex items-center justify-center" title="Reorder">
+            <GripVertical className="h-4 w-4" />
+          </div>
           <button
-            onClick={() => setHideDust((v) => !v)}
-            className={`px-2 py-1 rounded-lg border text-xs ${hideDust ? 'bg-slate-100 border-slate-200 text-slate-700' : 'bg-white border-slate-200 text-slate-700'} sherpa-surface`}
-            title="Hide tokens under $1"
+            onClick={controls.onToggleCollapse}
+            className="h-9 w-9 rounded-full border border-white/15 bg-white/10 text-white backdrop-blur-md transition hover:bg-white/20"
+            title={controls.collapsed ? 'Expand panel' : 'Minimize panel'}
           >
-            {hideDust ? 'Dust hidden' : 'Show dust'}
+            {controls.collapsed ? <ChevronDown className="h-4 w-4 mx-auto" /> : <ChevronUp className="h-4 w-4 mx-auto" />}
           </button>
           <button
-            onClick={() => setExpanded((v) => !v)}
-            className="px-2 py-1 rounded-lg border border-slate-200 text-xs text-slate-700 bg-white sherpa-surface"
+            onClick={controls.onExpand}
+            className="h-9 w-9 rounded-full border border-white/15 bg-white/10 text-white backdrop-blur-md transition hover:bg-white/20"
+            title="Expand"
           >
-            {expanded ? 'Show top 6' : `Show all (${full.length})`}
+            <Maximize2 className="h-4 w-4 mx-auto" />
           </button>
         </div>
-      </div>
-      <div className="space-y-2">
-        {shown.map((pos: any, idx: number) => {
-          const usd = Number(pos.usd || 0)
-          const pct = total > 0 ? Math.max(0, Math.min(100, (usd / total) * 100)) : 0
-          return (
-            <div key={(pos.sym || 'TOK') + String(idx) + String(pos.usd)} className="rounded-xl border border-slate-200 bg-white p-3">
-              <div className="flex items-center justify-between">
-                <div className="text-sm font-medium text-slate-900">{pos.sym}</div>
-                <div className="flex items-center gap-2">
-                  <span className="text-xs text-slate-600">{pct.toFixed(1)}%</span>
-                  <span className="text-sm font-semibold text-slate-900">${usd.toLocaleString()}</span>
-                </div>
+      )}
+
+      <div className="relative space-y-4 text-sm">
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <div className="text-xs uppercase tracking-[0.2em] text-slate-200/80">Your Portfolio Snapshot</div>
+            <div className="mt-1 text-2xl font-semibold text-white">
+              {Number.isFinite(total) ? `$${total.toLocaleString(undefined, { maximumFractionDigits: 2 })}` : '—'}
+            </div>
+            {!collapsed && (
+              <div className="mt-1 text-xs text-slate-200/70">{full.length} positions tracked</div>
+            )}
+          </div>
+          {!collapsed && (
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => setHideDust((v) => !v)}
+                className={`${portfolioTheme.chip.base} ${hideDust ? portfolioTheme.chip.active : ''}`}
+                title="Hide tokens under $1"
+              >
+                {hideDust ? 'Dust hidden' : 'Show dust'}
+              </button>
+              <button
+                onClick={() => setExpanded((v) => !v)}
+                className={`${portfolioTheme.chip.base} ${expanded ? portfolioTheme.chip.active : ''}`}
+              >
+                {expanded ? 'Show top 10' : `Show all (${full.length})`}
+              </button>
+            </div>
+          )}
+        </div>
+
+        {collapsed ? (
+          <div className="grid gap-3 sm:grid-cols-2 text-slate-100">
+            <div className="rounded-2xl border border-white/15 bg-white/5 p-4 backdrop-blur-sm">
+              <div className="text-[11px] uppercase tracking-[0.2em] text-slate-200/70">Top holding</div>
+              <div className="mt-2 text-sm font-semibold">
+                {full[0]?.sym || '—'}
               </div>
-              <div className="mt-2 h-1.5 w-full rounded bg-slate-100">
-                <div className="h-1.5 rounded bg-primary-600" style={{ width: `${pct}%` }} />
+              <div className="text-xs text-slate-200/70">{full[0] ? `$${Number(full[0].usd || 0).toLocaleString()}` : 'Connect wallet'}</div>
+            </div>
+            <div className="rounded-2xl border border-white/15 bg-white/5 p-4 backdrop-blur-sm">
+              <div className="text-[11px] uppercase tracking-[0.2em] text-slate-200/70">Allocation spread</div>
+              <div className="mt-2 text-xs text-slate-200/70">{full.length} assets</div>
+              <div className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-white/10">
+                <div className="h-full bg-white/50" style={{ width: `${Math.min(100, (Number(full[0]?.usd || 0) / (total || 1)) * 100)}%` }} />
               </div>
             </div>
-          )
-        })}
+          </div>
+        ) : (
+          <>
+            <div className="space-y-3">
+              {shown.map((pos: any, idx: number) => {
+                const usd = Number(pos.usd || 0)
+                const pct = total > 0 ? Math.max(0, Math.min(100, (usd / total) * 100)) : 0
+                return (
+                  <div
+                    key={(pos.sym || 'TOK') + String(idx) + String(pos.usd)}
+                    className="rounded-2xl border border-white/15 bg-white/5 p-4 backdrop-blur-sm shadow-[0_10px_40px_rgba(15,35,66,0.2)]"
+                  >
+                    <div className="flex flex-wrap items-center justify-between gap-3">
+                      <div>
+                        <div className="text-sm font-semibold text-white/95">{pos.sym}</div>
+                        {pos.network && <div className="text-[11px] uppercase tracking-wide text-slate-200/70">{pos.network}</div>}
+                      </div>
+                      <div className="flex items-center gap-3 text-slate-100">
+                        <span className="text-xs text-slate-200/80">{pct.toFixed(1)}%</span>
+                        <span className="text-sm font-semibold">${usd.toLocaleString()}</span>
+                      </div>
+                    </div>
+                    <div className={`mt-3 h-1.5 w-full overflow-hidden rounded-full ${portfolioTheme.progress.track}`}>
+                      <div className={`h-1.5 rounded-full ${portfolioTheme.progress.fill}`} style={{ width: `${pct}%` }} />
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+            {!expanded && full.length > collapsedCount && (
+              <div className="text-xs text-slate-200/80">Showing top {collapsedCount} of {full.length}</div>
+            )}
+          </>
+        )}
+
+        {payload?.sources?.length > 0 && (
+          <div className="flex flex-wrap gap-2 text-xs text-slate-200/70">
+            <span>Sources:</span>
+            {payload.sources.map((src: any) => (
+              <a
+                key={src?.name || src}
+                href={src?.url || src?.href || '#'}
+                target="_blank"
+                rel="noreferrer"
+                className="inline-flex items-center gap-1 rounded-full border border-white/20 bg-white/10 px-3 py-1 text-xs font-medium text-slate-100 hover:bg-white/20"
+              >
+                {src?.name || src}
+                <ExternalLink className="h-3 w-3" />
+              </a>
+            ))}
+          </div>
+        )}
       </div>
-      {!expanded && full.length > collapsedCount && (
-        <div className="text-xs text-slate-500">Showing top {collapsedCount} of {full.length}</div>
-      )}
     </div>
   )
 }

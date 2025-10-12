@@ -105,7 +105,7 @@ function ExampleWidget() {
 ## Real Usage Examples
 
 - `TrendingTokensWidget` reorganized its hotspots, token list, and refresh action with the kit (`src/components/widgets/TrendingTokensWidget.tsx`).
-- `RelayQuoteWidget` leverages `WidgetStatGrid` and `WidgetButton` to present bridge/swap quotes consistently (`src/components/widgets/RelayQuoteWidget.tsx`).
+- `RelayQuoteWidget` now draws from dedicated swap/bridge themes (`src/components/widgets/relay-quote-theme.ts`) to render gradient quotes with frosted stats, prompts, and execution controls (`src/components/widgets/RelayQuoteWidget.tsx`).
 
 ## Extending the Kit
 
