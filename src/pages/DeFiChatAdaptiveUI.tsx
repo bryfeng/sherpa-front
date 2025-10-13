@@ -10,7 +10,6 @@ import {
   Sparkles,
   Settings,
   Wand2,
-  Wallet,
   BarChart3,
   Repeat,
   ArrowLeftRight,
@@ -771,7 +770,6 @@ function RightPanel({
           <CardHeader className="pb-2">
             <CardTitle className="text-sm flex items-center gap-2">
               {p.kind === 'chart' && <BarChart3 className="h-4 w-4" />}
-              {p.kind === 'portfolio' && <Wallet className="h-4 w-4" />}
               {p.kind === 'trending' && <Star className="h-4 w-4" />}
               {p.kind === 'prediction' && <TrendingUp className="h-4 w-4" />}
               {p.title}
@@ -791,9 +789,6 @@ function RightPanel({
           {!panelUI[p.id]?.collapsed && (
             <CardContent>
               {p.kind === 'chart' && <ChartPanel p={p} />}
-              {p.kind === 'portfolio' && (
-                <PortfolioOverview payload={p.payload} walletAddress={walletAddress} />
-              )}
               {p.kind === 'card' && (
                 (() => {
                   const quoteType = typeof p.payload?.quote_type === 'string' ? p.payload.quote_type : undefined
