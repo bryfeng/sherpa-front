@@ -15,6 +15,8 @@ export interface ChatRequest {
   address?: string
   chain?: string
   conversation_id?: string
+  llm_provider?: string
+  llm_model?: string
 }
 
 export interface ChatResponse {

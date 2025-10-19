@@ -1,0 +1,116 @@
+{
+  "version": "0.1.0",
+  "modules": [
+    {
+      "id": "portfolio-overview",
+      "name": "Portfolio Overview",
+      "description": "Wallet snapshot with allocation breakdown and dust controls.",
+      "category": "portfolio",
+      "owners": ["@sherpa/frontend"],
+      "tags": ["priority:p0", "wallet"],
+      "contracts": {
+        "dataHook": "src/workspace/hooks/usePortfolioSummary.ts#usePortfolioSummary",
+        "queryKeys": ["portfolio"]
+      },
+      "tiers": {
+        "full": {
+          "status": "in_progress",
+          "component": "src/pages/DeFiChatAdaptiveUI.tsx#PortfolioOverview",
+          "notes": "Data hook extracted; still need shared component package + story coverage."
+        },
+        "preview": {
+          "status": "in_progress",
+          "component": "src/components/conversation/PortfolioInlineCard.tsx",
+          "notes": "Snapshot component now powers the workspace panel; reintroduce inline conversation attachment post layout refinements."
+        },
+        "attachment": {
+          "status": "planned",
+          "notes": "Needs ConversationAttachment schema for quick action payloads."
+        }
+      },
+      "notes": "View-model now centralised in workspace hook; next steps: shared component extraction + mini variants."
+    },
+    {
+      "id": "top-coins",
+      "name": "Top Coins",
+      "description": "Daily list of top moving non-stable assets.",
+      "category": "market-data",
+      "owners": ["@sherpa/frontend"],
+      "tags": ["priority:p2"],
+      "contracts": {
+        "dataHook": "src/services/prices.ts#getTopPrices"
+      },
+      "tiers": {
+        "full": {
+          "status": "in_progress",
+          "component": "src/pages/DeFiChatAdaptiveUI.tsx#TopCoinsPanel",
+          "notes": "Card renders in workspace but lacks collapse, story, and hook wrapper."
+        },
+        "preview": {
+          "status": "planned",
+          "notes": "Mini should show top mover change% + CTA to expand."
+        },
+        "attachment": {
+          "status": "planned",
+          "notes": "Inline badge group for quick replies once prompt attachments land."
+        }
+      }
+    },
+    {
+      "id": "trending-tokens",
+      "name": "Trending Tokens",
+      "description": "Relay-ready trending assets with bridge/swap prompts.",
+      "category": "market-data",
+      "owners": ["@sherpa/frontend"],
+      "tags": ["priority:p1", "relay"],
+      "contracts": {
+        "dataHook": "src/services/trending.ts#getTrendingTokens"
+      },
+      "tiers": {
+        "full": {
+          "status": "in_progress",
+          "component": "src/components/widgets/TrendingTokensWidget.tsx#TrendingTokensList",
+          "notes": "Widget is production-ready but needs doc + hook + story alignment."
+        },
+        "preview": {
+          "status": "planned",
+          "notes": "Banner-style mini exists but not wired into attachments."
+        },
+        "attachment": {
+          "status": "in_progress",
+          "component": "src/components/widgets/TrendingTokensWidget.tsx#TrendingTokensBanner",
+          "notes": "Banner renders in conversation hero but lacks attachment schema + lifecycle."
+        }
+      },
+      "notes": "Banner variant already exists; wire into conversation once attachment contract defined."
+    },
+    {
+      "id": "relay-quote",
+      "name": "Relay Quote",
+      "description": "Executable swap/bridge quotes with CTA hooks.",
+      "category": "automation",
+      "owners": ["@sherpa/frontend"],
+      "tags": ["relay", "priority:p1"],
+      "contracts": {
+        "dataHook": "src/services/relay.ts#getRelayQuote",
+        "queryKeys": ["relay-quote"]
+      },
+      "tiers": {
+        "full": {
+          "status": "in_progress",
+          "component": "src/components/widgets/RelayQuoteWidget.tsx",
+          "notes": "Widget supports collapse/expand but lacks story + shared hook."
+        },
+        "preview": {
+          "status": "planned",
+          "notes": "Need compact quote summary for conversation inline acknowledgement."
+        },
+        "attachment": {
+          "status": "planned",
+          "notes": "Attachment schema should include request/quote metadata for follow-up."
+        }
+      },
+      "notes": "Swap + bridge share widget; clarify quote_type union before mini build."
+    }
+  ]
+}

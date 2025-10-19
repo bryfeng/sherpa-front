@@ -16,6 +16,97 @@ export const api = {
     return data
   },
 
+  async chatStream(
+    payload: ChatRequest,
+    onDelta: (chunk: string) => void,
+  ): Promise<ChatResponse | null> {
+    const controller = new AbortController()
+    let finalResponse: ChatResponse | null = null
+    let done = false
+
+    try {
+      const response = await fetch(`${BASE}/chat/stream`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Accept: 'text/event-stream',
+        },
+        body: JSON.stringify(payload),
+        signal: controller.signal,
+      })
+
+      if (!response.ok || !response.body) {
+        throw new Error(`Streaming request failed with status ${response.status}`)
+      }
+
+      const reader = response.body.getReader()
+      const decoder = new TextDecoder()
+      let buffer = ''
+
+      while (!done) {
+        const { value, done: readerDone } = await reader.read()
+        if (readerDone) break
+        buffer += decoder.decode(value, { stream: true })
+
+        const parts = buffer.split('\n\n')
+        buffer = parts.pop() ?? ''
+
+        for (const part of parts) {
+          if (!part.trim()) continue
+          const lines = part.split('\n')
+          let dataStr = ''
+          for (const line of lines) {
+            if (line.startsWith('data:')) {
+              dataStr += line.slice(5).trim()
+            }
+          }
+
+          if (!dataStr) continue
+          if (dataStr === '[DONE]') {
+            done = true
+            break
+          }
+
+          let payloadJson: any
+          try {
+            payloadJson = JSON.parse(dataStr)
+          } catch (error) {
+            console.warn('Failed to parse streaming payload', error)
+            continue
+          }
+
+          if (payloadJson?.type === 'delta') {
+            if (typeof payloadJson.delta === 'string') {
+              onDelta(payloadJson.delta)
+            }
+          } else if (payloadJson?.type === 'final') {
+            if (payloadJson.response) {
+              finalResponse = payloadJson.response as ChatResponse
+            }
+          } else if (payloadJson?.type === 'error') {
+            throw new Error(payloadJson.message || 'Streaming error')
+          }
+        }
+      }
+
+      // Flush any remaining buffered data
+      if (buffer.trim()) {
+        try {
+          const payloadJson = JSON.parse(buffer.replace(/^data:\s*/, ''))
+          if (payloadJson?.type === 'final' && payloadJson.response) {
+            finalResponse = payloadJson.response as ChatResponse
+          }
+        } catch {
+          // ignore trailing buffer noise
+        }
+      }
+
+      return finalResponse
+    } finally {
+      controller.abort()
+    }
+  },
+
   async portfolio(address: string, chain = 'ethereum'): Promise<PortfolioAPIResponse> {
     const { data } = await axios.get(`${BASE}/tools/portfolio`, {
       params: { address, chain },

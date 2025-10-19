@@ -225,10 +225,12 @@ import { formatRelativeTime } from '../utils/time'
 import { usePublicClient, useSwitchChain, useWalletClient } from 'wagmi'
 import { erc20Abi } from 'viem'
 import type { EntitlementSnapshot } from '../types/entitlement'
+import type { PortfolioPositionViewModel, PortfolioSummaryViewModel, WorkspaceRequestStatus } from '../workspace/types'
 import { ResponsiveContainer, AreaChart, Area, XAxis, YAxis, Tooltip, CartesianGrid } from 'recharts'
 import { TrendingTokensBanner, TrendingTokensList } from '../components/widgets/TrendingTokensWidget'
 import { RelayQuoteWidget } from '../components/widgets/RelayQuoteWidget'
-import { portfolioTheme } from '../components/widgets/portfolio-theme'
+import { PortfolioInlineCard } from '../components/conversation/PortfolioInlineCard'
+import { PortfolioRailChip } from '../components/conversation/PortfolioRailChip'
 
 function PersonaBadge({ p }: { p: Persona }) {
   const s = personaStyles[p]
@@ -1131,6 +1133,11 @@ export default function DeFiChatAdaptiveUI({
   onRequestPro,
   allowManualUnlock,
   onManualUnlock,
+  portfolioSummary,
+  portfolioStatus = 'idle',
+  portfolioError,
+  onRefreshPortfolio,
+  portfolioRefreshing = false,
 }: {
   persona: Persona
   setPersona: (p: Persona) => void
@@ -1140,6 +1147,11 @@ export default function DeFiChatAdaptiveUI({
   onRequestPro: (source: 'cta' | 'action') => void
   allowManualUnlock?: boolean
   onManualUnlock?: () => void
+  portfolioSummary?: PortfolioSummaryViewModel
+  portfolioStatus?: WorkspaceRequestStatus
+  portfolioError?: string | null
+  onRefreshPortfolio: () => Promise<void>
+  portfolioRefreshing?: boolean
 }) {
   const [messages, setMessages] = useState<AgentMessage[]>(seedIntro)
   const [panels, setPanels] = useState<Panel[]>(seedPanels)
@@ -1222,6 +1234,31 @@ export default function DeFiChatAdaptiveUI({
   const publicClient = usePublicClient()
   const { switchChainAsync } = useSwitchChain()
   const walletReady = Boolean(walletClient)
+  const portfolioHighlightPending = useRef(Boolean(walletAddress))
+  const prevPortfolioFetchRef = useRef<string | null>(null)
+  const prevWalletAddressRef = useRef<string | undefined>(walletAddress)
+
+  const ensurePortfolioPanel = React.useCallback(
+    ({ refresh = false, highlight = true }: { refresh?: boolean; highlight?: boolean } = {}) => {
+      if (!walletAddress) return false
+      if (refresh || !portfolioSummary) {
+        if (highlight) portfolioHighlightPending.current = true
+        onRefreshPortfolio().catch(() => {})
+        return true
+      }
+      if (highlight) {
+        setHighlight(['portfolio_overview'])
+        portfolioHighlightPending.current = false
+      }
+      return true
+    },
+    [walletAddress, portfolioSummary, onRefreshPortfolio, setHighlight],
+  )
+
+  const openPortfolioWorkspace = React.useCallback((forceRefresh = false) => {
+    ensurePortfolioPanel({ refresh: forceRefresh || !portfolioSummary, highlight: true })
+    setActiveSurface('workspace')
+  }, [ensurePortfolioPanel, portfolioSummary])
 
   function handleProUpsell(source: 'cta' | 'action') {
     onRequestPro(source)
@@ -1242,6 +1279,22 @@ export default function DeFiChatAdaptiveUI({
       setCopiedToken(false)
     }
   }
+
+  useEffect(() => {
+    if (walletAddress && walletAddress !== prevWalletAddressRef.current) {
+      portfolioHighlightPending.current = true
+    }
+    if (!walletAddress) {
+      portfolioHighlightPending.current = false
+    }
+    prevWalletAddressRef.current = walletAddress
+  }, [walletAddress])
+
+  useEffect(() => {
+    if (portfolioStatus === 'error') {
+      portfolioHighlightPending.current = false
+    }
+  }, [portfolioStatus])
 
   useEffect(() => {
     return () => {
@@ -1273,33 +1326,6 @@ export default function DeFiChatAdaptiveUI({
       lastAnnouncedId.current = latestAssistant.id
     }
   }, [messages])
-
-  const loadPortfolioPanel = React.useCallback(async (addr: string) => {
-    try {
-      const res = await api.portfolio(addr)
-      if (res.success && res.portfolio) {
-        const data = res.portfolio
-        const totalUsd = Number(data.total_value_usd || 0)
-        const sorted = (data.tokens || [])
-          .filter((t: any) => Number(t.value_usd || 0) > 0)
-          .sort((a: any, b: any) => Number(b.value_usd || 0) - Number(a.value_usd || 0))
-        const allPositions = sorted.map((t: any) => ({ sym: t.symbol || t.name || 'TOK', usd: Number(t.value_usd || 0) }))
-        const positions = allPositions.slice(0, 6)
-        const panel: Panel = {
-          id: 'portfolio_overview',
-          kind: 'portfolio',
-          title: 'Your Portfolio Snapshot',
-          payload: { totalUsd, positions, allPositions },
-          sources: Array.isArray(res.sources) ? res.sources : undefined,
-        }
-        setPanels((prev) => {
-          const others = prev.filter((p) => p.id !== 'portfolio_overview')
-          return [panel, ...others]
-        })
-        setHighlight(['portfolio_overview'])
-      }
-    } catch {}
-  }, [setPanels, setHighlight])
 
   // Uniswap TVL removed in favor of a simple Top Coins panel
 
@@ -1357,15 +1383,56 @@ export default function DeFiChatAdaptiveUI({
     return Array.from(byId.values())
   }, [])
 
-  // Load portfolio panel when wallet address is available
   useEffect(() => {
-    if (!walletAddress) {
-      // Remove portfolio panel when wallet disconnects
+    if (!portfolioSummary) {
+      prevPortfolioFetchRef.current = null
       setPanels((prev) => prev.filter((p) => p.id !== 'portfolio_overview'))
       return
     }
-    loadPortfolioPanel(walletAddress).catch(() => {})
-  }, [walletAddress, loadPortfolioPanel])
+
+    const fetchedKey = portfolioSummary.fetchedAt || `${portfolioSummary.totalUsd}`
+    const needsUpdate = prevPortfolioFetchRef.current !== fetchedKey
+
+    let panelChanged = false
+
+    if (needsUpdate) {
+      prevPortfolioFetchRef.current = fetchedKey
+    }
+
+    const payload = {
+      totalUsd: portfolioSummary.totalUsd,
+      positions: portfolioSummary.positions,
+      allPositions: portfolioSummary.allPositions,
+      topPositions: portfolioSummary.topPositions,
+      tokenCount: portfolioSummary.tokenCount,
+      fetchedAt: portfolioSummary.fetchedAt,
+      sources: portfolioSummary.sources,
+      raw: portfolioSummary.raw,
+    }
+
+    const panel: Panel = {
+      id: 'portfolio_overview',
+      kind: 'portfolio',
+      title: 'Your Portfolio Snapshot',
+      payload,
+      sources: portfolioSummary.sources,
+    }
+
+    setPanels((prev) => {
+      const existing = prev.find((p) => p.id === 'portfolio_overview')
+      if (!needsUpdate && existing) {
+        return prev
+      }
+      panelChanged = true
+      const others = prev.filter((p) => p.id !== 'portfolio_overview')
+      return [panel, ...others]
+    })
+
+    if ((needsUpdate || panelChanged) && portfolioHighlightPending.current) {
+      setHighlight(['portfolio_overview'])
+      portfolioHighlightPending.current = false
+    }
+  }, [portfolioSummary, setPanels, setHighlight])
 
   useEffect(() => {
     loadTrendingTokensPanel({ highlight: true }).catch(() => {})
@@ -1429,8 +1496,7 @@ export default function DeFiChatAdaptiveUI({
             { id: uid('msg'), role: 'assistant', text: 'Please connect your wallet to view your portfolio.' },
           ])
         } else {
-          loadPortfolioPanel(walletAddress).catch(() => {})
-          setHighlight(['portfolio_overview'])
+          ensurePortfolioPanel({ refresh: true, highlight: true })
         }
       }
 
@@ -1457,7 +1523,7 @@ export default function DeFiChatAdaptiveUI({
     } finally {
       scheduleScrollToBottom()
     }
-  }, [conversationId, loadPortfolioPanel, mergePanelsLocal, scheduleScrollToBottom, setConversationId, setHighlight, setPanels, storageKey, walletAddress])
+  }, [conversationId, ensurePortfolioPanel, mergePanelsLocal, scheduleScrollToBottom, setConversationId, setHighlight, setPanels, storageKey, walletAddress])
 
   const send = async () => {
     const q = input.trim()
@@ -1740,7 +1806,8 @@ export default function DeFiChatAdaptiveUI({
           break
         }
         if (a.params?.panel_id === 'portfolio_overview' && walletAddress) {
-          loadPortfolioPanel(walletAddress).catch(() => {})
+          openPortfolioWorkspace(true)
+          break
         }
         setHighlight(a.params?.panel_id ? [a.params?.panel_id] : undefined)
         if (a.params?.panel_id) setMessages((m) => [...m, { id: uid('msg'), role: 'assistant', text: `Opened: ${a.params?.panel_id}` }])
@@ -1863,11 +1930,22 @@ export default function DeFiChatAdaptiveUI({
                 {workspaceButtonLabel}
               </button>
             </div>
-            <div className="flex items-center gap-2 text-xs text-slate-500">
-              <span className="hidden sm:inline">Session</span>
-              <span className="rounded-full border border-slate-200 bg-white px-2 py-1 font-medium text-slate-700 shadow-sm">
-                {conversationDisplay}
-              </span>
+            <div className="flex flex-wrap items-center gap-3">
+              {walletAddress ? (
+                <PortfolioRailChip
+                  summary={portfolioSummary ?? null}
+                  status={portfolioStatus}
+                  refreshing={portfolioRefreshing}
+                  onOpenWorkspace={() => openPortfolioWorkspace(false)}
+                  onRefresh={() => onRefreshPortfolio().catch(() => {})}
+                />
+              ) : null}
+              <div className="flex items-center gap-2 text-xs text-slate-500">
+                <span className="hidden sm:inline">Session</span>
+                <span className="rounded-full border border-slate-200 bg-white px-2 py-1 font-medium text-slate-700 shadow-sm">
+                  {conversationDisplay}
+                </span>
+              </div>
             </div>
           </div>
           {activeSurface === 'conversation' ? (
@@ -2038,9 +2116,10 @@ export default function DeFiChatAdaptiveUI({
                         size="sm"
                         variant="secondary"
                         className="justify-start"
+                        disabled={walletAddress ? portfolioRefreshing : false}
                         onClick={() => {
                           if (walletAddress) {
-                            loadPortfolioPanel(walletAddress).catch(() => {})
+                            openPortfolioWorkspace(true)
                           } else {
                             handleInsertQuickPrompt('Help me review my wallet once it is connected.')
                           }
@@ -2049,6 +2128,11 @@ export default function DeFiChatAdaptiveUI({
                       >
                         <ArrowLeftRight className="mr-2 h-3.5 w-3.5" />Portfolio check
                       </Button>
+                      {walletAddress && portfolioStatus === 'error' && (
+                        <div className="text-xs text-rose-600">
+                          {portfolioError || 'Unable to load portfolio. Try again in a moment.'}
+                        </div>
+                      )}
                       <Button
                         size="sm"
                         variant="secondary"
@@ -2282,150 +2366,133 @@ function PortfolioOverview({
     onExpand: () => void
   }
 }) {
-  const [expanded, setExpanded] = React.useState(false)
-  const [hideDust, setHideDust] = React.useState(true)
-  const total = Number(payload?.totalUsd ?? 0)
-  const basePositions = Array.isArray(payload?.allPositions) ? payload.allPositions : Array.isArray(payload?.positions) ? payload.positions : []
-  const hasData = (Number.isFinite(total) && total > 0) || basePositions.length > 0
+  const summary = React.useMemo<PortfolioSummaryViewModel | null>(() => {
+    if (!payload) return null
+    const total = Number(payload.totalUsd ?? payload.totalUsdFormatted ?? 0)
+    const topPositions = Array.isArray(payload.topPositions) ? payload.topPositions : Array.isArray(payload.positions) ? payload.positions.slice(0, 3) : []
+    const positions = Array.isArray(payload.positions) ? payload.positions : []
+    const allPositions = Array.isArray(payload.allPositions) ? payload.allPositions : positions
 
-  if (!hasData) {
+    if (!Number.isFinite(total) && allPositions.length === 0) return null
+
+    const formattedTotal = Number.isFinite(total)
+      ? `$${total.toLocaleString(undefined, { maximumFractionDigits: 2 })}`
+      : '—'
+
+    return {
+      totalUsd: Number.isFinite(total) ? total : 0,
+      totalUsdFormatted: formattedTotal,
+      tokenCount: typeof payload.tokenCount === 'number' ? payload.tokenCount : allPositions.length,
+      address: typeof payload.address === 'string' ? payload.address : undefined,
+      fetchedAt: typeof payload.fetchedAt === 'string' ? payload.fetchedAt : new Date().toISOString(),
+      positions,
+      allPositions,
+      topPositions,
+      sources: Array.isArray(payload.sources) ? payload.sources : undefined,
+      raw: payload.raw,
+    }
+  }, [payload])
+
+  const [hideDust, setHideDust] = React.useState(true)
+  const [showAll, setShowAll] = React.useState(false)
+
+  React.useEffect(() => {
+    if (collapsed) setShowAll(false)
+  }, [collapsed])
+
+  if (!summary) {
     if (!walletAddress) return <div className="text-sm text-slate-500">Connect your wallet to load portfolio data.</div>
     return <div className="text-sm text-slate-500">Loading portfolio…</div>
   }
 
-  const threshold = 1 // USD
-  const full = hideDust ? basePositions.filter((p: any) => Number(p.usd || 0) >= threshold) : basePositions
-  const collapsedCount = 10
-  const shown = expanded ? full : full.slice(0, collapsedCount)
+  const dustThreshold = 1
+  const allPositions = summary.allPositions || []
+  const filtered = hideDust
+    ? allPositions.filter((pos: PortfolioPositionViewModel) => Number(pos.usd || 0) >= dustThreshold)
+    : allPositions
+  const displayLimit = 8
+  const displayed = showAll ? filtered : filtered.slice(0, displayLimit)
+
+  const handleToggleDust = () => setHideDust((prev) => !prev)
+  const handleToggleShowAll = () => setShowAll((prev) => !prev)
 
   return (
-    <div className={`relative overflow-hidden ${portfolioTheme.card} ${portfolioTheme.gradient}`}>
-      <div className={`pointer-events-none absolute inset-0 rounded-[inherit] border ${portfolioTheme.cardBorder}`} />
-      <div className="pointer-events-none absolute -left-20 top-16 h-56 w-56 rounded-full bg-white/10 blur-3xl" />
-      <div className="pointer-events-none absolute right-[-60px] top-8 h-56 w-56 rounded-full bg-[#6cc6ff]/20 blur-2xl" />
-      <div className="pointer-events-none absolute bottom-[-80px] left-12 h-72 w-72 rounded-full bg-[#0c4a7d]/30 blur-3xl" />
+    <div className="space-y-4">
+      <PortfolioInlineCard
+        summary={summary}
+        status="success"
+        onOpenWorkspace={controls?.onExpand ?? (() => {})}
+        description="Monitor top holdings and jump into expanded analysis when you need deeper allocation views."
+      />
 
-      {controls && (
-        <div className="absolute right-4 top-4 z-20 flex items-center gap-2">
-          <div className="h-9 w-9 rounded-full border border-white/15 bg-white/10 text-white backdrop-blur-md flex items-center justify-center" title="Reorder">
-            <GripVertical className="h-4 w-4" />
+      {filtered.length > 0 && (
+        <div className="rounded-2xl border border-slate-200 bg-white/75 shadow-sm">
+          <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-200 px-4 py-3">
+            <span className="text-sm font-semibold text-slate-800">Positions</span>
+            <div className="flex items-center gap-2 text-xs">
+              <button
+                type="button"
+                onClick={handleToggleDust}
+                className="rounded-full border border-slate-200 px-3 py-1 font-medium text-slate-600 transition hover:border-slate-300 hover:text-slate-800"
+                title={hideDust ? 'Show tokens under $1' : 'Hide low-value tokens'}
+              >
+                {hideDust ? 'Dust hidden' : 'Dust shown'}
+              </button>
+              {filtered.length > displayLimit && (
+                <button
+                  type="button"
+                  onClick={handleToggleShowAll}
+                  className="rounded-full border border-slate-200 px-3 py-1 font-medium text-slate-600 transition hover:border-slate-300 hover:text-slate-800"
+                >
+                  {showAll ? `Show top ${displayLimit}` : `Show all (${filtered.length})`}
+                </button>
+              )}
+            </div>
           </div>
-          <button
-            onClick={controls.onToggleCollapse}
-            className="h-9 w-9 rounded-full border border-white/15 bg-white/10 text-white backdrop-blur-md transition hover:bg-white/20"
-            title={controls.collapsed ? 'Expand panel' : 'Minimize panel'}
-          >
-            {controls.collapsed ? <ChevronDown className="h-4 w-4 mx-auto" /> : <ChevronUp className="h-4 w-4 mx-auto" />}
-          </button>
-          <button
-            onClick={controls.onExpand}
-            className="h-9 w-9 rounded-full border border-white/15 bg-white/10 text-white backdrop-blur-md transition hover:bg-white/20"
-            title="Expand"
-          >
-            <Maximize2 className="h-4 w-4 mx-auto" />
-          </button>
+          <div className="max-h-[320px] overflow-y-auto">
+            <ul className="divide-y divide-slate-200 text-sm">
+              {displayed.map((pos, idx) => {
+                const usd = Number(pos.usd || 0)
+                const pct = summary.totalUsd > 0 ? Math.max(0, Math.min(100, (usd / summary.totalUsd) * 100)) : 0
+                return (
+                  <li key={`${pos.symbol || pos.sym || idx}-${idx}`} className="flex items-center justify-between gap-3 px-4 py-3">
+                    <div className="min-w-0">
+                      <div className="text-sm font-medium text-slate-800">{pos.sym || pos.symbol || '—'}</div>
+                      <div className="text-xs text-slate-500">
+                        {pos.name}
+                        {pos.network ? ` · ${pos.network}` : ''}
+                        {pos.balanceFormatted ? ` · ${pos.balanceFormatted}` : ''}
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-3 text-right">
+                      <span className="text-xs text-slate-500">{Number.isFinite(pct) ? `${pct.toFixed(1)}%` : '—'}</span>
+                      <span className="text-sm font-semibold text-slate-900">{pos.usdFormatted ?? `$${usd.toLocaleString()}`}</span>
+                    </div>
+                  </li>
+                )
+              })}
+            </ul>
+          </div>
         </div>
       )}
 
-      <div className="relative space-y-4 text-sm">
-        <div className="flex flex-wrap items-start justify-between gap-3">
-          <div>
-            <div className="text-xs uppercase tracking-[0.2em] text-slate-200/80">Your Portfolio Snapshot</div>
-            <div className="mt-1 text-2xl font-semibold text-white">
-              {Number.isFinite(total) ? `$${total.toLocaleString(undefined, { maximumFractionDigits: 2 })}` : '—'}
-            </div>
-            {!collapsed && (
-              <div className="mt-1 text-xs text-slate-200/70">{full.length} positions tracked</div>
-            )}
-          </div>
-          {!collapsed && (
-            <div className="flex items-center gap-2">
-              <button
-                onClick={() => setHideDust((v) => !v)}
-                className={`${portfolioTheme.chip.base} ${hideDust ? portfolioTheme.chip.active : ''}`}
-                title="Hide tokens under $1"
-              >
-                {hideDust ? 'Dust hidden' : 'Show dust'}
-              </button>
-              <button
-                onClick={() => setExpanded((v) => !v)}
-                className={`${portfolioTheme.chip.base} ${expanded ? portfolioTheme.chip.active : ''}`}
-              >
-                {expanded ? 'Show top 10' : `Show all (${full.length})`}
-              </button>
-            </div>
-          )}
+      {Array.isArray(summary.sources) && summary.sources.length > 0 && (
+        <div className="flex flex-wrap gap-2 text-xs text-slate-500">
+          <span>Sources:</span>
+          {summary.sources.map((src: any) => (
+            <a
+              key={src?.name || src}
+              href={src?.url || src?.href || '#'}
+              target="_blank"
+              rel="noreferrer"
+              className="inline-flex items-center gap-1 rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-medium text-slate-600 transition hover:border-slate-300 hover:text-slate-900"
+            >
+              {src?.name || src}
+              <ExternalLink className="h-3 w-3" />
+            </a>
+          ))}
         </div>
-
-        {collapsed ? (
-          <div className="grid gap-3 sm:grid-cols-2 text-slate-100">
-            <div className="rounded-2xl border border-white/15 bg-white/5 p-4 backdrop-blur-sm">
-              <div className="text-[11px] uppercase tracking-[0.2em] text-slate-200/70">Top holding</div>
-              <div className="mt-2 text-sm font-semibold">
-                {full[0]?.sym || '—'}
-              </div>
-              <div className="text-xs text-slate-200/70">{full[0] ? `$${Number(full[0].usd || 0).toLocaleString()}` : 'Connect wallet'}</div>
-            </div>
-            <div className="rounded-2xl border border-white/15 bg-white/5 p-4 backdrop-blur-sm">
-              <div className="text-[11px] uppercase tracking-[0.2em] text-slate-200/70">Allocation spread</div>
-              <div className="mt-2 text-xs text-slate-200/70">{full.length} assets</div>
-              <div className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-white/10">
-                <div className="h-full bg-white/50" style={{ width: `${Math.min(100, (Number(full[0]?.usd || 0) / (total || 1)) * 100)}%` }} />
-              </div>
-            </div>
-          </div>
-        ) : (
-          <>
-            <div className="space-y-3">
-              {shown.map((pos: any, idx: number) => {
-                const usd = Number(pos.usd || 0)
-                const pct = total > 0 ? Math.max(0, Math.min(100, (usd / total) * 100)) : 0
-                return (
-                  <div
-                    key={(pos.sym || 'TOK') + String(idx) + String(pos.usd)}
-                    className="rounded-2xl border border-white/15 bg-white/5 p-4 backdrop-blur-sm shadow-[0_10px_40px_rgba(15,35,66,0.2)]"
-                  >
-                    <div className="flex flex-wrap items-center justify-between gap-3">
-                      <div>
-                        <div className="text-sm font-semibold text-white/95">{pos.sym}</div>
-                        {pos.network && <div className="text-[11px] uppercase tracking-wide text-slate-200/70">{pos.network}</div>}
-                      </div>
-                      <div className="flex items-center gap-3 text-slate-100">
-                        <span className="text-xs text-slate-200/80">{pct.toFixed(1)}%</span>
-                        <span className="text-sm font-semibold">${usd.toLocaleString()}</span>
-                      </div>
-                    </div>
-                    <div className={`mt-3 h-1.5 w-full overflow-hidden rounded-full ${portfolioTheme.progress.track}`}>
-                      <div className={`h-1.5 rounded-full ${portfolioTheme.progress.fill}`} style={{ width: `${pct}%` }} />
-                    </div>
-                  </div>
-                )
-              })}
-            </div>
-            {!expanded && full.length > collapsedCount && (
-              <div className="text-xs text-slate-200/80">Showing top {collapsedCount} of {full.length}</div>
-            )}
-          </>
-        )}
-
-        {payload?.sources?.length > 0 && (
-          <div className="flex flex-wrap gap-2 text-xs text-slate-200/70">
-            <span>Sources:</span>
-            {payload.sources.map((src: any) => (
-              <a
-                key={src?.name || src}
-                href={src?.url || src?.href || '#'}
-                target="_blank"
-                rel="noreferrer"
-                className="inline-flex items-center gap-1 rounded-full border border-white/20 bg-white/10 px-3 py-1 text-xs font-medium text-slate-100 hover:bg-white/20"
-              >
-                {src?.name || src}
-                <ExternalLink className="h-3 w-3" />
-              </a>
-            ))}
-          </div>
-        )}
-      </div>
+      )}
     </div>
   )
 }

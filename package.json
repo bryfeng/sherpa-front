@@ -13,7 +13,8 @@
     "format:write": "prettier --write .",
     "test": "vitest",
     "test:ci": "vitest run --pool=forks",
-    "typecheck": "tsc -b --noEmit"
+    "typecheck": "tsc -b --noEmit",
+    "workspace:status": "node scripts/workspace-status.js"
   },
   "dependencies": {
     "@reown/appkit": "^1.8.2",

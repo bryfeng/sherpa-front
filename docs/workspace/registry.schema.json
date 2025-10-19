@@ -1,0 +1,170 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://sherpa.ai/frontend/workspace-registry.schema.json",
+  "title": "Workspace Registry",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["version", "modules"],
+  "properties": {
+    "version": {
+      "type": "string",
+      "pattern": "^\\d+\\.\\d+\\.\\d+$",
+      "description": "Semver controlling breaking schema changes"
+    },
+    "generatedAt": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Optional ISO timestamp for automated updates"
+    },
+    "modules": {
+      "type": "array",
+      "items": {
+        "$ref": "#/definitions/WorkspaceModule"
+      }
+    }
+  },
+  "definitions": {
+    "WorkspaceModule": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "name", "owners", "contracts", "tiers"],
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^[a-z0-9-]+$"
+        },
+        "name": {
+          "type": "string",
+          "minLength": 1
+        },
+        "description": {
+          "type": "string"
+        },
+        "category": {
+          "type": "string"
+        },
+        "owners": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "tags": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "uniqueItems": true
+        },
+        "contracts": {
+          "$ref": "#/definitions/ModuleContracts"
+        },
+        "tiers": {
+          "$ref": "#/definitions/ModuleTiers"
+        },
+        "analyticsKey": {
+          "type": "string"
+        },
+        "notes": {
+          "type": "string"
+        },
+        "lastUpdated": {
+          "type": "string",
+          "format": "date-time"
+        }
+      }
+    },
+    "ModuleContracts": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["dataHook"],
+      "properties": {
+        "dataHook": {
+          "type": "string",
+          "pattern": "^src/.*",
+          "description": "Relative path to the canonical workspace data hook"
+        },
+        "attachmentSchema": {
+          "type": "string",
+          "description": "Reference to the conversation attachment schema or type"
+        },
+        "queryKeys": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "uniqueItems": true
+        }
+      }
+    },
+    "ModuleTiers": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["full", "preview", "attachment"],
+      "properties": {
+        "full": {
+          "$ref": "#/definitions/TierMetadata"
+        },
+        "preview": {
+          "$ref": "#/definitions/TierMetadata"
+        },
+        "attachment": {
+          "$ref": "#/definitions/TierMetadata"
+        }
+      }
+    },
+    "TierStatus": {
+      "type": "string",
+      "enum": [
+        "complete",
+        "in_progress",
+        "planned",
+        "not_applicable",
+        "deprecated"
+      ]
+    },
+    "TierMetadata": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["status"],
+      "properties": {
+        "status": {
+          "$ref": "#/definitions/TierStatus"
+        },
+        "component": {
+          "type": "string"
+        },
+        "story": {
+          "type": "string"
+        },
+        "docs": {
+          "type": "string"
+        },
+        "notes": {
+          "type": "string"
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": { "status": { "const": "complete" } }
+          },
+          "then": {
+            "required": ["component", "story"]
+          }
+        },
+        {
+          "if": {
+            "properties": { "status": { "const": "not_applicable" } }
+          },
+          "then": {
+            "required": ["notes"]
+          }
+        }
+      ]
+    }
+  }
+}

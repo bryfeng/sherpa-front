@@ -5,13 +5,13 @@ import { useEffect, useMemo, useState } from 'react'
 // import { PanelManager } from './components/panels/PanelManager'
 import { api } from './services/api'
 import type { EntitlementSnapshot } from './types/entitlement'
-import type { PortfolioData } from './types/portfolio'
 import { useAccount, useDisconnect, useReconnect } from 'wagmi'
 import { useAppKitAccount } from '@reown/appkit/react'
 import { truncateAddress } from './services/wallet'
 import { AppKitButton } from '@reown/appkit/react'
 import DeFiChatAdaptiveUI from './pages/DeFiChatAdaptiveUI'
 import WidgetPlayground from './pages/WidgetPlayground'
+import { usePortfolioSummary } from './workspace/hooks'
 
 export type PersonaId = 'friendly' | 'technical' | 'professional' | 'educational'
 
@@ -21,7 +21,6 @@ function MainApp() {
   const [theme, setTheme] = useState<'default' | 'snow'>(() => (localStorage.getItem('theme') as any) || 'snow')
   const [health, setHealth] = useState<string>('checking…')
   const [walletAddress, setWalletAddress] = useState<string | null>(null)
-  const [portfolio, setPortfolio] = useState<PortfolioData | null>(null)
   const [entitlement, setEntitlement] = useState<EntitlementSnapshot>({ status: 'idle', pro: false, chain: null })
   const [proOverride, setProOverride] = useState(false)
   const { address, isConnected } = useAccount()
@@ -55,31 +54,32 @@ function MainApp() {
     reconnectAsync().catch(() => {})
   }, [reconnectAsync])
 
+  const {
+    data: portfolioSummary,
+    status: portfolioStatus,
+    error: portfolioError,
+    isFetching: isPortfolioFetching,
+    refresh: refreshPortfolio,
+    reset: resetPortfolio,
+  } = usePortfolioSummary({ walletAddress: walletAddress ?? undefined })
+
   const totalUsd = useMemo(() => {
-    if (!portfolio) return null
-    const v = typeof portfolio.total_value_usd === 'string' ? parseFloat(portfolio.total_value_usd) : portfolio.total_value_usd
-    if (isNaN(v)) return null
-    return `$${v.toLocaleString(undefined, { maximumFractionDigits: 2 })}`
-  }, [portfolio])
+    if (!portfolioSummary) return null
+    return portfolioSummary.totalUsdFormatted !== '—' ? portfolioSummary.totalUsdFormatted : null
+  }, [portfolioSummary])
 
   useEffect(() => {
     const a = address || akAddress || null
     const connected = isConnected || akConnected
     if (connected && a) {
       setWalletAddress(a)
-      api
-        .portfolio(a)
-        .then((res) => {
-          if (res.success && res.portfolio) setPortfolio(res.portfolio)
-        })
-        .catch(() => {})
     } else {
       setWalletAddress(null)
-      setPortfolio(null)
+      resetPortfolio()
       setEntitlement({ status: 'idle', pro: false, chain: null })
       setProOverride(false)
     }
-  }, [isConnected, address, akAddress, akConnected])
+  }, [isConnected, address, akAddress, akConnected, resetPortfolio])
 
   useEffect(() => {
     if (!walletAddress) return
@@ -170,8 +170,6 @@ function MainApp() {
                     if (input && /^0x[a-fA-F0-9]{40}$/.test(input)) {
                       setWalletAddress(input)
                       try {
-                        const res = await api.portfolio(input)
-                        if (res.success && res.portfolio) setPortfolio(res.portfolio)
                       } catch {}
                     }
                   }}
@@ -196,6 +194,11 @@ function MainApp() {
             onRequestPro={handleProRequest}
             allowManualUnlock={allowManualUnlock}
             onManualUnlock={() => setProOverride(true)}
+            portfolioSummary={portfolioSummary ?? undefined}
+            portfolioStatus={portfolioStatus}
+            portfolioError={portfolioError}
+            onRefreshPortfolio={refreshPortfolio}
+            portfolioRefreshing={isPortfolioFetching}
           />
         </div>
       </main>
