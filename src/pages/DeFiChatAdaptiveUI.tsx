@@ -8,7 +8,6 @@ import {
   Bot,
   User,
   Sparkles,
-  Settings,
   Wand2,
   BarChart3,
   Repeat,
@@ -1214,6 +1213,7 @@ export default function DeFiChatAdaptiveUI({
   const [showSwap, setShowSwap] = useState<{ from?: string; to?: string } | null>(null)
   const [showBridge, setShowBridge] = useState<boolean>(false)
   const [showRelay, setShowRelay] = useState<boolean>(false)
+  const [activeSurface, setActiveSurface] = useState<'conversation' | 'workspace'>('conversation')
   const copyInfoTimeout = useRef<number | undefined>(undefined)
   const isAssistantTyping = useMemo(() => messages.some((msg) => msg.typing), [messages])
   const [ariaAnnouncement, setAriaAnnouncement] = useState('')
@@ -1486,6 +1486,33 @@ export default function DeFiChatAdaptiveUI({
     }
   }, [sendPrompt])
 
+  const handleStartNewChat = React.useCallback(async () => {
+    try {
+      if (walletAddress) {
+        const res = await api.createConversation(walletAddress)
+        const newId = res?.conversation_id
+        if (newId) {
+          setConversationId(newId)
+          try {
+            localStorage.setItem(storageKey(walletAddress), newId)
+          } catch {}
+        }
+      } else {
+        setConversationId(undefined)
+        try {
+          localStorage.removeItem(storageKey(null))
+        } catch {}
+      }
+    } catch {
+      setConversationId(undefined)
+    }
+
+    setMessages(seedIntro)
+    setPanels(seedPanels)
+    setHighlight(undefined)
+    setPanelUI({})
+  }, [setConversationId, setMessages, setPanels, setHighlight, setPanelUI, storageKey, walletAddress])
+
   const handleRelayExecution = React.useCallback(async (panel: Panel) => {
     const payload = panel.payload || {}
     const quoteType = typeof payload.quote_type === 'string'
@@ -1757,331 +1784,424 @@ export default function DeFiChatAdaptiveUI({
     scheduleScrollToBottom()
   }
 
-  return (
-    <div className="h-[calc(100vh-64px)] w-full grid grid-cols-12 gap-4 p-4 overflow-hidden">
-      {/* Left rail */}
-      <div className="col-span-2 hidden xl:flex flex-col gap-3 min-h-0 overflow-y-auto pr-2">
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm">Session</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            <div className="flex items-center gap-2">
-              <PersonaBadge p={persona} />
-              <span className="text-xs text-slate-400">Current persona</span>
-            </div>
-            <PersonaDropdown persona={persona} setPersona={setPersona} />
-            <Button
-              variant="secondary"
-              className="w-full"
-              onClick={async () => {
-                // Create a new conversation explicitly (if address), else clear guest
-                try {
-                  if (walletAddress) {
-                    const res = await api.createConversation(walletAddress)
-                    const newId = res?.conversation_id
-                    if (newId) {
-                      setConversationId(newId)
-                      try { localStorage.setItem(storageKey(walletAddress), newId) } catch {}
-                    }
-                  } else {
-                    // Guest session: clear any existing id
-                    setConversationId(undefined)
-                    try { localStorage.removeItem(storageKey(null)) } catch {}
-                  }
-                } catch {
-                  // Fallback: just clear local state
-                  setConversationId(undefined)
-                }
-                // Reset UI conversation state
-                setMessages(seedIntro)
-                setPanels(seedPanels)
-              }}
-            >
-              <Sparkles className="h-4 w-4 mr-2" />New Chat
-            </Button>
-            {(import.meta as any).env?.DEV || (import.meta as any).env?.VITE_ENABLE_DEBUG_TOOLS === 'true' ? (
-              <div className="flex flex-col gap-2">
-                <Button
-                  variant="outline"
-                  className="w-full"
-                  onClick={async () => {
-                    // Frontend-only export (no server call)
-                    try {
-                      const payload = {
-                        exported_at: new Date().toISOString(),
-                        persona,
-                        wallet_address: walletAddress || null,
-                        conversation_id: conversationId || null,
-                        ui: {
-                          panels,
-                          highlight: highlight || [],
-                          panelUI,
-                          expandedPanelId,
-                          pro,
-                        },
-                        messages: messages.map((m) => ({
-                          id: m.id,
-                          role: m.role,
-                          text: m.text,
-                          actions: m.actions || [],
-                          panels: m.panels || [],
-                          sources: m.sources || [],
-                          typing: Boolean(m.typing),
-                        })),
-                      }
-                      const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' })
-                      const url = URL.createObjectURL(blob)
-                      const a = document.createElement('a')
-                      a.href = url
-                      a.download = `ui-conversation-${conversationId || 'guest'}.json`
-                      document.body.appendChild(a)
-                      a.click()
-                      a.remove()
-                      URL.revokeObjectURL(url)
-                    } catch (e: any) {
-                      console.error('Export(UI) failed', e)
-                      setMessages((m) => [...m, { id: uid('msg'), role: 'assistant', text: 'Failed to export UI conversation JSON.' }])
-                    }
-                  }}
-                >
-                  <BarChart3 className="h-4 w-4 mr-2" />Export UI Log JSON
-                </Button>
-                <Button
-                  variant="outline"
-                  className="w-full"
-                  onClick={async () => {
-                    // Server snapshot export (uses backend route)
-                    if (!conversationId) {
-                      setMessages((m) => [...m, { id: uid('msg'), role: 'assistant', text: 'No active conversation to export.' }])
-                      return
-                    }
-                    try {
-                      const data = await api.getConversation(conversationId)
-                      const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' })
-                      const url = URL.createObjectURL(blob)
-                      const a = document.createElement('a')
-                      a.href = url
-                      a.download = `conversation-${conversationId}.json`
-                      document.body.appendChild(a)
-                      a.click()
-                      a.remove()
-                      URL.revokeObjectURL(url)
-                    } catch (e: any) {
-                      console.error('Export(server) failed', e)
-                      setMessages((m) => [...m, { id: uid('msg'), role: 'assistant', text: 'Failed to export server conversation JSON.' }])
-                    }
-                  }}
-                >
-                  <BarChart3 className="h-4 w-4 mr-2" />Export Server JSON
-                </Button>
-              </div>
-            ) : null}
-            <Button variant="outline" className="w-full">
-              <Settings className="h-4 w-4 mr-2" />Settings
-            </Button>
-          </CardContent>
-        </Card>
-<Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm">Recent Chats</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-2">
-            {walletAddress ? (
-              recentChats.length > 0 ? (
-                recentChats.map((c) => (
-                  <button
-                    key={c.conversation_id}
-                    className={`w-full text-left px-3 py-2 rounded-lg border text-xs ${
-                      c.conversation_id === conversationId ? 'bg-primary-50 border-primary-200 text-primary-800' : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-50'
-                    } sherpa-surface`}
-                    onClick={() => {
-                      setConversationId(c.conversation_id)
-                      try { localStorage.setItem(storageKey(walletAddress), c.conversation_id) } catch {}
-                    }}
-                    title={c.title || c.conversation_id}
-                  >
-                    <div className="flex items-center justify-between gap-2">
-                      <span className="truncate">{c.title || c.conversation_id.slice(0, 18)}{c.title ? '' : '…'}</span>
-                      <span className="text-[10px] text-slate-400">{formatRelativeTime(c.last_activity)}</span>
-                    </div>
-                  </button>
-                ))
-              ) : (
-                <div className="text-xs text-slate-500">No recent chats yet.</div>
-              )
-            ) : (
-              <div className="text-xs text-slate-500">Connect a wallet to see chats.</div>
-            )}
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm">Shortcuts</CardTitle>
-          </CardHeader>
-          <CardContent className="flex flex-col gap-2">
-            <Button variant="secondary" className="justify-start" onClick={() => loadTopCoinsPanel()}>
-              <BarChart3 className="h-4 w-4 mr-2" />Top Coins
-            </Button>
-            <Button variant="secondary" className="justify-start">
-              <BarChart3 className="h-4 w-4 mr-2" />Market Overview
-            </Button>
-            <Button variant="secondary" className="justify-start" onClick={() => setShowRelay(true)}>
-              <Repeat className="h-4 w-4 mr-2" />Bridging (POC)
-            </Button>
-            <Button variant="secondary" className="justify-start">
-              <ArrowLeftRight className="h-4 w-4 mr-2" />Swaps
-            </Button>
-            <Button variant="secondary" className="justify-start">
-              <Wand2 className="h-4 w-4 mr-2" />Explain DeFi
-            </Button>
-          </CardContent>
-        </Card>
-      </div>
+  const hasPanels = panels.length > 0
+  const workspaceButtonLabel = hasPanels ? `Workspace (${panels.length})` : 'Workspace'
+  const surfaceButtonClass = (surface: 'conversation' | 'workspace') =>
+    `rounded-full px-3 py-1.5 text-xs font-medium transition ${
+      activeSurface === surface
+        ? 'bg-white text-slate-900 shadow-sm'
+        : 'text-slate-500 hover:text-slate-700'
+    }`
+  const conversationDisplay = conversationId ? `${conversationId.slice(0, 10)}…` : 'Draft session'
 
-      {/* Center chat */}
-      <div className="col-span-12 xl:col-span-7 flex flex-col min-h-0">
-        <div
-          ref={scrollRef}
-          className="flex-1 overflow-y-auto space-y-4 pr-2"
-          role="log"
-          aria-live="polite"
-          aria-relevant="additions text"
-          aria-busy={isAssistantTyping}
-          tabIndex={0}
-        >
-          <AnimatePresence>
-            {messages.map((m) => (
-              <motion.div
-                key={m.id}
-                initial={prefersReducedMotion ? false : { opacity: 0, y: 6 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={prefersReducedMotion ? undefined : { opacity: 0, y: -6 }}
-                transition={prefersReducedMotion ? { duration: 0 } : undefined}
-              >
-                <MessageBubble m={m} onAction={handleAction} />
-              </motion.div>
-            ))}
-          </AnimatePresence>
-        </div>
-        <div className="sr-only" aria-live="polite" aria-atomic="false">
-          {ariaAnnouncement}
-        </div>
-        <div className="mt-3">
-          <div className="w-full flex items-center">
-            <div className="w-full flex items-center gap-2 border border-slate-300 bg-white rounded-2xl p-2 sherpa-surface">
-              <Textarea
-                ref={inputRef}
-                value={input}
-                onChange={(e) => setInput(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter' && !e.shiftKey) {
-                    e.preventDefault()
-                    send()
-                  }
-                }}
-                placeholder="Ask about a token, protocol, or action…"
-                aria-label="Chat message"
-                className="border-0 bg-transparent p-2 min-h-[44px] focus:ring-0 focus:border-0"
-              />
-              <Button onClick={send} className="h-10 rounded-xl px-4">
-                <Send className="h-4 w-4 mr-2" />Send
-              </Button>
-            </div>
+  return (
+    <div className="min-h-[calc(100vh-64px)] w-full bg-slate-50/80 px-4 py-8">
+      <div className="mx-auto flex w-full max-w-6xl flex-col gap-6">
+        <header className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
+          <div className="flex flex-col gap-1">
+            <h1 className="text-2xl font-semibold text-slate-900">Sherpa AI workspace</h1>
+            <p className="text-sm text-slate-600">Guide strategy, chat, and insights without juggling side rails.</p>
           </div>
-          <div className="flex items-center justify-between mt-2">
-            <div className="flex items-center gap-2 text-xs text-slate-600">
-              <Badge variant="outline" className="rounded-full">{proBadgeLabel}</Badge>
-              <span>Adaptive CTAs are generated by the agent.</span>
-            </div>
-            {!pro && (
-              <div className="flex items-center gap-2">
-                <Button size="sm" variant="outline" onClick={() => handleProUpsell('cta')} className="rounded-full">
-                  <Star className="h-3 w-3 mr-1" />Upgrade to Pro
-                </Button>
-                {manualUnlockAvailable && (
-                  <Button size="sm" variant="secondary" onClick={onManualUnlock} className="rounded-full">
-                    <Sparkles className="h-3 w-3 mr-1" />Dev Unlock
-                  </Button>
-                )}
+          <div className="flex flex-wrap items-center gap-2">
+            <div className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-3 py-1.5 shadow-sm">
+              <PersonaBadge p={persona} />
+              <div className="min-w-[160px] max-w-[220px]">
+                <PersonaDropdown persona={persona} setPersona={setPersona} />
               </div>
-            )}
+            </div>
+            <Badge variant={walletAddress ? 'secondary' : 'outline'} className="rounded-full px-3 py-1 text-xs">
+              {walletAddress ? truncateAddress(walletAddress) : 'Guest session'}
+            </Badge>
+            <Badge variant="outline" className="rounded-full px-3 py-1 text-xs">{proBadgeLabel}</Badge>
+            <Button size="sm" variant="secondary" onClick={handleStartNewChat} className="rounded-full">
+              <Sparkles className="mr-1 h-3 w-3" />New chat
+            </Button>
           </div>
-          {showProInfo && !pro && (
-            <div className="mt-3">
-              <div className="rounded-2xl border border-primary-200/80 bg-primary-50/80 p-4 text-xs text-primary-900 shadow-sm">
-                <div className="flex items-start gap-3">
-                  <div className="mt-[2px] rounded-full bg-white/60 p-1 border border-primary-200">
-                    <Star className="h-3.5 w-3.5 text-primary-600" />
+        </header>
+
+        <div className="flex flex-wrap items-center gap-2 rounded-2xl border border-slate-200 bg-white/80 p-3 shadow-sm">
+          <span className="text-[11px] font-semibold uppercase tracking-[0.2em] text-slate-400">Focus</span>
+          <Button
+            size="sm"
+            variant="secondary"
+            onClick={() => handleInsertQuickPrompt('Outline the next best DeFi workflow for my wallet.')}
+            className="rounded-full"
+          >
+            <Wand2 className="mr-1 h-3 w-3" />Plan workflow
+          </Button>
+          <Button
+            size="sm"
+            variant="secondary"
+            onClick={() => {
+              loadTrendingTokensPanel({ highlight: true }).catch(() => {})
+              setActiveSurface('workspace')
+            }}
+            className="rounded-full"
+          >
+            <TrendingUp className="mr-1 h-3 w-3" />Trending tokens
+          </Button>
+          <Button size="sm" variant="outline" onClick={() => setActiveSurface('workspace')} className="rounded-full">
+            <BarChart3 className="mr-1 h-3 w-3" />Open workspace
+          </Button>
+        </div>
+
+        <Card className="overflow-hidden border-slate-200/80 bg-white/95 shadow-lg">
+          <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 bg-white/60 px-4 py-3">
+            <div className="inline-flex items-center rounded-full bg-slate-100 p-1">
+              <button
+                type="button"
+                className={surfaceButtonClass('conversation')}
+                onClick={() => setActiveSurface('conversation')}
+              >
+                Conversation
+              </button>
+              <button
+                type="button"
+                className={surfaceButtonClass('workspace')}
+                onClick={() => setActiveSurface('workspace')}
+              >
+                {workspaceButtonLabel}
+              </button>
+            </div>
+            <div className="flex items-center gap-2 text-xs text-slate-500">
+              <span className="hidden sm:inline">Session</span>
+              <span className="rounded-full border border-slate-200 bg-white px-2 py-1 font-medium text-slate-700 shadow-sm">
+                {conversationDisplay}
+              </span>
+            </div>
+          </div>
+          {activeSurface === 'conversation' ? (
+            <div className="flex h-full flex-col">
+              <div
+                ref={scrollRef}
+                className="flex-1 space-y-4 overflow-y-auto px-4 pt-4 pb-6"
+                role="log"
+                aria-live="polite"
+                aria-relevant="additions text"
+                aria-busy={isAssistantTyping}
+                tabIndex={0}
+              >
+                <AnimatePresence>
+                  {messages.map((m) => (
+                    <motion.div
+                      key={m.id}
+                      initial={prefersReducedMotion ? false : { opacity: 0, y: 6 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      exit={prefersReducedMotion ? undefined : { opacity: 0, y: -6 }}
+                      transition={prefersReducedMotion ? { duration: 0 } : undefined}
+                    >
+                      <MessageBubble m={m} onAction={handleAction} />
+                    </motion.div>
+                  ))}
+                </AnimatePresence>
+              </div>
+              <div className="sr-only" aria-live="polite" aria-atomic="false">
+                {ariaAnnouncement}
+              </div>
+              <div className="border-t border-slate-200 bg-white/70 px-4 py-4">
+                <div className="space-y-3">
+                  <div className="flex w-full items-center gap-2 rounded-2xl border border-slate-200 bg-white/80 p-2 shadow-inner">
+                    <Textarea
+                      ref={inputRef}
+                      value={input}
+                      onChange={(e) => setInput(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter' && !e.shiftKey) {
+                          e.preventDefault()
+                          send()
+                        }
+                      }}
+                      placeholder="Ask about a token, protocol, or action…"
+                      aria-label="Chat message"
+                      className="min-h-[44px] flex-1 border-0 bg-transparent p-2 focus:border-0 focus:ring-0"
+                    />
+                    <Button onClick={send} className="h-10 rounded-xl px-4">
+                      <Send className="mr-2 h-4 w-4" />Send
+                    </Button>
                   </div>
-                  <div className="flex-1 space-y-2">
-                    <div className="flex items-start justify-between gap-2">
-                      <div>
-                        <p className="text-sm font-semibold text-primary-900">Unlock Sherpa Pro</p>
-                        <p className="mt-1 text-[11px] leading-relaxed text-primary-900/80">{proRequirement}</p>
-                      </div>
-                      <button
-                        onClick={() => {
-                          setShowProInfo(false)
-                          setCopiedToken(false)
-                        }}
-                        className="rounded-full p-1 text-primary-700 hover:bg-primary-100"
-                        aria-label="Dismiss Pro info"
-                      >
-                        <X className="h-4 w-4" />
-                      </button>
+                  <div className="flex flex-wrap items-center justify-between gap-3 text-xs text-slate-600">
+                    <div className="flex items-center gap-2">
+                      <Badge variant="outline" className="rounded-full px-2 py-0.5">{proBadgeLabel}</Badge>
+                      <span>Adaptive CTAs are generated by the agent.</span>
                     </div>
-                    {proTokenAddress && (
-                      <div className="flex flex-wrap items-center gap-2 text-[11px] text-primary-900">
-                        <code className="rounded-lg border border-primary-200 bg-white/80 px-2 py-1 font-mono text-[11px] tracking-tight">{proContractDisplay}</code>
-                        <Button size="sm" variant="secondary" onClick={handleCopyToken} className="rounded-full px-3 py-1 text-[11px]">
-                          {copiedToken ? 'Copied' : 'Copy contract'}
+                    {!pro && (
+                      <div className="flex items-center gap-2">
+                        <Button size="sm" variant="outline" onClick={() => handleProUpsell('cta')} className="rounded-full">
+                          <Star className="mr-1 h-3 w-3" />Upgrade to Pro
                         </Button>
-                        {proExplorerUrl && (
-                          <a
-                            href={proExplorerUrl}
-                            target="_blank"
-                            rel="noreferrer"
-                            className="inline-flex items-center gap-1 rounded-full border border-primary-200 px-2 py-1 text-[11px] text-primary-800 hover:bg-primary-100"
-                          >
-                            View explorer
-                          </a>
+                        {manualUnlockAvailable && (
+                          <Button size="sm" variant="secondary" onClick={onManualUnlock} className="rounded-full">
+                            <Sparkles className="mr-1 h-3 w-3" />Dev Unlock
+                          </Button>
                         )}
                       </div>
                     )}
                   </div>
+                  {showProInfo && !pro && (
+                    <div className="rounded-2xl border border-primary-200/80 bg-primary-50/80 p-4 text-xs text-primary-900 shadow-sm">
+                      <div className="flex items-start gap-3">
+                        <div className="mt-[2px] rounded-full border border-primary-200 bg-white/60 p-1">
+                          <Star className="h-3.5 w-3.5 text-primary-600" />
+                        </div>
+                        <div className="flex-1 space-y-2">
+                          <div className="flex items-start justify-between gap-2">
+                            <div>
+                              <p className="text-sm font-semibold text-primary-900">Unlock Sherpa Pro</p>
+                              <p className="mt-1 text-[11px] leading-relaxed text-primary-900/80">{proRequirement}</p>
+                            </div>
+                            <button
+                              onClick={() => {
+                                setShowProInfo(false)
+                                setCopiedToken(false)
+                              }}
+                              className="rounded-full p-1 text-primary-700 hover:bg-primary-100"
+                              aria-label="Dismiss Pro info"
+                            >
+                              <X className="h-4 w-4" />
+                            </button>
+                          </div>
+                          {proTokenAddress && (
+                            <div className="flex flex-wrap items-center gap-2 text-[11px] text-primary-900">
+                              <code className="rounded-lg border border-primary-200 bg-white/80 px-2 py-1 font-mono text-[11px] tracking-tight">{proContractDisplay}</code>
+                              <Button size="sm" variant="secondary" onClick={handleCopyToken} className="rounded-full px-3 py-1 text-[11px]">
+                                {copiedToken ? 'Copied' : 'Copy contract'}
+                              </Button>
+                              {proExplorerUrl && (
+                                <a
+                                  href={proExplorerUrl}
+                                  target="_blank"
+                                  rel="noreferrer"
+                                  className="inline-flex items-center gap-1 rounded-full border border-primary-200 px-2 py-1 text-[11px] text-primary-800 hover:bg-primary-100"
+                                >
+                                  View explorer
+                                </a>
+                              )}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                      <div className="mt-3 text-[11px] text-primary-900/70">
+                        <span className="font-medium text-primary-900">Pro perks:</span> deeper simulations, fee benchmarking, and guided DeFi workflows tailored to your wallet state.
+                      </div>
+                    </div>
+                  )}
                 </div>
-                <div className="mt-3 text-[11px] text-primary-900/70">
-                  <span className="font-medium text-primary-900">Pro perks:</span> deeper simulations, fee benchmarking, and guided DeFi workflows tailored to your wallet state.
+              </div>
+            </div>
+          ) : (
+            <div className="flex h-full flex-col">
+              <div className="border-b border-slate-200 bg-white/70 px-4 py-3 text-sm text-slate-600">
+                Arrange live panels, quotes, and research in one streamlined workspace.
+              </div>
+              <div className="flex-1 overflow-y-auto px-4 py-4">
+                {hasPanels ? (
+                  <RightPanel
+                    panels={panels}
+                    highlight={highlight}
+                    walletAddress={walletAddress}
+                    panelUI={panelUI}
+                    onToggleCollapse={(id) => toggleCollapse(id)}
+                    onExpand={(id) => setExpandedPanelId(id)}
+                    onReorder={(from, to) => reorderPanels(from, to)}
+                    onBridge={handleRelayExecution}
+                    onSwap={handleRelayExecution}
+                    walletReady={walletReady}
+                    onRefreshBridgeQuote={requestBridgeQuoteRefresh}
+                    onRefreshSwapQuote={requestSwapQuoteRefresh}
+                    onInsertQuickPrompt={handleInsertQuickPrompt}
+                  />
+                ) : (
+                  <div className="flex h-full min-h-[220px] flex-col items-center justify-center gap-3 rounded-3xl border border-dashed border-slate-300 bg-slate-50/80 p-8 text-center text-slate-500">
+                    <Sparkles className="h-5 w-5 text-primary-500" />
+                    <div className="text-sm font-medium text-slate-600">No workspace panels yet.</div>
+                    <p className="text-xs text-slate-500">
+                      Ask Sherpa for portfolio or market insights and they’ll land here automatically.
+                    </p>
+                  </div>
+                )}
+                <div className="mt-5 grid gap-4 lg:grid-cols-2">
+                  <div className="rounded-2xl border border-slate-200 bg-white/80 shadow-sm">
+                    <div className="border-b border-slate-200 px-4 py-3 text-sm font-medium text-slate-900">Quick actions</div>
+                    <div className="flex flex-col gap-2 p-4">
+                      <Button
+                        size="sm"
+                        variant="secondary"
+                        className="justify-start"
+                        onClick={() => {
+                          loadTopCoinsPanel().catch(() => {})
+                          setActiveSurface('workspace')
+                        }}
+                      >
+                        <BarChart3 className="mr-2 h-3.5 w-3.5" />Top coins insight
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="secondary"
+                        className="justify-start"
+                        onClick={() => {
+                          if (walletAddress) {
+                            loadPortfolioPanel(walletAddress).catch(() => {})
+                          } else {
+                            handleInsertQuickPrompt('Help me review my wallet once it is connected.')
+                          }
+                          setActiveSurface('workspace')
+                        }}
+                      >
+                        <ArrowLeftRight className="mr-2 h-3.5 w-3.5" />Portfolio check
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="secondary"
+                        className="justify-start"
+                        onClick={() => {
+                          setShowRelay(true)
+                          setActiveSurface('workspace')
+                        }}
+                      >
+                        <Repeat className="mr-2 h-3.5 w-3.5" />Relay bridge quote
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="secondary"
+                        className="justify-start"
+                        onClick={() => handleInsertQuickPrompt('Explain this protocol like a playbook I can follow.')}
+                      >
+                        <Wand2 className="mr-2 h-3.5 w-3.5" />Explain a protocol
+                      </Button>
+                      {(import.meta as any).env?.DEV || (import.meta as any).env?.VITE_ENABLE_DEBUG_TOOLS === 'true' ? (
+                        <div className="pt-3">
+                          <div className="text-[10px] font-semibold uppercase tracking-[0.2em] text-slate-400">Dev tools</div>
+                          <div className="mt-2 flex flex-col gap-2">
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              className="justify-start"
+                              onClick={async () => {
+                                try {
+                                  const payload = {
+                                    exported_at: new Date().toISOString(),
+                                    persona,
+                                    wallet_address: walletAddress || null,
+                                    conversation_id: conversationId || null,
+                                    ui: {
+                                      panels,
+                                      highlight: highlight || [],
+                                      panelUI,
+                                      expandedPanelId,
+                                      pro,
+                                    },
+                                    messages: messages.map((m) => ({
+                                      id: m.id,
+                                      role: m.role,
+                                      text: m.text,
+                                      actions: m.actions || [],
+                                      panels: m.panels || [],
+                                      sources: m.sources || [],
+                                      typing: Boolean(m.typing),
+                                    })),
+                                  }
+                                  const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' })
+                                  const url = URL.createObjectURL(blob)
+                                  const a = document.createElement('a')
+                                  a.href = url
+                                  a.download = `ui-conversation-${conversationId || 'guest'}.json`
+                                  document.body.appendChild(a)
+                                  a.click()
+                                  a.remove()
+                                  URL.revokeObjectURL(url)
+                                } catch (e: any) {
+                                  console.error('Export(UI) failed', e)
+                                  setMessages((m) => [
+                                    ...m,
+                                    { id: uid('msg'), role: 'assistant', text: 'Failed to export UI conversation JSON.' },
+                                  ])
+                                }
+                              }}
+                            >
+                              <BarChart3 className="mr-2 h-3.5 w-3.5" />Export UI Log JSON
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              className="justify-start"
+                              onClick={async () => {
+                                if (!conversationId) {
+                                  setMessages((m) => [
+                                    ...m,
+                                    { id: uid('msg'), role: 'assistant', text: 'No active conversation to export.' },
+                                  ])
+                                  return
+                                }
+                                try {
+                                  const data = await api.getConversation(conversationId)
+                                  const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' })
+                                  const url = URL.createObjectURL(blob)
+                                  const a = document.createElement('a')
+                                  a.href = url
+                                  a.download = `conversation-${conversationId}.json`
+                                  document.body.appendChild(a)
+                                  a.click()
+                                  a.remove()
+                                  URL.revokeObjectURL(url)
+                                } catch (e: any) {
+                                  console.error('Export(server) failed', e)
+                                  setMessages((m) => [
+                                    ...m,
+                                    { id: uid('msg'), role: 'assistant', text: 'Failed to export server conversation JSON.' },
+                                  ])
+                                }
+                              }}
+                            >
+                              <BarChart3 className="mr-2 h-3.5 w-3.5" />Export Server JSON
+                            </Button>
+                          </div>
+                        </div>
+                      ) : null}
+                    </div>
+                  </div>
+                  <div className="rounded-2xl border border-slate-200 bg-white/80 shadow-sm">
+                    <div className="border-b border-slate-200 px-4 py-3 text-sm font-medium text-slate-900">Recent chats</div>
+                    <div className="max-h-[260px] space-y-2 overflow-y-auto p-4 text-xs text-slate-600">
+                      {walletAddress ? (
+                        recentChats.length > 0 ? (
+                          recentChats.map((c) => (
+                            <button
+                              key={c.conversation_id}
+                              className={`w-full rounded-xl border px-3 py-2 text-left transition ${
+                                c.conversation_id === conversationId
+                                  ? 'border-primary-200 bg-primary-50 text-primary-800'
+                                  : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50'
+                              } sherpa-surface`}
+                              onClick={() => {
+                                setConversationId(c.conversation_id)
+                                try {
+                                  localStorage.setItem(storageKey(walletAddress), c.conversation_id)
+                                } catch {}
+                              }}
+                              title={c.title || c.conversation_id}
+                            >
+                              <div className="flex items-center justify-between gap-2">
+                                <span className="truncate">{c.title || `${c.conversation_id.slice(0, 18)}…`}</span>
+                                <span className="text-[10px] text-slate-400">{formatRelativeTime(c.last_activity)}</span>
+                              </div>
+                            </button>
+                          ))
+                        ) : (
+                          <div className="text-xs text-slate-500">No recent chats yet.</div>
+                        )
+                      ) : (
+                        <div className="text-xs text-slate-500">Connect a wallet to see chats.</div>
+                      )}
+                    </div>
+                  </div>
                 </div>
               </div>
             </div>
           )}
-        </div>
+        </Card>
       </div>
 
-      {/* Right panel */}
-      <div className="col-span-12 xl:col-span-3 flex flex-col min-h-0">
-        <div className="flex-1 overflow-y-auto pr-2">
-          <RightPanel
-            panels={panels}
-            highlight={highlight}
-            walletAddress={walletAddress}
-            panelUI={panelUI}
-            onToggleCollapse={(id) => toggleCollapse(id)}
-            onExpand={(id) => setExpandedPanelId(id)}
-            onReorder={(from, to) => reorderPanels(from, to)}
-            onBridge={handleRelayExecution}
-            onSwap={handleRelayExecution}
-            walletReady={walletReady}
-            onRefreshBridgeQuote={requestBridgeQuoteRefresh}
-            onRefreshSwapQuote={requestSwapQuoteRefresh}
-            onInsertQuickPrompt={handleInsertQuickPrompt}
-          />
-        </div>
-      </div>
-
-      {/* Modals */}
+    {/* Modals */}
       {showSim && (
         <SimulateModal
           from={showSim.from}
