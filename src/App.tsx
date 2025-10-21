@@ -242,8 +242,6 @@ function MainApp() {
                   const input = window.prompt('Paste a wallet address (0x…)')
                   if (input && /^0x[a-fA-F0-9]{40}$/.test(input)) {
                     setWalletAddress(input)
-                    try {
-                    } catch {}
                   }
                 }}
                 className="rounded-lg px-3 py-1.5 text-white bg-gradient-to-r from-glacier-600 to-primary-600 hover:opacity-95 shadow-sm ring-1 ring-white/40 sherpa-surface"
