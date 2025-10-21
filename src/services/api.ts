@@ -2,6 +2,7 @@ import axios from 'axios'
 import type { ChatRequest, ChatResponse } from '../types/chat'
 import type { EntitlementResponse } from '../types/entitlement'
 import type { PortfolioAPIResponse } from '../types/portfolio'
+import type { LLMProvidersResponse } from '../types/llm'
 
 const BASE = (import.meta as any).env?.VITE_API_BASE_URL || 'http://localhost:8000'
 
@@ -14,6 +15,11 @@ export const api = {
   async chat(payload: ChatRequest): Promise<ChatResponse> {
     const { data } = await axios.post(`${BASE}/chat`, payload)
     return data
+  },
+
+  async llmProviders(): Promise<LLMProvidersResponse> {
+    const { data } = await axios.get(`${BASE}/llm/providers`)
+    return data as LLMProvidersResponse
   },
 
   async chatStream(

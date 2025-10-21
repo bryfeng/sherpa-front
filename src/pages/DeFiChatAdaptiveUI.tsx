@@ -1138,6 +1138,7 @@ export default function DeFiChatAdaptiveUI({
   portfolioError,
   onRefreshPortfolio,
   portfolioRefreshing = false,
+  llmModel,
 }: {
   persona: Persona
   setPersona: (p: Persona) => void
@@ -1152,6 +1153,7 @@ export default function DeFiChatAdaptiveUI({
   portfolioError?: string | null
   onRefreshPortfolio: () => Promise<void>
   portfolioRefreshing?: boolean
+  llmModel?: string
 }) {
   const [messages, setMessages] = useState<AgentMessage[]>(seedIntro)
   const [panels, setPanels] = useState<Panel[]>(seedPanels)
@@ -1479,6 +1481,7 @@ export default function DeFiChatAdaptiveUI({
         address: walletAddress,
         chain: 'ethereum',
         conversation_id: conversationId,
+        llm_model: llmModel,
       }
       const res = await api.chat(payload)
       if (res?.conversation_id && res.conversation_id !== conversationId) {
@@ -1523,7 +1526,7 @@ export default function DeFiChatAdaptiveUI({
     } finally {
       scheduleScrollToBottom()
     }
-  }, [conversationId, ensurePortfolioPanel, mergePanelsLocal, scheduleScrollToBottom, setConversationId, setHighlight, setPanels, storageKey, walletAddress])
+  }, [conversationId, ensurePortfolioPanel, llmModel, mergePanelsLocal, scheduleScrollToBottom, setConversationId, setHighlight, setPanels, storageKey, walletAddress])
 
   const send = async () => {
     const q = input.trim()
