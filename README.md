@@ -14,7 +14,7 @@ Notes
 
 - Backend endpoints used:
   - `POST /chat` for messages
-  - `GET /tools/portfolio?address=...&chain=ethereum` for portfolio
+  - `GET /tools/portfolio?address=...&chain=ethereum|solana` for portfolio snapshots
   - `GET /healthz` for health status
 - CORS is enabled in the backend (`app.main`).
 
@@ -26,9 +26,8 @@ Conversation IDs
 
 Wallets
 
-- When `VITE_WALLETCONNECT_PROJECT_ID` is set, the app shows a WalletConnect modal with multiple EVM wallets.
-- If not set, a fallback "Use Address" button lets you paste an `0x...` address to preview portfolio data.
-- Architecture is ready to add non‑EVM connectors (e.g., Solana, Sui) via separate providers later.
+- When `VITE_WALLETCONNECT_PROJECT_ID` is set, the app now exposes Reown AppKit with both Wagmi (EVM) and Solana adapters. WalletConnect sessions can connect Ethereum or Solana wallets side by side.
+- If not set, a fallback "Use Address" button lets you paste either an `0x...` EVM address or a Solana base58 address to preview portfolio data.
 
 Roadmap
 

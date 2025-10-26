@@ -4,7 +4,7 @@ import { Web3Provider } from '../providers/Web3Provider'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 
 describe('App', () => {
-  it('renders header', () => {
+  it('renders header', async () => {
     const client = new QueryClient()
     render(
       <QueryClientProvider client={client}>
@@ -13,6 +13,6 @@ describe('App', () => {
         </Web3Provider>
       </QueryClientProvider>
     )
-    expect(screen.getByText('Agentic Wallet')).toBeInTheDocument()
+    expect(await screen.findByText(/Sherpa AI workspace/i)).toBeInTheDocument()
   })
 })

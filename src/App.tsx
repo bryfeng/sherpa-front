@@ -1,12 +1,12 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 // Old UI imports kept for reference
 // import { PersonaSwitcher } from './components/personas/PersonaSwitcher'
 // import { ChatContainer } from './components/chat/ChatContainer'
 // import { PanelManager } from './components/panels/PanelManager'
 import { api } from './services/api'
 import type { EntitlementSnapshot } from './types/entitlement'
-import { useAccount, useDisconnect, useReconnect } from 'wagmi'
-import { useAppKitAccount } from '@reown/appkit/react'
+import { useAccount, useDisconnect as useWagmiDisconnect, useReconnect } from 'wagmi'
+import { useAppKitAccount, useDisconnect as useAppKitDisconnect } from '@reown/appkit/react'
 import { truncateAddress } from './services/wallet'
 import { AppKitButton } from '@reown/appkit/react'
 import DeFiChatAdaptiveUI from './pages/DeFiChatAdaptiveUI'
@@ -23,16 +23,25 @@ function MainApp() {
   const [theme, setTheme] = useState<'default' | 'snow'>(() => (localStorage.getItem('theme') as any) || 'snow')
   const [health, setHealth] = useState<string>('checking…')
   const [walletAddress, setWalletAddress] = useState<string | null>(null)
+  const [walletChain, setWalletChain] = useState<'ethereum' | 'solana'>('ethereum')
+  const [manualWallet, setManualWallet] = useState<{ address: string; chain: 'ethereum' | 'solana' } | null>(null)
   const [entitlement, setEntitlement] = useState<EntitlementSnapshot>({ status: 'idle', pro: false, chain: null })
   const [proOverride, setProOverride] = useState(false)
   const [llmModel, setLlmModel] = useState<string>(() => localStorage.getItem('sherpa.llm_model') || 'claude-3-5-sonnet-20241022')
   const [llmProviders, setLlmProviders] = useState<LLMProviderInfo[]>([])
   const [llmProvidersLoading, setLlmProvidersLoading] = useState<boolean>(true)
-  const { address, isConnected } = useAccount()
+  const { address, isConnected, chainId } = useAccount()
   const { reconnectAsync } = useReconnect()
-  const { address: akAddress, isConnected: akConnected } = useAppKitAccount()
-  const { disconnect } = useDisconnect()
+  const evmAppKitAccount = useAppKitAccount({ namespace: 'eip155' })
+  const solanaAccount = useAppKitAccount({ namespace: 'solana' })
+  const { disconnect: disconnectEvm } = useWagmiDisconnect()
+  const { disconnect: disconnectAppKit } = useAppKitDisconnect()
   const hasModal = Boolean(import.meta.env.VITE_WALLETCONNECT_PROJECT_ID)
+
+  const resolveEvmChain = useCallback((id?: number | null): 'ethereum' => {
+    void id // Future extension hook
+    return 'ethereum'
+  }, [])
   useEffect(() => {
     if (isTestEnv) {
       setHealth('healthy')
@@ -62,6 +71,36 @@ function MainApp() {
   useEffect(() => {
     reconnectAsync().catch(() => {})
   }, [reconnectAsync])
+
+  const activeWallet = useMemo(() => {
+    if (solanaAccount.isConnected && solanaAccount.address) {
+      return { address: solanaAccount.address, chain: 'solana' as const }
+    }
+    if (isConnected && address) {
+      return { address, chain: resolveEvmChain(chainId) }
+    }
+    if (evmAppKitAccount.isConnected && evmAppKitAccount.address) {
+      return { address: evmAppKitAccount.address, chain: resolveEvmChain(chainId) }
+    }
+    return null
+  }, [
+    address,
+    chainId,
+    evmAppKitAccount.address,
+    evmAppKitAccount.isConnected,
+    isConnected,
+    resolveEvmChain,
+    solanaAccount.address,
+    solanaAccount.isConnected,
+  ])
+
+  const resolvedWallet = useMemo(() => activeWallet ?? manualWallet, [activeWallet, manualWallet])
+
+  useEffect(() => {
+    if (activeWallet && manualWallet) {
+      setManualWallet(null)
+    }
+  }, [activeWallet, manualWallet])
 
   useEffect(() => {
     let cancelled = false
@@ -129,7 +168,7 @@ function MainApp() {
     isFetching: isPortfolioFetching,
     refresh: refreshPortfolio,
     reset: resetPortfolio,
-  } = usePortfolioSummary({ walletAddress: walletAddress ?? undefined })
+  } = usePortfolioSummary({ walletAddress: walletAddress ?? undefined, chain: walletChain })
 
   const totalUsd = useMemo(() => {
     if (!portfolioSummary) return null
@@ -137,26 +176,41 @@ function MainApp() {
   }, [portfolioSummary])
 
   useEffect(() => {
-    const a = address || akAddress || null
-    const connected = isConnected || akConnected
-    if (connected && a) {
-      setWalletAddress(a)
-    } else {
+    if (resolvedWallet) {
+      setWalletAddress((prev) => (prev === resolvedWallet.address ? prev : resolvedWallet.address))
+      setWalletChain((prev) => (prev === resolvedWallet.chain ? prev : resolvedWallet.chain))
+      return
+    }
+
+    if (walletAddress !== null || walletChain !== 'ethereum') {
       setWalletAddress(null)
+      setWalletChain('ethereum')
       resetPortfolio()
       setEntitlement({ status: 'idle', pro: false, chain: null })
       setProOverride(false)
     }
-  }, [isConnected, address, akAddress, akConnected, resetPortfolio])
+  }, [resolvedWallet, walletAddress, walletChain, resetPortfolio])
 
   useEffect(() => {
     if (!walletAddress) return
 
+    if (walletChain !== 'ethereum') {
+      setEntitlement({
+        status: 'disabled',
+        pro: false,
+        chain: walletChain,
+        gating: 'disabled',
+        reason: 'Entitlement checks are currently available for EVM wallets only.',
+      })
+      setProOverride(false)
+      return
+    }
+
     let cancelled = false
-    setEntitlement((prev) => ({ status: 'loading', pro: prev.pro && prev.status === 'ready', chain: prev.chain ?? null }))
+    setEntitlement((prev) => ({ status: 'loading', pro: prev.pro && prev.status === 'ready', chain: walletChain }))
 
     api
-      .entitlement(walletAddress)
+      .entitlement(walletAddress, walletChain)
       .then((res) => {
         if (cancelled) return
         const status: EntitlementSnapshot['status'] = res.gating === 'disabled' ? 'disabled' : 'ready'
@@ -187,7 +241,7 @@ function MainApp() {
     return () => {
       cancelled = true
     }
-  }, [walletAddress])
+  }, [walletAddress, walletChain])
 
   const gatingActive = entitlement.status === 'ready' && entitlement.gating === 'token'
   const pro = entitlement.pro || (!gatingActive && proOverride)
@@ -201,6 +255,34 @@ function MainApp() {
     // Token-gated users handle upsell inside chat component
     void source;
   }
+
+  const handleDisconnect = useCallback(async () => {
+    if (walletChain === 'solana') {
+      await disconnectAppKit({ namespace: 'solana' }).catch((error) => {
+        console.warn('Failed to disconnect Solana wallet', error)
+      })
+      setManualWallet(null)
+      return
+    }
+
+    await Promise.allSettled([
+      (async () => {
+        try {
+          await disconnectEvm()
+        } catch (error) {
+          console.warn('Failed to disconnect EVM wallet', error)
+        }
+      })(),
+      (async () => {
+        try {
+          await disconnectAppKit({ namespace: 'eip155' })
+        } catch (error) {
+          console.warn('Failed to disconnect AppKit EVM wallet', error)
+        }
+      })(),
+    ])
+    setManualWallet(null)
+  }, [disconnectAppKit, disconnectEvm, walletChain])
 
   return (
     <div className="min-h-screen flex flex-col">
@@ -231,18 +313,26 @@ function MainApp() {
             {walletAddress ? (
               <div className="flex items-center gap-2 text-xs">
                 <span className="px-2 py-1 rounded-lg bg-white border border-slate-200 text-slate-700 sherpa-surface">{truncateAddress(walletAddress)}</span>
+                <span className="px-2 py-1 rounded-lg bg-white border border-slate-200 text-slate-500 uppercase tracking-wide sherpa-surface">{walletChain === 'solana' ? 'Solana' : 'Ethereum'}</span>
                 {totalUsd && <span className="px-2 py-1 rounded-lg bg-white border border-slate-200 text-slate-700 sherpa-surface">{totalUsd}</span>}
-                <button onClick={() => disconnect()} className="rounded-lg px-3 py-1.5 bg-white border border-slate-200 text-slate-700 hover:bg-slate-50 sherpa-surface">Disconnect</button>
+                <button onClick={handleDisconnect} className="rounded-lg px-3 py-1.5 bg-white border border-slate-200 text-slate-700 hover:bg-slate-50 sherpa-surface">Disconnect</button>
               </div>
             ) : hasModal && !isTestEnv ? (
               <AppKitButton />
             ) : (
               <button
                 onClick={async () => {
-                  const input = window.prompt('Paste a wallet address (0x…)')
-                  if (input && /^0x[a-fA-F0-9]{40}$/.test(input)) {
-                    setWalletAddress(input)
+                  const input = window.prompt('Paste a wallet address (0x… or Solana base58)')
+                  if (!input) return
+                  if (/^0x[a-fA-F0-9]{40}$/.test(input)) {
+                    setManualWallet({ address: input, chain: 'ethereum' })
+                    return
                   }
+                  if (/^[1-9A-HJ-NP-Za-km-z]{32,44}$/.test(input)) {
+                    setManualWallet({ address: input, chain: 'solana' })
+                    return
+                  }
+                  window.alert('Address must be a 0x-prefixed EVM wallet or a Solana base58 string (32–44 characters).')
                 }}
                 className="rounded-lg px-3 py-1.5 text-white bg-gradient-to-r from-glacier-600 to-primary-600 hover:opacity-95 shadow-sm ring-1 ring-white/40 sherpa-surface"
               >

@@ -1,0 +1,31 @@
+.panel-host {
+  display: grid;
+  gap: var(--s4, 24px);
+  grid-template-columns: repeat(12, 1fr);
+}
+
+.panel-host .card {
+  min-height: 180px;
+}
+
+.panel-host .card.density-rail {
+  grid-column: span 4;
+}
+
+.panel-host .card.density-full {
+  grid-column: 1 / -1;
+  min-height: 280px;
+}
+
+@media (max-width: 1200px) {
+  .panel-host .card.density-rail {
+    grid-column: span 6;
+  }
+}
+
+@media (max-width: 860px) {
+  .panel-host .card.density-rail,
+  .panel-host .card.density-full {
+    grid-column: 1 / -1;
+  }
+}

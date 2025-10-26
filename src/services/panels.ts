@@ -1,4 +1,4 @@
-import type { Panel, PanelSource } from '../pages/DeFiChatAdaptiveUI'
+import type { Panel, PanelSource } from '../types/defi-ui'
 
 // Normalize various backend panel payload shapes into UI Panel[]
 export function transformBackendPanels(input: any): Panel[] {

@@ -1,13 +1,13 @@
 import React from 'react'
 import { ChevronDown, ChevronRight, ChevronUp, GripVertical, MessageSquarePlus, Maximize2, Repeat } from 'lucide-react'
-import type { Panel } from '../../pages/DeFiChatAdaptiveUI'
+import type { Widget } from '../../types/widgets'
 import { relayQuoteThemes } from './relay-quote-theme'
 
 type RelayQuoteWidgetProps = {
-  panel: Panel
+  panel: Widget
   walletAddress?: string
   walletReady?: boolean
-  onExecuteQuote?: (panel: Panel) => Promise<string | void>
+  onExecuteQuote?: (panel: Widget) => Promise<string | void>
   onRefreshQuote?: () => Promise<void>
   onInsertQuickPrompt?: (prompt: string) => void
   controls?: {

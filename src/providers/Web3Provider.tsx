@@ -3,12 +3,15 @@ import { WagmiConfig, http, createConfig } from 'wagmi'
 import { mainnet, polygon, arbitrum, optimism, base } from 'wagmi/chains'
 import { createAppKit } from '@reown/appkit/react'
 import { WagmiAdapter } from '@reown/appkit-adapter-wagmi'
+import { SolanaAdapter } from '@reown/appkit-adapter-solana'
+import { solana } from '@reown/appkit/networks'
 
 const projectId = (import.meta as any).env?.VITE_WALLETCONNECT_PROJECT_ID as string | undefined
 const isTestEnv = ((import.meta as any).env?.MODE || '').toLowerCase() === 'test'
 
 const wagmiChains = [mainnet, base, arbitrum, optimism, polygon] as const
-const networks = [...wagmiChains] as any
+const wagmiNetworks = [...wagmiChains] as any
+const appKitNetworks = [...wagmiNetworks, solana] as any
 
 const metadata = {
   name: 'Agentic Wallet',
@@ -31,7 +34,7 @@ let wagmiConfig = createConfig({
 if (projectId && !isTestEnv) {
   const wagmiAdapter = new WagmiAdapter({
     projectId,
-    networks,
+    networks: wagmiNetworks,
     transports: {
       [mainnet.id]: http(),
       [base.id]: http(),
@@ -41,12 +44,13 @@ if (projectId && !isTestEnv) {
     },
     ssr: false,
   })
+  const solanaAdapter = new SolanaAdapter()
 
   createAppKit({
-    adapters: [wagmiAdapter],
+    adapters: [wagmiAdapter, solanaAdapter],
     projectId,
     metadata,
-    networks,
+    networks: appKitNetworks,
   })
 
   wagmiConfig = wagmiAdapter.wagmiConfig as any
