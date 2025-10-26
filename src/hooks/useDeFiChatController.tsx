@@ -12,6 +12,7 @@ import { getSwapQuote } from '../services/quotes'
 import { getTopPrices } from '../services/prices'
 import { getTrendingTokens, type TrendingToken } from '../services/trending'
 import { truncateAddress } from '../services/wallet'
+import { getFlag, setFlag } from '../utils/prefs'
 import { SimulateModal } from '../components/modals/SimulateModal'
 import { SwapModal } from '../components/modals/SwapModal'
 import { BridgeModal } from '../components/modals/BridgeModal'
@@ -198,6 +199,8 @@ export function useDeFiChatController({ props, shellState, dispatch }: UseDeFiCh
 
   const [messages, setMessages] = useState<AgentMessage[]>(seedIntro)
   const [widgets, setWidgets] = useState<Widget[]>(seedWidgets)
+  const [hasNudgedWorkspace, setHasNudgedWorkspace] = useState(() => getFlag('ws.nudged'))
+  const [coachMarkDismissed, setCoachMarkDismissed] = useState(() => getFlag('ws.tip.dismissed'))
   const [input, setInput] = useState('')
   const [conversationId, setConversationId] = useState<string | undefined>(() => {
     try {
@@ -378,6 +381,14 @@ export function useDeFiChatController({ props, shellState, dispatch }: UseDeFiCh
     }
   }, [storageKey, walletAddress])
 
+  useEffect(() => {
+    if (widgets.length > 0 && !hasNudgedWorkspace) {
+      setFlag('ws.nudged', true)
+      setHasNudgedWorkspace(true)
+      setActiveSurface('workspace')
+    }
+  }, [widgets.length, hasNudgedWorkspace, setActiveSurface])
+
   const mergeWidgetsLocal = useCallback((current: Widget[], incoming: Widget[]): Widget[] => upsertWidgets(current, incoming), [])
 
   useEffect(() => {
@@ -466,6 +477,11 @@ export function useDeFiChatController({ props, shellState, dispatch }: UseDeFiCh
     },
     [ensurePortfolioPanel, portfolioSummary, setActiveSurface],
   )
+
+  const dismissCoachMark = useCallback(() => {
+    setCoachMarkDismissed(true)
+    setFlag('ws.tip.dismissed', true)
+  }, [])
 
   const sendPrompt = useCallback(async (raw: string) => {
     const question = raw.trim()
@@ -941,6 +957,8 @@ export function useDeFiChatController({ props, shellState, dispatch }: UseDeFiCh
       setActiveSurface('workspace')
     },
     onExplainProtocol: () => handleInsertQuickPrompt('Explain this protocol like a playbook I can follow.'),
+    showCoachMark: widgets.length > 0 && !coachMarkDismissed,
+    onDismissCoachMark: dismissCoachMark,
   }
 
   const modals = (

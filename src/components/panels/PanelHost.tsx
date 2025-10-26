@@ -60,6 +60,15 @@ export function PanelHost({
     return [...priority, ...remainder]
   }, [widgets, highlight, highlightedIds])
 
+  const liveMessage = useMemo(() => {
+    if (!highlight?.length) return ''
+    const titles = highlight
+      .map((id) => widgets.find((widget) => widget.id === id)?.title)
+      .filter((title): title is string => Boolean(title))
+    if (!titles.length) return ''
+    return `Opened ${titles.join(', ')}`
+  }, [highlight, widgets])
+
   return (
     <div className="panel-host" role="list">
       {orderedWidgets.map((widget, index) => {
@@ -205,6 +214,9 @@ export function PanelHost({
           </PanelCard>
         )
       })}
+      <div className="sr-only" aria-live="polite">
+        {liveMessage}
+      </div>
     </div>
   )
 }

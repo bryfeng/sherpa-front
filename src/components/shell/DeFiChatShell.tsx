@@ -27,11 +27,53 @@ export function DeFiChatShell({
   chat,
   workspace,
 }: DeFiChatShellProps) {
+  const surfaceRefs = React.useRef<Record<SurfaceId, HTMLButtonElement | null>>({
+    conversation: null,
+    workspace: null,
+  })
+
   const surfaceButtonClass = React.useCallback(
     (surface: SurfaceId) =>
       `rounded-full px-3 py-1.5 text-xs font-medium transition ${
         activeSurface === surface ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-700'
       }`,
+    [activeSurface],
+  )
+
+  const handleTabKeyDown = React.useCallback(
+    (event: React.KeyboardEvent<HTMLDivElement>) => {
+      const order: SurfaceId[] = ['conversation', 'workspace']
+      const currentIndex = order.indexOf(activeSurface)
+      if (currentIndex < 0) return
+
+      const focusSurface = (index: number) => {
+        const target = surfaceRefs.current[order[index]]
+        target?.focus()
+      }
+
+      switch (event.key) {
+        case 'ArrowRight':
+        case 'ArrowDown':
+          event.preventDefault()
+          focusSurface((currentIndex + 1) % order.length)
+          break
+        case 'ArrowLeft':
+        case 'ArrowUp':
+          event.preventDefault()
+          focusSurface((currentIndex - 1 + order.length) % order.length)
+          break
+        case 'Home':
+          event.preventDefault()
+          focusSurface(0)
+          break
+        case 'End':
+          event.preventDefault()
+          focusSurface(order.length - 1)
+          break
+        default:
+          break
+      }
+    },
     [activeSurface],
   )
 
@@ -42,11 +84,21 @@ export function DeFiChatShell({
 
         <Card className="overflow-hidden border-slate-200/80 bg-white/95 shadow-lg">
           <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 bg-white/60 px-4 py-3">
-            <div className="inline-flex items-center rounded-full bg-slate-100 p-1" role="tablist" aria-label="Surface selection">
+            <div
+              className="inline-flex items-center rounded-full bg-slate-100 p-1"
+              role="tablist"
+              aria-label="Surface selection"
+              onKeyDown={handleTabKeyDown}
+            >
               <button
                 type="button"
                 role="tab"
+                id="surface-tab-conversation"
+                ref={(el) => {
+                  surfaceRefs.current.conversation = el
+                }}
                 aria-selected={activeSurface === 'conversation'}
+                aria-controls="surface-panel-conversation"
                 className={surfaceButtonClass('conversation')}
                 onClick={() => onSelectSurface('conversation')}
               >
@@ -55,7 +107,12 @@ export function DeFiChatShell({
               <button
                 type="button"
                 role="tab"
+                id="surface-tab-workspace"
+                ref={(el) => {
+                  surfaceRefs.current.workspace = el
+                }}
                 aria-selected={activeSurface === 'workspace'}
+                aria-controls="surface-panel-workspace"
                 className={surfaceButtonClass('workspace')}
                 onClick={() => onSelectSurface('workspace')}
               >
@@ -72,7 +129,22 @@ export function DeFiChatShell({
               </div>
             </div>
           </div>
-          {activeSurface === 'conversation' ? <ChatSurface {...chat} /> : <WorkspaceSurface {...workspace} />}
+          <div
+            role="tabpanel"
+            id="surface-panel-conversation"
+            aria-labelledby="surface-tab-conversation"
+            hidden={activeSurface !== 'conversation'}
+          >
+            {activeSurface === 'conversation' && <ChatSurface {...chat} />}
+          </div>
+          <div
+            role="tabpanel"
+            id="surface-panel-workspace"
+            aria-labelledby="surface-tab-workspace"
+            hidden={activeSurface !== 'workspace'}
+          >
+            {activeSurface === 'workspace' && <WorkspaceSurface {...workspace} />}
+          </div>
         </Card>
       </div>
     </div>

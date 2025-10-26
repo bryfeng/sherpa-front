@@ -28,6 +28,8 @@ export interface WorkspaceSurfaceProps {
   onOpenPortfolio: () => void
   onOpenRelayQuote: () => void
   onExplainProtocol: () => void
+  showCoachMark?: boolean
+  onDismissCoachMark?: () => void
   quickActionsFooter?: React.ReactNode
   secondaryColumn?: React.ReactNode
 }
@@ -53,6 +55,8 @@ export function WorkspaceSurface({
   onOpenPortfolio,
   onOpenRelayQuote,
   onExplainProtocol,
+  showCoachMark = false,
+  onDismissCoachMark,
   quickActionsFooter,
   secondaryColumn,
 }: WorkspaceSurfaceProps) {
@@ -64,6 +68,25 @@ export function WorkspaceSurface({
         Arrange live panels, quotes, and research in one streamlined workspace.
       </div>
       <div className="flex-1 overflow-y-auto px-4 py-4">
+        {showCoachMark && (
+          <div className="mb-4 rounded-2xl border border-primary-200 bg-primary-50/60 p-4 text-sm text-slate-800 shadow-sm">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div className="flex-1">
+                <span className="font-semibold text-slate-900">Workspace tip:</span>{' '}
+                Arrange widgets, pin favourites, or expand cards for deeper analysis. Everything you request lands here.
+              </div>
+              {onDismissCoachMark && (
+                <button
+                  type="button"
+                  onClick={onDismissCoachMark}
+                  className="rounded-full border border-primary-200 bg-white px-3 py-1 text-xs font-medium text-primary-700 hover:bg-primary-100"
+                >
+                  Got it
+                </button>
+              )}
+            </div>
+          </div>
+        )}
         {hasWidgets ? (
           <PanelHost
             widgets={widgets}
