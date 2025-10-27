@@ -1,6 +1,7 @@
 import React from 'react'
 import { ChevronDown, ChevronRight, ChevronUp, GripVertical, MessageSquarePlus, Maximize2, Repeat } from 'lucide-react'
 import type { Widget } from '../../types/widgets'
+import { ErrorView } from '../ErrorView'
 import { relayQuoteThemes } from './relay-quote-theme'
 
 type RelayQuoteWidgetProps = {
@@ -17,7 +18,7 @@ type RelayQuoteWidgetProps = {
   }
 }
 
-export function RelayQuoteWidget({
+function RelayQuoteWidgetComponent({
   panel,
   walletAddress,
   walletReady = false,
@@ -463,7 +464,12 @@ export function RelayQuoteWidget({
         )}
 
         {error && (
-          <div className={`${theme.section} text-xs ${theme.errorText}`}>{error}</div>
+          <ErrorView
+            message={error}
+            onRetry={onRefreshQuote ? handleRefresh : undefined}
+            retryLabel={refreshing ? 'Refreshing…' : 'Retry'}
+            className={theme.section}
+          />
         )}
         {txHash && (
           <div className={`${theme.section} text-xs ${theme.successText}`}>
@@ -474,5 +480,11 @@ export function RelayQuoteWidget({
     </div>
   )
 }
+
+export const RelayQuoteWidget = React.memo(RelayQuoteWidgetComponent)
+
+RelayQuoteWidget.displayName = 'RelayQuoteWidget'
+
+export default RelayQuoteWidget
 
 export type { RelayQuoteWidgetProps }

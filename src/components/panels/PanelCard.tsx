@@ -4,6 +4,8 @@ import React from 'react'
 import { ChevronDown, ChevronUp, Maximize2 } from 'lucide-react'
 
 import type { WidgetAction, WidgetDensity } from '../../types/widgets'
+import { ErrorView } from '../ErrorView'
+import { Skeleton } from '../Skeleton'
 import { Card, CardContent, CardHeader, CardTitle } from '../ui/primitives'
 
 interface SourceLink {
@@ -57,6 +59,10 @@ export interface PanelCardProps {
   sources?: SourceLink[]
   highlighted?: boolean
   children?: React.ReactNode
+  status?: 'idle' | 'loading' | 'error'
+  errorMessage?: string
+  onRetry?: () => void
+  retryLabel?: string
 }
 
 function PanelCardComponent({
@@ -71,6 +77,10 @@ function PanelCardComponent({
   sources,
   highlighted,
   children,
+  status = 'idle',
+  errorMessage,
+  onRetry,
+  retryLabel,
 }: PanelCardProps) {
   const renderActions = () => {
     if (!actions || actions.length === 0) return null
@@ -79,6 +89,7 @@ function PanelCardComponent({
         key={action.id}
         type="button"
         onClick={action.onClick}
+        disabled={status === 'loading'}
         className="rounded-lg border border-slate-200 px-2 py-1 text-xs font-medium text-slate-600 hover:border-slate-300 hover:text-slate-900"
         aria-label={action.ariaLabel || action.label}
       >
@@ -123,8 +134,21 @@ function PanelCardComponent({
       </CardHeader>
       {!collapsed && (
         <CardContent>
-          {children}
-          <SourcesFooter sources={sources} />
+          {status === 'loading' ? (
+            <div className="flex flex-col gap-[var(--s1)]">
+              <Skeleton height="1rem" width="35%" />
+              <Skeleton height="0.75rem" />
+              <Skeleton height="0.75rem" width="70%" />
+              <Skeleton height="0.75rem" width="55%" />
+            </div>
+          ) : status === 'error' ? (
+            <ErrorView message={errorMessage} onRetry={onRetry} retryLabel={retryLabel} />
+          ) : (
+            <>
+              {children}
+              <SourcesFooter sources={sources} />
+            </>
+          )}
         </CardContent>
       )}
     </Card>

@@ -49,7 +49,7 @@ function formatCompact(value: number, unit?: string, withUnit: boolean = true): 
   return withUnit ? `${base}${suffix}${formattedUnit}` : `${base}${suffix}`
 }
 
-export function ChartPanel({ widget }: { widget: Widget }) {
+function ChartPanelComponent({ widget }: { widget: Widget }) {
   const [range, setRange] = React.useState<'7d' | '30d'>('7d')
   const [points, setPoints] = React.useState<TVLPoint[]>(normalizeChartPoints(widget.payload))
   const unit = widget.payload?.unit
@@ -137,3 +137,9 @@ export function ChartPanel({ widget }: { widget: Widget }) {
     </div>
   )
 }
+
+export const ChartPanel = React.memo(ChartPanelComponent)
+
+ChartPanel.displayName = 'ChartPanel'
+
+export default ChartPanel

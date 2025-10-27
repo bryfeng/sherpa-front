@@ -2,15 +2,7 @@
 
 import React from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
-import {
-  Bot,
-  ExternalLink,
-  Send,
-  Sparkles,
-  Star,
-  User,
-  X,
-} from 'lucide-react'
+import { Bot, ExternalLink, Send, Star, User, X, BarChart3, Pin } from 'lucide-react'
 
 import type { AgentAction, AgentMessage } from '../../types/defi-ui'
 import { Badge, Button, Textarea } from '../ui/primitives'
@@ -227,13 +219,14 @@ export interface ChatSurfaceProps {
   inputValue: string
   onInputChange: (value: string) => void
   onSend: () => void
+  onOpenWorkspace: () => void
+  onPinLatest: () => void
+  canPinLatest: boolean
   proBadgeLabel: string
   pro: boolean
   showProInfo: boolean
   onDismissProInfo: () => void
   onProUpsell: (source: 'cta' | 'action') => void
-  manualUnlockAvailable: boolean
-  onManualUnlock: () => void
   proRequirement: string
   proTokenAddress?: string | null
   proContractDisplay: string | null
@@ -253,13 +246,14 @@ export function ChatSurface({
   inputValue,
   onInputChange,
   onSend,
+  onOpenWorkspace,
+  onPinLatest,
+  canPinLatest,
   proBadgeLabel,
   pro,
   showProInfo,
   onDismissProInfo,
   onProUpsell,
-  manualUnlockAvailable,
-  onManualUnlock,
   proRequirement,
   proTokenAddress,
   proContractDisplay,
@@ -267,6 +261,13 @@ export function ChatSurface({
   copiedToken,
   onCopyToken,
 }: ChatSurfaceProps) {
+  const canSend = inputValue.trim().length > 0
+
+  const handleSend = () => {
+    if (!canSend) return
+    onSend()
+  }
+
   return (
     <div className="flex h-full flex-col">
       <div
@@ -295,30 +296,50 @@ export function ChatSurface({
       <div className="sr-only" aria-live="polite" aria-atomic="false">
         {ariaAnnouncement}
       </div>
-      <div className="border-t border-slate-200 bg-white/70 px-4 py-4">
-        <div className="space-y-3">
-          <div className="flex w-full items-center gap-2 rounded-2xl border border-slate-200 bg-white/80 p-2 shadow-inner">
-            <Textarea
-              ref={inputRef}
-              value={inputValue}
-              onChange={(event) => onInputChange(event.target.value)}
-              onKeyDown={(event) => {
-                if (event.key === 'Enter' && !event.shiftKey) {
-                  event.preventDefault()
-                  onSend()
-                }
-              }}
-              placeholder="Ask about a token, protocol, or action…"
-              aria-label="Chat message"
-              className="min-h-[44px] flex-1 border-0 bg-transparent p-2 focus:border-0 focus:ring-0"
-            />
-            <Button onClick={onSend} className="h-10 rounded-xl px-4">
-              <Send className="mr-2 h-4 w-4" />Send
-            </Button>
+      <div className="border-t border-[var(--line)] bg-[var(--bg-elev)]/80 px-4 py-[var(--s2)]">
+        <div className="space-y-[var(--s2)]">
+          <div
+            className="rounded-2xl border bg-[var(--bg)]/80 p-[var(--s2)] shadow-inner"
+            style={{ borderColor: 'var(--line)' }}
+          >
+            <div className="flex flex-col gap-[var(--s1)] sm:flex-row sm:items-end">
+              <Textarea
+                ref={inputRef}
+                value={inputValue}
+                onChange={(event) => onInputChange(event.target.value)}
+                onKeyDown={(event) => {
+                  if (event.key === 'Enter' && !event.shiftKey) {
+                    event.preventDefault()
+                    handleSend()
+                  }
+                }}
+                placeholder="Ask about a token, protocol, or action…"
+                aria-label="Chat message"
+                className="min-h-[48px] flex-1 border-0 bg-transparent p-2 focus:border-0 focus:ring-0"
+              />
+              <Button
+                onClick={handleSend}
+                className="h-11 rounded-xl px-[var(--s3)]"
+                style={{ boxShadow: 'var(--shadow-1)' }}
+                disabled={!canSend}
+              >
+                <Send className="mr-2 h-4 w-4" />Send
+              </Button>
+            </div>
+            <div className="mt-[var(--s1)] flex flex-wrap items-center gap-[var(--s1)]">
+              <Button size="sm" variant="outline" onClick={onOpenWorkspace}>
+                <BarChart3 className="mr-1 h-3.5 w-3.5" />Open workspace
+              </Button>
+              <Button size="sm" variant="outline" onClick={onPinLatest} disabled={!canPinLatest}>
+                <Pin className="mr-1 h-3.5 w-3.5" />Pin latest panel
+              </Button>
+            </div>
           </div>
-          <div className="flex flex-wrap items-center justify-between gap-3 text-xs text-slate-600">
+          <div className="flex flex-wrap items-center justify-between gap-3 text-xs" style={{ color: 'var(--muted)' }}>
             <div className="flex items-center gap-2">
-              <Badge variant="outline" className="rounded-full px-2 py-0.5">{proBadgeLabel}</Badge>
+              <Badge variant="outline" className="rounded-full px-2 py-0.5">
+                {proBadgeLabel}
+              </Badge>
               <span>Adaptive CTAs are generated by the agent.</span>
             </div>
             {!pro && (
@@ -326,11 +347,6 @@ export function ChatSurface({
                 <Button size="sm" variant="outline" onClick={() => onProUpsell('cta')} className="rounded-full">
                   <Star className="mr-1 h-3 w-3" />Upgrade to Pro
                 </Button>
-                {manualUnlockAvailable && (
-                  <Button size="sm" variant="secondary" onClick={onManualUnlock} className="rounded-full">
-                    <Sparkles className="mr-1 h-3 w-3" />Dev Unlock
-                  </Button>
-                )}
               </div>
             )}
           </div>

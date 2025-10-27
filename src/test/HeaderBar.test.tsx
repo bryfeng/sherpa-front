@@ -13,6 +13,7 @@ function renderHeaderBar(overrides: Partial<HeaderBarProps> = {}) {
     onPlanWorkflow: vi.fn(),
     onShowTrending: vi.fn(),
     onOpenWorkspace: vi.fn(),
+    menuActions: [],
     ...overrides,
   }
   return render(<HeaderBar {...props} />)
@@ -31,5 +32,21 @@ describe('HeaderBar', () => {
     const toggle = screen.getByRole('button', { name: /change/i })
     fireEvent.click(toggle)
     expect(onPersonaChange).not.toHaveBeenCalled()
+  })
+
+  it('shows header menu actions', () => {
+    const onSelect = vi.fn()
+    renderHeaderBar({
+      menuActions: [
+        {
+          id: 'export',
+          label: 'Download session JSON',
+          onSelect,
+        },
+      ],
+    })
+    fireEvent.click(screen.getByRole('button', { name: /open more actions/i }))
+    fireEvent.click(screen.getByText(/download session json/i))
+    expect(onSelect).toHaveBeenCalled()
   })
 })

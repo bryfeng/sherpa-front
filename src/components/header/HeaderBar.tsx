@@ -5,47 +5,30 @@ import { createPortal } from 'react-dom'
 import { BarChart3, Sparkles, TrendingUp, Wand2 } from 'lucide-react'
 
 import type { PersonaId as Persona } from '../../types/persona'
+import { Entitled } from '../Entitled'
 import { Badge, Button } from '../ui/primitives'
+import { HeaderActionMenu, type HeaderActionItem } from './HeaderActionMenu'
 
-const personaStyles: Record<
-  Persona,
-  { label: string; badge: string; text: string; dot: string; hover: string; border: string; ring: string }
-> = {
+const personaStyles: Record<Persona, { label: string; accent: string; soft: string }> = {
   friendly: {
     label: 'Friendly',
-    badge: 'bg-emerald-100 text-emerald-700',
-    text: 'text-emerald-700',
-    dot: 'bg-emerald-500',
-    hover: 'hover:bg-emerald-50',
-    border: 'border-emerald-300',
-    ring: 'focus:ring-emerald-200',
+    accent: '#7de3c3',
+    soft: 'rgba(125, 227, 195, 0.18)',
   },
   technical: {
     label: 'Technical',
-    badge: 'bg-violet-100 text-violet-700',
-    text: 'text-violet-700',
-    dot: 'bg-violet-500',
-    hover: 'hover:bg-violet-50',
-    border: 'border-violet-300',
-    ring: 'focus:ring-violet-200',
+    accent: '#c3a4ff',
+    soft: 'rgba(195, 164, 255, 0.18)',
   },
   professional: {
     label: 'Professional',
-    badge: 'bg-slate-100 text-slate-700',
-    text: 'text-slate-700',
-    dot: 'bg-slate-500',
-    hover: 'hover:bg-slate-50',
-    border: 'border-slate-300',
-    ring: 'focus:ring-slate-200',
+    accent: '#91a6ff',
+    soft: 'rgba(145, 166, 255, 0.2)',
   },
   educational: {
     label: 'Educational',
-    badge: 'bg-amber-100 text-amber-700',
-    text: 'text-amber-700',
-    dot: 'bg-amber-500',
-    hover: 'hover:bg-amber-50',
-    border: 'border-amber-300',
-    ring: 'focus:ring-amber-200',
+    accent: '#ffc466',
+    soft: 'rgba(255, 196, 102, 0.22)',
   },
 }
 
@@ -53,7 +36,19 @@ const personaOrder: Persona[] = ['friendly', 'technical', 'professional', 'educa
 
 function PersonaBadge({ persona }: { persona: Persona }) {
   const style = personaStyles[persona]
-  return <Badge className={`rounded-full ${style.badge}`}>{style.label}</Badge>
+  return (
+    <Badge
+      variant="outline"
+      className="rounded-full"
+      style={{
+        borderColor: style.accent,
+        color: style.accent,
+        backgroundColor: style.soft,
+      }}
+    >
+      {style.label}
+    </Badge>
+  )
 }
 
 interface PersonaDropdownProps {
@@ -158,21 +153,47 @@ function PersonaDropdown({ persona, onSelect }: PersonaDropdownProps) {
         aria-haspopup="menu"
         aria-expanded={open}
         aria-controls={open ? menuId : undefined}
-        className={`rounded-full bg-white text-slate-900 ${personaStyles[persona].border} ${personaStyles[persona].hover} focus:ring-2 ${personaStyles[persona].ring} inline-flex items-center gap-2 px-3 py-1.5 text-sm font-medium transition`}
+        className="rounded-full inline-flex items-center gap-2 px-3 py-1.5 text-sm font-medium transition-colors duration-150"
+        style={{
+          background: 'var(--bg-elev)',
+          border: '1px solid var(--line)',
+          color: 'var(--text)',
+          boxShadow: 'var(--shadow-1)',
+        }}
       >
-        <span className={`inline-flex h-2.5 w-2.5 rounded-full ${personaStyles[persona].dot}`} />
-        <span className={`capitalize font-medium ${personaStyles[persona].text}`}>{persona}</span>
-        <span className="text-xs text-slate-500">Change</span>
+        <span
+          className="inline-flex h-2.5 w-2.5 rounded-full"
+          style={{ backgroundColor: personaStyles[persona].accent }}
+        />
+        <span className="capitalize font-medium" style={{ color: personaStyles[persona].accent }}>
+          {persona}
+        </span>
+        <span className="text-xs" style={{ color: 'var(--muted)' }}>
+          Change
+        </span>
       </button>
       {open &&
         createPortal(
           <div
             id={menuId}
             role="menu"
-            className="z-[60] rounded-2xl border border-slate-200 bg-white p-2 shadow-xl"
-            style={{ position: 'absolute', top: coords.top, left: coords.left, width: coords.width }}
+            className="z-[60] rounded-2xl p-2 shadow-xl"
+            style={{
+              position: 'absolute',
+              top: coords.top,
+              left: coords.left,
+              width: coords.width,
+              background: 'var(--bg-elev)',
+              border: '1px solid var(--line)',
+              boxShadow: 'var(--shadow-2)',
+            }}
           >
-            <div className="px-3 py-2 text-xs font-semibold uppercase tracking-[0.2em] text-slate-400">Personas</div>
+            <div
+              className="px-3 py-2 font-semibold uppercase tracking-[0.2em]"
+              style={{ fontSize: 'var(--fs-xs)', color: 'var(--muted)' }}
+            >
+              Personas
+            </div>
             <div className="flex flex-col gap-1">
               {personaOrder.map((option, index) => (
                 <button
@@ -187,11 +208,25 @@ function PersonaDropdown({ persona, onSelect }: PersonaDropdownProps) {
                     setOpen(false)
                   }}
                   onKeyDown={(event) => handlePersonaKey(event, index, option)}
-                  className={`w-full text-left px-2 py-2 rounded-lg flex items-center gap-2 ${personaStyles[option].hover}`}
+                  className="w-full text-left px-2 py-2 rounded-lg flex items-center gap-2 transition-colors duration-150"
+                  style={{
+                    background: persona === option ? personaStyles[option].soft : 'transparent',
+                    border: `1px solid ${persona === option ? personaStyles[option].accent : 'transparent'}`,
+                    color: 'var(--text)',
+                  }}
                 >
-                  <span className={`inline-flex h-2.5 w-2.5 rounded-full ${personaStyles[option].dot}`} />
-                  <span className={`capitalize font-medium ${personaStyles[option].text}`}>{option}</span>
-                  {persona === option && <span className={`ml-auto text-xs ${personaStyles[option].text}`}>Current</span>}
+                  <span
+                    className="inline-flex h-2.5 w-2.5 rounded-full"
+                    style={{ backgroundColor: personaStyles[option].accent }}
+                  />
+                  <span className="capitalize font-medium" style={{ color: personaStyles[option].accent }}>
+                    {option}
+                  </span>
+                  {persona === option && (
+                    <span className="ml-auto text-xs" style={{ color: personaStyles[option].accent }}>
+                      Current
+                    </span>
+                  )}
                 </button>
               ))}
             </div>
@@ -212,6 +247,8 @@ export interface HeaderBarProps {
   onPlanWorkflow: () => void
   onShowTrending: () => void
   onOpenWorkspace: () => void
+  onRequestPro?: (source: 'cta' | 'action') => void
+  menuActions?: HeaderActionItem[]
 }
 
 function HeaderBarComponent({
@@ -224,18 +261,31 @@ function HeaderBarComponent({
   onPlanWorkflow,
   onShowTrending,
   onOpenWorkspace,
+  onRequestPro,
+  menuActions = [],
 }: HeaderBarProps) {
   const personaLabel = useMemo(() => personaStyles[persona].label, [persona])
 
   return (
-    <div className="flex flex-col gap-4">
+    <div className="flex flex-col gap-4" style={{ color: 'var(--text)' }}>
       <header className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
         <div className="flex flex-col gap-1">
-          <h1 className="text-2xl font-semibold text-slate-900">Sherpa AI workspace</h1>
-          <p className="text-sm text-slate-600">Guide strategy, chat, and insights without juggling side rails.</p>
+          <h1 className="font-semibold" style={{ fontSize: 'var(--fs-2xl)', color: 'var(--text)' }}>
+            Sherpa AI workspace
+          </h1>
+          <p style={{ fontSize: 'var(--fs-sm)', color: 'var(--muted)' }}>
+            Guide strategy, chat, and insights without juggling side rails.
+          </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          <div className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-3 py-1.5 shadow-sm">
+          <div
+            className="inline-flex items-center gap-2 rounded-full px-3 py-1.5"
+            style={{
+              background: 'var(--bg-elev)',
+              border: '1px solid var(--line)',
+              boxShadow: 'var(--shadow-1)',
+            }}
+          >
             <PersonaBadge persona={persona} />
             <div className="min-w-[160px] max-w-[220px]">
               <PersonaDropdown persona={persona} onSelect={onPersonaChange} />
@@ -250,14 +300,41 @@ function HeaderBarComponent({
           <Button size="sm" variant="secondary" onClick={onNewChat} className="rounded-full">
             <Sparkles className="mr-1 h-3 w-3" />New chat
           </Button>
+          <HeaderActionMenu actions={menuActions} />
         </div>
       </header>
 
-      <div className="flex flex-wrap items-center gap-2 rounded-2xl border border-slate-200 bg-white/80 p-3 shadow-sm">
-        <span className="text-[11px] font-semibold uppercase tracking-[0.2em] text-slate-400">Focus</span>
-        <Button size="sm" variant="secondary" onClick={onPlanWorkflow} className="rounded-full">
-          <Wand2 className="mr-1 h-3 w-3" />Plan workflow
-        </Button>
+      <div
+        className="flex flex-wrap items-center gap-2 rounded-2xl p-3"
+        style={{
+          background: 'var(--bg-elev)',
+          border: '1px solid var(--line)',
+          boxShadow: 'var(--shadow-1)',
+        }}
+      >
+        <span
+          className="font-semibold uppercase tracking-[0.2em]"
+          style={{ fontSize: 'var(--fs-xs)', color: 'var(--muted)' }}
+        >
+          Focus
+        </span>
+        <Entitled
+          fallback={
+            <Button
+              size="sm"
+              variant="secondary"
+              onClick={() => onRequestPro?.('action')}
+              className="rounded-full"
+              aria-label="Plan workflow (requires Pro)"
+            >
+              <Wand2 className="mr-1 h-3 w-3" />Plan workflow
+            </Button>
+          }
+        >
+          <Button size="sm" variant="secondary" onClick={onPlanWorkflow} className="rounded-full">
+            <Wand2 className="mr-1 h-3 w-3" />Plan workflow
+          </Button>
+        </Entitled>
         <Button size="sm" variant="secondary" onClick={onShowTrending} className="rounded-full">
           <TrendingUp className="mr-1 h-3 w-3" />Trending tokens
         </Button>

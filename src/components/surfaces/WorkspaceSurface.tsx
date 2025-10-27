@@ -4,6 +4,8 @@ import React from 'react'
 import { ArrowLeftRight, Repeat, Sparkles, Wand2, BarChart3 } from 'lucide-react'
 
 import type { Widget } from '../../types/widgets'
+import '../../styles/workspace.css'
+import { Entitled } from '../Entitled'
 import { Button } from '../ui/primitives'
 import { PanelHost } from '../panels/PanelHost'
 
@@ -32,6 +34,7 @@ export interface WorkspaceSurfaceProps {
   onDismissCoachMark?: () => void
   quickActionsFooter?: React.ReactNode
   secondaryColumn?: React.ReactNode
+  onRequestPro?: (source: 'cta' | 'action') => void
 }
 
 export function WorkspaceSurface({
@@ -59,11 +62,12 @@ export function WorkspaceSurface({
   onDismissCoachMark,
   quickActionsFooter,
   secondaryColumn,
+  onRequestPro,
 }: WorkspaceSurfaceProps) {
   const hasWidgets = widgets.length > 0
 
   return (
-    <div className="flex h-full flex-col">
+    <div className="workspace-surface flex h-full flex-col">
       <div className="border-b border-slate-200 bg-white/70 px-4 py-3 text-sm text-slate-600">
         Arrange live panels, quotes, and research in one streamlined workspace.
       </div>
@@ -136,9 +140,23 @@ export function WorkspaceSurface({
               <Button size="sm" variant="secondary" className="justify-start" onClick={onOpenRelayQuote}>
                 <Repeat className="mr-2 h-3.5 w-3.5" />Relay bridge quote
               </Button>
-              <Button size="sm" variant="secondary" className="justify-start" onClick={onExplainProtocol}>
-                <Wand2 className="mr-2 h-3.5 w-3.5" />Explain a protocol
-              </Button>
+              <Entitled
+                fallback={
+                  <Button
+                    size="sm"
+                    variant="secondary"
+                    className="justify-start"
+                    onClick={() => onRequestPro?.('action')}
+                    aria-label="Explain a protocol (requires Pro)"
+                  >
+                    <Wand2 className="mr-2 h-3.5 w-3.5" />Explain a protocol
+                  </Button>
+                }
+              >
+                <Button size="sm" variant="secondary" className="justify-start" onClick={onExplainProtocol}>
+                  <Wand2 className="mr-2 h-3.5 w-3.5" />Explain a protocol
+                </Button>
+              </Entitled>
               {quickActionsFooter}
             </div>
           </div>

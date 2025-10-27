@@ -1,3 +1,7 @@
+@import './styles/tokens.css';
+@import './styles/components/card.css';
+@import './styles/components/skeleton.css';
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;

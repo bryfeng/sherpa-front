@@ -1,0 +1,37 @@
+:root{
+  --bg:#0b0d10;
+  --bg-elev:#12161b;
+  --card:#151a21;
+  --line:#1f2630;
+  --text:#e8eef7;
+  --muted:#aeb6c2;
+  --brand:#6ea8fe;
+  --accent:#7de3c3;
+  --danger:#ff6b6b;
+  --warning:#ffc466;
+  --success:#6be37d;
+  --s-1:4px;
+  --s0:8px;
+  --s1:12px;
+  --s2:16px;
+  --s3:20px;
+  --s4:24px;
+  --s5:32px;
+  --s6:40px;
+  --s7:56px;
+  --s8:72px;
+  --r-sm:8px;
+  --r-md:14px;
+  --r-lg:20px;
+  --r-xl:28px;
+  --r-2xl:36px;
+  --shadow-1:0 1px 2px rgba(0,0,0,.25);
+  --shadow-2:0 6px 18px rgba(0,0,0,.35);
+  --fs-xs:12px;
+  --fs-sm:13px;
+  --fs-md:15px;
+  --fs-lg:17px;
+  --fs-xl:20px;
+  --fs-2xl:24px;
+  --fs-3xl:28px;
+}

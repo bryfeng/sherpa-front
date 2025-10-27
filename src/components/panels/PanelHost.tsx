@@ -1,14 +1,22 @@
-import React, { useMemo } from 'react'
+import React, { Suspense, useMemo } from 'react'
 import { BarChart3, Star, TrendingUp } from 'lucide-react'
 
 import type { Widget } from '../../types/widgets'
 import '../../styles/panel-host.css'
-import { TrendingTokensBanner, TrendingTokensList } from '../widgets/TrendingTokensWidget'
-import { RelayQuoteWidget } from '../widgets/RelayQuoteWidget'
+import { emit } from '../../utils/events'
 import { PortfolioOverview } from './PortfolioOverview'
 import { TopCoinsPanel } from './TopCoinsPanel'
-import { ChartPanel } from './ChartPanel'
-import { PanelCard } from './PanelCard'
+import { PanelCard, type PanelCardProps } from './PanelCard'
+import { CardSkeleton } from './CardSkeleton'
+
+const ChartPanel = React.lazy(() => import('./ChartPanel'))
+const RelayQuoteWidget = React.lazy(() => import('../widgets/RelayQuoteWidget'))
+const TrendingTokensBanner = React.lazy(() =>
+  import('../widgets/TrendingTokensWidget').then((module) => ({ default: module.TrendingTokensBanner })),
+)
+const TrendingTokensList = React.lazy(() =>
+  import('../widgets/TrendingTokensWidget').then((module) => ({ default: module.TrendingTokensList })),
+)
 
 export interface PanelHostProps {
   widgets: Widget[]
@@ -75,17 +83,46 @@ export function PanelHost({
         const collapsed = Boolean(panelUI[widget.id]?.collapsed)
         const isHighlighted = highlightedIds.has(widget.id)
         const density = widget.density ?? 'rail'
+
+        const handleToggleCollapse = () => {
+          const nextCollapsed = !collapsed
+          emit({
+            name: nextCollapsed ? 'panel.close' : 'panel.open',
+            payload: { id: widget.id, title: widget.title, nextCollapsed },
+          })
+          emit({
+            name: nextCollapsed ? 'panel.pin' : 'panel.unpin',
+            payload: { id: widget.id, title: widget.title },
+          })
+          onToggleCollapse(widget.id)
+        }
+
+        const handleExpand = () => {
+          emit({ name: 'panel.expand', payload: { id: widget.id, title: widget.title } })
+          onExpand(widget.id)
+        }
+
+        const handleMove = (direction: 'up' | 'down') => {
+          const fromIndex = index
+          const toIndex = direction === 'up' ? Math.max(0, index - 1) : Math.min(orderedWidgets.length - 1, index + 1)
+          emit({
+            name: 'panel.reorder',
+            payload: { id: widget.id, title: widget.title, direction, from: fromIndex, to: toIndex },
+          })
+          onMove(widget.id, direction)
+        }
+
         const actions = [
           {
             id: `pin-${widget.id}`,
             label: collapsed ? 'Unpin' : 'Pin',
-            onClick: () => onToggleCollapse(widget.id),
+            onClick: handleToggleCollapse,
             ariaLabel: collapsed ? `Unpin ${widget.title}` : `Pin ${widget.title}`,
           },
           {
             id: `expand-${widget.id}`,
             label: 'Expand',
-            onClick: () => onExpand(widget.id),
+            onClick: handleExpand,
             ariaLabel: `Expand ${widget.title}`,
           },
         ]
@@ -94,7 +131,7 @@ export function PanelHost({
           actions.push({
             id: `move-up-${widget.id}`,
             label: 'Move up',
-            onClick: () => onMove(widget.id, 'up'),
+            onClick: () => handleMove('up'),
             ariaLabel: `Move ${widget.title} earlier`,
           })
         }
@@ -102,82 +139,87 @@ export function PanelHost({
           actions.push({
             id: `move-down-${widget.id}`,
             label: 'Move down',
-            onClick: () => onMove(widget.id, 'down'),
+            onClick: () => handleMove('down'),
             ariaLabel: `Move ${widget.title} later`,
           })
         }
 
-        const sharedCardProps = {
-          id: widget.id,
-          title: widget.title,
-          density,
-          collapsed,
-          onToggleCollapse: () => onToggleCollapse(widget.id),
-          onExpand: () => onExpand(widget.id),
-          actions,
-          sources: widget.sources,
-          highlighted: isHighlighted,
-        }
-
         const payload: any = widget.payload
 
-        const renderWidget = () => {
-          switch (widget.kind) {
-            case 'portfolio':
-              return (
-                <PortfolioOverview
-                  payload={payload}
+        let panelStatus: PanelCardProps['status'] = 'idle'
+        let panelError: string | undefined
+        let panelRetry: (() => void) | undefined
+        let widgetContent: React.ReactNode = null
+
+        if (payload && typeof payload === 'object' && payload.status === 'loading') {
+          panelStatus = 'loading'
+        }
+
+        switch (widget.kind) {
+          case 'portfolio':
+            widgetContent = (
+              <PortfolioOverview
+                payload={payload}
+                walletAddress={walletAddress}
+                collapsed={collapsed}
+                controls={{
+                  collapsed,
+                  onToggleCollapse: handleToggleCollapse,
+                  onExpand: handleExpand,
+                }}
+              />
+            )
+            break
+          case 'card': {
+            const quoteType = typeof payload?.quote_type === 'string' ? payload.quote_type : undefined
+            const isSwapWidget = quoteType === 'swap' || widget.id === 'relay_swap_quote'
+            const isBridgeWidget = quoteType === 'bridge' || widget.id === 'relay_bridge_quote'
+            if (isSwapWidget || isBridgeWidget) {
+              const executeFn = isSwapWidget ? onSwap : onBridge
+              const refreshFn = isSwapWidget ? onRefreshSwapQuote : onRefreshBridgeQuote
+              widgetContent = (
+                <RelayQuoteWidget
+                  panel={widget}
                   walletAddress={walletAddress}
-                  collapsed={collapsed}
+                  walletReady={walletReady}
+                  onExecuteQuote={executeFn}
+                  onRefreshQuote={refreshFn}
+                  onInsertQuickPrompt={onInsertQuickPrompt}
                   controls={{
                     collapsed,
-                    onToggleCollapse: () => onToggleCollapse(widget.id),
-                    onExpand: () => onExpand(widget.id),
+                    onToggleCollapse: handleToggleCollapse,
+                    onExpand: handleExpand,
                   }}
                 />
               )
-            case 'card': {
-              const quoteType = typeof payload?.quote_type === 'string' ? payload.quote_type : undefined
-              const isSwapWidget = quoteType === 'swap' || widget.id === 'relay_swap_quote'
-              const isBridgeWidget = quoteType === 'bridge' || widget.id === 'relay_bridge_quote'
-              if (isSwapWidget || isBridgeWidget) {
-                const executeFn = isSwapWidget ? onSwap : onBridge
-                const refreshFn = isSwapWidget ? onRefreshSwapQuote : onRefreshBridgeQuote
-                return (
-                  <RelayQuoteWidget
-                    panel={widget}
-                    walletAddress={walletAddress}
-                    walletReady={walletReady}
-                    onExecuteQuote={executeFn}
-                    onRefreshQuote={refreshFn}
-                    onInsertQuickPrompt={onInsertQuickPrompt}
-                    controls={{
-                      collapsed,
-                      onToggleCollapse: () => onToggleCollapse(widget.id),
-                      onExpand: () => onExpand(widget.id),
-                    }}
-                  />
-                )
-              }
-              return <div className="text-sm text-slate-700">{JSON.stringify(payload)}</div>
+            } else {
+              widgetContent = <div className="text-sm text-slate-700">{JSON.stringify(payload)}</div>
             }
-            case 'prices':
-              return <TopCoinsPanel payload={payload} />
-            case 'trending': {
-              const tokens = Array.isArray(payload?.tokens) ? payload.tokens : []
-              const fetchedAt = typeof payload?.fetchedAt === 'string' ? payload.fetchedAt : undefined
-              const error = typeof payload?.error === 'string' ? payload.error : undefined
-              if (payload?.layout === 'banner') {
-                return (
-                  <TrendingTokensBanner
-                    tokens={tokens}
-                    fetchedAt={fetchedAt}
-                    onInsertQuickPrompt={onInsertQuickPrompt}
-                    onViewAll={() => onExpand(widget.id)}
-                  />
-                )
-              }
-              return (
+            break
+          }
+          case 'prices':
+            widgetContent = <TopCoinsPanel payload={payload} />
+            break
+          case 'trending': {
+            const tokens = Array.isArray(payload?.tokens) ? payload.tokens : []
+            const fetchedAt = typeof payload?.fetchedAt === 'string' ? payload.fetchedAt : undefined
+            const error = typeof payload?.error === 'string' ? payload.error : undefined
+            if (error && tokens.length === 0) {
+              panelStatus = 'error'
+              panelError = error
+              panelRetry = () => onInsertQuickPrompt?.('Show me trending tokens again.')
+            } else if (payload?.layout === 'banner') {
+              widgetContent = (
+                <TrendingTokensBanner
+                  tokens={tokens}
+                  fetchedAt={fetchedAt}
+                  onInsertQuickPrompt={onInsertQuickPrompt}
+                  onViewAll={handleExpand}
+                  error={error}
+                />
+              )
+            } else {
+              widgetContent = (
                 <TrendingTokensList
                   tokens={tokens}
                   fetchedAt={fetchedAt}
@@ -186,11 +228,29 @@ export function PanelHost({
                 />
               )
             }
-            case 'chart':
-              return <ChartPanel widget={widget} />
-            default:
-              return <div className="text-sm text-slate-400">{JSON.stringify(payload)}</div>
+            break
           }
+          case 'chart':
+            widgetContent = <ChartPanel widget={widget} />
+            break
+          default:
+            widgetContent = <div className="text-sm text-slate-400">{JSON.stringify(payload)}</div>
+            break
+        }
+
+        const sharedCardProps = {
+          id: widget.id,
+          title: widget.title,
+          density,
+          collapsed,
+          onToggleCollapse: handleToggleCollapse,
+          onExpand: handleExpand,
+          actions,
+          sources: widget.sources,
+          highlighted: isHighlighted,
+          status: panelStatus,
+          errorMessage: panelError,
+          onRetry: panelRetry,
         }
 
         return (
@@ -210,7 +270,9 @@ export function PanelHost({
               }
             })()}
           >
-            {renderWidget()}
+            <Suspense fallback={<CardSkeleton density={density} />}>
+              {panelStatus === 'error' ? null : widgetContent}
+            </Suspense>
           </PanelCard>
         )
       })}

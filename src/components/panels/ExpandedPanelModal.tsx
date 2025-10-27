@@ -1,12 +1,16 @@
-import React from 'react'
+import React, { Suspense } from 'react'
 import { Minimize2 } from 'lucide-react'
 
 import type { Widget } from '../../types/widgets'
-import { RelayQuoteWidget } from '../widgets/RelayQuoteWidget'
-import { TrendingTokensList } from '../widgets/TrendingTokensWidget'
-import { ChartPanel } from './ChartPanel'
 import { PortfolioOverview } from './PortfolioOverview'
 import { TopCoinsPanel } from './TopCoinsPanel'
+import { CardSkeleton } from './CardSkeleton'
+
+const ChartPanel = React.lazy(() => import('./ChartPanel'))
+const RelayQuoteWidget = React.lazy(() => import('../widgets/RelayQuoteWidget'))
+const TrendingTokensList = React.lazy(() =>
+  import('../widgets/TrendingTokensWidget').then((module) => ({ default: module.TrendingTokensList })),
+)
 
 export interface ExpandedPanelModalProps {
   widget?: Widget
@@ -99,7 +103,11 @@ export function ExpandedPanelModal({
             <Minimize2 className="h-4 w-4 mx-auto" />
           </button>
         </div>
-        <div className="p-4 flex-1 overflow-y-auto">{renderContent()}</div>
+        <div className="p-4 flex-1 overflow-y-auto">
+          <Suspense fallback={<CardSkeleton density="full" />}>
+            {renderContent()}
+          </Suspense>
+        </div>
       </div>
     </div>
   )

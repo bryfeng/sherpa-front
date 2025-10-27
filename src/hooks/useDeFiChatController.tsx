@@ -245,6 +245,10 @@ export function useDeFiChatController({ props, shellState, dispatch }: UseDeFiCh
   const setActiveSurface = useCallback((surface: ShellUIState['activeSurface']) => dispatch({ type: 'setActiveSurface', surface }), [dispatch])
   const setAriaAnnouncement = useCallback((value: string) => dispatch({ type: 'setAriaAnnouncement', value }), [dispatch])
   const resetPanelUI = useCallback(() => dispatch({ type: 'resetPanelUI' }), [dispatch])
+  const setPanelCollapsed = useCallback(
+    (panelId: string, collapsed: boolean) => dispatch({ type: 'setPanelCollapsed', panelId, collapsed }),
+    [dispatch],
+  )
 
   const isMounted = useRef(true)
 
@@ -267,6 +271,33 @@ export function useDeFiChatController({ props, shellState, dispatch }: UseDeFiCh
   const publicClient = usePublicClient()
   const { switchChainAsync } = useSwitchChain()
   const walletReady = Boolean(walletClient)
+
+  const exportSession = useCallback(() => {
+    try {
+      const snapshot = {
+        exportedAt: new Date().toISOString(),
+        persona,
+        walletAddress,
+        conversationId,
+        messages,
+        widgets,
+      }
+      const blob = new Blob([JSON.stringify(snapshot, null, 2)], { type: 'application/json' })
+      const url = URL.createObjectURL(blob)
+      const anchor = document.createElement('a')
+      anchor.href = url
+      anchor.download = `sherpa-session-${Date.now()}.json`
+      anchor.click()
+      URL.revokeObjectURL(url)
+    } catch (error) {
+      console.error('Failed to export session', error)
+    }
+  }, [conversationId, messages, persona, walletAddress, widgets])
+
+  const revealProInfo = useCallback(() => {
+    setCopiedToken(false)
+    setShowProInfo(true)
+  }, [setCopiedToken, setShowProInfo])
 
   useEffect(() => () => {
     isMounted.current = false
@@ -482,6 +513,14 @@ export function useDeFiChatController({ props, shellState, dispatch }: UseDeFiCh
     setCoachMarkDismissed(true)
     setFlag('ws.tip.dismissed', true)
   }, [])
+
+  const handlePinLatestPanel = useCallback(() => {
+    if (!widgets.length) return
+    const latest = widgets[0]
+    setPanelCollapsed(latest.id, false)
+    setActiveSurface('workspace')
+    setHighlight([latest.id])
+  }, [setActiveSurface, setHighlight, setPanelCollapsed, widgets])
 
   const sendPrompt = useCallback(async (raw: string) => {
     const question = raw.trim()
@@ -889,6 +928,31 @@ export function useDeFiChatController({ props, shellState, dispatch }: UseDeFiCh
       setActiveSurface('workspace')
     },
     onOpenWorkspace: () => setActiveSurface('workspace'),
+    onRequestPro: handleProUpsell,
+    menuActions: [
+      {
+        id: 'export-session',
+        label: 'Download session JSON',
+        description: 'Save the current transcript and workspace data',
+        onSelect: exportSession,
+      },
+      {
+        id: 'view-pro-details',
+        label: 'View Pro requirements',
+        description: 'Open the Pro entitlement panel',
+        onSelect: revealProInfo,
+      },
+      ...(manualUnlockAvailable && onManualUnlock
+        ? [
+            {
+              id: 'manual-unlock',
+              label: 'Manual unlock',
+              description: 'Enable developer mode for this session',
+              onSelect: onManualUnlock,
+            },
+          ]
+        : []),
+    ],
   }
 
   const railChip = walletAddress ? (
@@ -912,6 +976,9 @@ export function useDeFiChatController({ props, shellState, dispatch }: UseDeFiCh
     inputValue: input,
     onInputChange: setInput,
     onSend: () => { void send() },
+    onOpenWorkspace: () => setActiveSurface('workspace'),
+    onPinLatest: handlePinLatestPanel,
+    canPinLatest: widgets.length > 0,
     proBadgeLabel,
     pro,
     showProInfo,
@@ -920,8 +987,6 @@ export function useDeFiChatController({ props, shellState, dispatch }: UseDeFiCh
       setCopiedToken(false)
     },
     onProUpsell: handleProUpsell,
-    manualUnlockAvailable,
-    onManualUnlock: onManualUnlock ?? (() => {}),
     proRequirement,
     proTokenAddress,
     proContractDisplay,
@@ -959,6 +1024,7 @@ export function useDeFiChatController({ props, shellState, dispatch }: UseDeFiCh
     onExplainProtocol: () => handleInsertQuickPrompt('Explain this protocol like a playbook I can follow.'),
     showCoachMark: widgets.length > 0 && !coachMarkDismissed,
     onDismissCoachMark: dismissCoachMark,
+    onRequestPro: handleProUpsell,
   }
 
   const modals = (

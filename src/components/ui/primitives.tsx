@@ -7,19 +7,47 @@ export type ButtonProps = React.ButtonHTMLAttributes<HTMLButtonElement> & {
 }
 
 export const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(function Button(props, ref) {
-  const { children, className = '', variant = 'default', size = 'md', type = 'button', ...rest } = props
-  const base = 'inline-flex items-center justify-center rounded-xl transition shadow-sm border'
-  const variants: Record<string, string> = {
-    default: 'bg-primary-600 border-primary-500 text-white hover:opacity-95',
-    outline: 'bg-transparent border-slate-300 text-slate-700 hover:bg-slate-50',
-    secondary: 'bg-slate-50 border-slate-200 text-slate-700 hover:bg-slate-100',
+  const { children, className = '', variant = 'default', size = 'md', type = 'button', style, ...rest } = props
+  const baseClass = 'inline-flex items-center justify-center rounded-xl font-medium transition-colors duration-150 focus-visible:outline-none'
+
+  const sizeClasses: Record<string, string> = {
+    sm: 'text-[var(--fs-xs)] min-h-[34px] px-[var(--s1)] py-[var(--s-1)] gap-[var(--s-1)]',
+    md: 'text-[var(--fs-sm)] min-h-[40px] px-[var(--s2)] py-[var(--s1)] gap-[var(--s1)]',
   }
-  const sizes: Record<string, string> = {
-    sm: 'text-xs px-3 py-1.5',
-    md: 'text-sm px-4 py-2',
+
+  const variantStyles: Record<string, React.CSSProperties> = {
+    default: {
+      backgroundColor: 'var(--brand)',
+      border: '1px solid var(--brand)',
+      color: 'var(--bg)',
+      boxShadow: 'var(--shadow-1)',
+    },
+    outline: {
+      backgroundColor: 'transparent',
+      border: '1px solid var(--line)',
+      color: 'var(--text)',
+    },
+    secondary: {
+      backgroundColor: 'rgba(255,255,255,0.06)',
+      border: '1px solid rgba(255,255,255,0.12)',
+      color: 'var(--muted)',
+      boxShadow: 'var(--shadow-1)',
+    },
   }
+
+  const mergedStyle: React.CSSProperties = {
+    ...variantStyles[variant],
+    ...style,
+  }
+
   return (
-    <button ref={ref} type={type} className={`${base} ${variants[variant]} ${sizes[size]} ${className}`} {...rest}>
+    <button
+      ref={ref}
+      type={type}
+      className={`${baseClass} ${sizeClasses[size] ?? sizeClasses.md} ${className}`}
+      style={mergedStyle}
+      {...rest}
+    >
       {children}
     </button>
   )
@@ -28,38 +56,70 @@ export const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(function 
 Button.displayName = 'Button'
 
 export function Card(
-  { children, className = '', ...rest }:
-  React.PropsWithChildren<{ className?: string } & React.HTMLAttributes<HTMLDivElement>>,
+  { children, className = '', style, ...rest }:
+  React.PropsWithChildren<{ className?: string; style?: React.CSSProperties } & React.HTMLAttributes<HTMLDivElement>>,
 ) {
+  const mergedStyle: React.CSSProperties = {
+    background: 'var(--card)',
+    border: '1px solid var(--line)',
+    borderRadius: 'var(--r-xl)',
+    boxShadow: 'var(--shadow-2)',
+    color: 'var(--text)',
+    ...style,
+  }
+
   return (
-    <div {...rest} className={`rounded-2xl border border-slate-200 bg-white ${className} sherpa-surface`}>
+    <div {...rest} className={`card ${className}`} style={mergedStyle}>
       {children}
     </div>
   )
 }
 
-export function CardHeader({ children, className = '' }: React.PropsWithChildren<{ className?: string }>) {
-  return <div className={`p-4 border-b border-slate-200 ${className}`}>{children}</div>
+export function CardHeader({ children, className = '', style }: React.PropsWithChildren<{ className?: string; style?: React.CSSProperties }>) {
+  return (
+    <div
+      className={`flex items-center justify-between gap-[var(--s2)] border-b px-[var(--s3)] py-[var(--s2)] ${className}`}
+      style={{ borderColor: 'var(--line)', ...style }}
+    >
+      {children}
+    </div>
+  )
 }
 
-export function CardTitle({ children, className = '' }: React.PropsWithChildren<{ className?: string }>) {
-  return <div className={`font-medium text-slate-900 ${className}`}>{children}</div>
+export function CardTitle({ children, className = '', style }: React.PropsWithChildren<{ className?: string; style?: React.CSSProperties }>) {
+  return (
+    <div className={`font-semibold text-[var(--fs-md)] ${className}`} style={{ color: 'var(--text)', ...style }}>
+      {children}
+    </div>
+  )
 }
 
-export function CardContent({ children, className = '' }: React.PropsWithChildren<{ className?: string }>) {
-  return <div className={`p-4 ${className}`}>{children}</div>
+export function CardContent({ children, className = '', style }: React.PropsWithChildren<{ className?: string; style?: React.CSSProperties }>) {
+  return (
+    <div className={`px-[var(--s3)] py-[var(--s2)] ${className}`} style={style}>
+      {children}
+    </div>
+  )
 }
 
 export const Textarea = React.forwardRef<
   HTMLTextAreaElement,
   React.TextareaHTMLAttributes<HTMLTextAreaElement> & { className?: string }
 >(function Textarea(props, ref) {
-  const { className = '', ...rest } = props
+  const { className = '', style, ...rest } = props
+  const mergedStyle: React.CSSProperties = {
+    background: 'var(--bg-elev)',
+    border: '1px solid var(--line)',
+    color: 'var(--text)',
+    boxShadow: 'var(--shadow-1)',
+    ...style,
+  }
   return (
     <textarea
       {...rest}
       ref={ref}
-      className={`min-h-[56px] w-full flex-1 rounded-2xl border border-slate-300 bg-slate-50 p-3 text-sm text-slate-900 placeholder:text-slate-500 outline-none focus:border-primary-400 focus:ring-2 focus:ring-primary-200 ${className}`}
+      className={`min-h-[56px] w-full flex-1 rounded-2xl px-[var(--s2)] py-[var(--s1)] text-[var(--fs-sm)] placeholder:opacity-70 outline-none ${className}`}
+      style={mergedStyle}
     />
   )
 })
@@ -67,16 +127,32 @@ export const Textarea = React.forwardRef<
 Textarea.displayName = 'Textarea'
 
 export function Badge(
-  { children, className = '', variant = 'solid' }:
-  React.PropsWithChildren<{ className?: string; variant?: 'solid' | 'outline' | 'secondary' }>,
+  { children, className = '', variant = 'solid', style }:
+  React.PropsWithChildren<{ className?: string; variant?: 'solid' | 'outline' | 'secondary'; style?: React.CSSProperties }>,
 ) {
-  const variants: Record<string, string> = {
-    solid: 'bg-primary-600 text-white border-primary-500',
-    outline: 'bg-transparent text-slate-700 border-slate-300',
-    secondary: 'bg-slate-100 text-slate-700 border-slate-200',
+  const variantStyles: Record<string, React.CSSProperties> = {
+    solid: {
+      backgroundColor: 'var(--accent)',
+      border: '1px solid rgba(255,255,255,0.16)',
+      color: 'var(--bg)',
+    },
+    outline: {
+      backgroundColor: 'transparent',
+      border: '1px solid var(--line)',
+      color: 'var(--text)',
+    },
+    secondary: {
+      backgroundColor: 'rgba(255,255,255,0.08)',
+      border: '1px solid rgba(255,255,255,0.12)',
+      color: 'var(--muted)',
+    },
   }
+
   return (
-    <span className={`inline-flex items-center rounded-full border px-2 py-0.5 text-xs ${variants[variant]} ${className}`}>
+    <span
+      className={`inline-flex items-center rounded-full px-[var(--s1)] py-[2px] text-[var(--fs-xs)] ${className}`}
+      style={{ ...variantStyles[variant], ...style }}
+    >
       {children}
     </span>
   )

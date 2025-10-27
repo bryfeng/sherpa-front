@@ -5,6 +5,7 @@ import { getTrendingTokens, type TrendingToken } from '../../services/trending'
 import { truncateAddress } from '../../services/wallet'
 import { getChainName } from '../../utils/chains'
 import { formatRelativeTime } from '../../utils/time'
+import { ErrorView } from '../ErrorView'
 import { WidgetButton, WidgetCard, WidgetSection, WidgetHeader } from './widget-kit'
 
 const POSITIVE_ACCENT = 'text-[#0c6f56]'
@@ -30,11 +31,13 @@ export function TrendingTokensList({
   compact = false,
 }: TrendingTokensListProps) {
   if (error && tokens.length === 0) {
-    return <div className="text-sm text-rose-600">{error}</div>
+    return <ErrorView message={error} />
   }
 
   if (!tokens.length) {
-    return <div className="text-sm text-slate-500">No trending tokens right now. Ask Sherpa for fresh market intel.</div>
+    return <div className="text-sm" style={{ color: 'var(--muted)' }}>
+      No trending tokens right now. Ask Sherpa for fresh market intel.
+    </div>
   }
 
   const formatUsd = (amount: number | null | undefined, opts?: Intl.NumberFormatOptions) => {
@@ -176,12 +179,18 @@ export function TrendingTokensBanner({
   fetchedAt,
   onInsertQuickPrompt,
   onViewAll,
+  error,
 }: {
   tokens: TrendingToken[]
   fetchedAt?: string
   onInsertQuickPrompt?: (prompt: string) => void
   onViewAll?: () => void
+  error?: string
 }) {
+  if (error && tokens.length === 0) {
+    return <ErrorView message={error} />
+  }
+
   const formatChange = (value: number | null | undefined) => {
     if (typeof value !== 'number' || Number.isNaN(value)) return null
     const sign = value >= 0 ? '+' : ''
