@@ -3,6 +3,7 @@ import { ArrowRight, ArrowUpRight, Info, Loader2, RefreshCw, Wallet, X } from 'l
 import { motion } from 'framer-motion'
 import type { PortfolioSummaryViewModel, WorkspaceRequestStatus } from '../../workspace/types'
 import { formatRelativeTime } from '../../utils/time'
+import { Badge, Button } from '../ui/primitives'
 
 interface PortfolioInlineCardProps {
   summary: PortfolioSummaryViewModel
@@ -51,15 +52,17 @@ export function PortfolioInlineCard({
     return (
       <div
         key={`${entry.symbol}-${index}`}
-        className="flex flex-1 min-w-[140px] items-center justify-between gap-3 rounded-xl bg-slate-900/5 px-3 py-2 text-xs text-slate-700"
+        className="chip flex min-w-[150px] flex-1 items-center justify-between gap-[var(--s1)]"
       >
-        <div className="flex items-center gap-2">
-          <span className="rounded-lg bg-slate-900/10 px-2 py-1 text-[11px] font-semibold uppercase tracking-wide text-slate-900">
+        <div className="flex items-center gap-[var(--s-1)]">
+          <Badge className="uppercase tracking-wide badge--outline" variant="outline">
             {entry.sym?.toUpperCase() || entry.symbol?.toUpperCase() || 'TOK'}
-          </span>
-          {pct && <span className="text-[11px] text-slate-500">{pct}</span>}
+          </Badge>
+          {pct && <span className="text-[11px]" style={{ color: 'var(--text-muted)' }}>{pct}</span>}
         </div>
-        <span className="font-medium text-slate-900">{amount}</span>
+        <span className="font-medium" style={{ color: 'var(--text)' }}>
+          {amount}
+        </span>
       </div>
     )
   }
@@ -76,27 +79,32 @@ export function PortfolioInlineCard({
       animate={{ opacity: 1, y: 0 }}
       exit={{ opacity: 0, y: -4 }}
       transition={{ duration: 0.18, ease: 'easeOut' }}
-      className="relative overflow-hidden rounded-2xl border border-slate-200/80 bg-white shadow-sm"
+      className="relative overflow-hidden card"
     >
-      <div className="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-sky-400 via-indigo-400 to-slate-700" aria-hidden="true" />
-      <div className="flex items-start justify-between gap-3 px-4 pt-4">
-        <div className="flex items-center gap-3">
-          <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-slate-900 text-white shadow-sm">
+      <div
+        className="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-[rgba(90,164,255,.45)] via-[rgba(41,127,240,.4)] to-transparent"
+        aria-hidden="true"
+      />
+      <div className="flex items-start justify-between gap-3 px-[var(--s3)] pt-[var(--s3)]">
+        <div className="flex items-center gap-[var(--s2)]">
+          <div className="flex h-10 w-10 items-center justify-center rounded-2xl subtle text-[var(--text)]">
             <Wallet className="h-5 w-5" />
           </div>
           <div>
-            <div className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-400">Portfolio snapshot</div>
-            <div className="mt-1 flex items-center gap-2 text-2xl font-semibold text-slate-900">
+            <div className="text-xs font-semibold uppercase tracking-[0.2em]" style={{ color: 'var(--text-muted)' }}>
+              Portfolio snapshot
+            </div>
+            <div className="mt-1 flex items-center gap-2 text-2xl font-semibold" style={{ color: 'var(--text)' }}>
               {loading ? (
                 <span className="flex items-center gap-2 text-base">
-                  <Loader2 className="h-4 w-4 animate-spin text-slate-400" />
+                  <Loader2 className="h-4 w-4 animate-spin" style={{ color: 'var(--text-muted)' }} />
                   Updating…
                 </span>
               ) : (
                 <>{summary.totalUsdFormatted}</>
               )}
             </div>
-            <div className="mt-1 text-xs text-slate-500">
+            <div className="mt-[var(--s-1)] text-xs" style={{ color: 'var(--text-muted)' }}>
               Updated {updatedLabel}
             </div>
           </div>
@@ -106,7 +114,7 @@ export function PortfolioInlineCard({
             <button
               type="button"
               onClick={onRefresh}
-              className="rounded-full border border-slate-200 p-2 text-slate-500 transition hover:border-slate-300 hover:text-slate-700"
+              className="rounded-full border border-[var(--line)] p-2 text-[var(--text-muted)] transition hover:bg-[var(--hover)]"
               title="Refresh portfolio"
             >
               <RefreshCw className={`h-4 w-4 ${refreshing ? 'animate-spin' : ''}`} />
@@ -116,7 +124,7 @@ export function PortfolioInlineCard({
             <button
               type="button"
               onClick={onDismiss}
-              className="rounded-full border border-slate-200 p-2 text-slate-500 transition hover:border-slate-300 hover:text-slate-700"
+              className="rounded-full border border-[var(--line)] p-2 text-[var(--text-muted)] transition hover:bg-[var(--hover)]"
               title="Hide snapshot"
             >
               <X className="h-4 w-4" />
@@ -124,39 +132,43 @@ export function PortfolioInlineCard({
           )}
         </div>
       </div>
-      <div className="px-4 pb-4">
-        <div className="mt-4 flex flex-col gap-3 md:flex-row">
+      <div className="px-[var(--s3)] pb-[var(--s3)]">
+        <div className="mt-[var(--s2)] flex flex-col gap-[var(--s2)] md:flex-row">
           {positions.length > 0 ? (
-            <div className="flex flex-1 flex-col gap-2 md:flex-row">
+            <div className="flex flex-1 flex-col gap-[var(--s1)] md:flex-row">
               {positions.map((entry, idx) => renderChip(entry, idx))}
             </div>
           ) : (
-            <div className="flex flex-1 items-center gap-2 rounded-xl bg-slate-100 px-3 py-2 text-sm text-slate-600">
-              <Info className="h-4 w-4 text-slate-400" />
+            <div className="chip flex flex-1 items-center gap-[var(--s1)]" style={{ color: 'var(--text-muted)' }}>
+              <Info className="h-4 w-4" />
               <span>No token positions available yet.</span>
             </div>
           )}
-          <div className="flex w-full max-w-[140px] flex-col items-start justify-center rounded-xl bg-emerald-50 px-3 py-2 text-emerald-700">
-            <div className="flex items-center gap-1 text-xs font-medium uppercase tracking-wide">
+          <div className="flex w-full max-w-[160px] flex-col items-start justify-center rounded-xl subtle px-[var(--s2)] py-[var(--s1)]">
+            <div className="flex items-center gap-[var(--s-1)] text-xs font-medium uppercase tracking-wide" style={{ color: 'var(--text-muted)' }}>
               Trend
-              <ArrowUpRight className={`h-3.5 w-3.5 ${changePositive === false ? 'rotate-90 text-rose-500' : ''}`} />
+              <ArrowUpRight
+                className={`h-3.5 w-3.5 ${changePositive === false ? 'rotate-90' : ''}`}
+                style={{ color: changePositive === false ? 'var(--danger)' : 'var(--success)' }}
+              />
             </div>
-            <div className={`mt-1 text-lg font-semibold ${changePositive === false ? 'text-rose-600' : 'text-emerald-600'}`}>
+            <div
+              className="mt-[var(--s-1)] text-lg font-semibold"
+              style={{ color: changePositive === false ? 'var(--danger)' : 'var(--success)' }}
+            >
               {typeof change === 'number' ? `${change.toFixed(1)}%` : '—'}
             </div>
-            <div className="text-[11px] text-emerald-700/70">24h outlook</div>
+            <div className="text-[11px]" style={{ color: 'var(--text-muted)' }}>
+              24h outlook
+            </div>
           </div>
         </div>
-        <div className="mt-4 flex flex-wrap items-center justify-between gap-3 text-sm text-slate-600">
-          <p className="flex-1 text-sm text-slate-600">{resolvedDescription}</p>
-          <button
-            type="button"
-            onClick={onOpenWorkspace}
-            className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-700 transition hover:border-slate-300 hover:text-slate-900"
-          >
+        <div className="mt-[var(--s2)] flex flex-wrap items-center justify-between gap-[var(--s1)] text-sm" style={{ color: 'var(--text-muted)' }}>
+          <p className="flex-1">{resolvedDescription}</p>
+          <Button size="sm" variant="secondary" onClick={onOpenWorkspace} className="rounded-full">
             View details
             <ArrowRight className="h-4 w-4" />
-          </button>
+          </Button>
         </div>
       </div>
     </motion.div>

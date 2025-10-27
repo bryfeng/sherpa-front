@@ -13,6 +13,7 @@ import DeFiChatAdaptiveUI from './pages/DeFiChatAdaptiveUI'
 import WidgetPlayground from './pages/WidgetPlayground'
 import { usePortfolioSummary } from './workspace/hooks'
 import { SettingsMenu } from './components/header/SettingsMenu'
+import { Button, Badge } from './components/ui/primitives'
 import type { LLMProviderInfo } from './types/llm'
 
 export type PersonaId = 'friendly' | 'technical' | 'professional' | 'educational'
@@ -285,42 +286,100 @@ function MainApp() {
   }, [disconnectAppKit, disconnectEvm, walletChain])
 
   return (
-    <div className="min-h-screen flex flex-col">
-      <header className="sticky top-0 z-30 border-b border-slate-200 bg-white sherpa-surface">
-        <div className="mx-auto max-w-7xl px-4 py-3 flex items-center justify-between">
+    <div className="min-h-screen flex flex-col" style={{ background: 'var(--bg)', color: 'var(--text)' }}>
+      <header
+        className="sticky top-0 z-30 border-b"
+        style={{ background: 'var(--bg)', borderColor: 'var(--line)' }}
+      >
+        <div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-3">
           <div className="flex items-center gap-3">
-            <div className="h-8 w-8 rounded-xl bg-gradient-to-br from-glacier-500 to-glacier-600 shadow-sm ring-1 ring-white/40 sherpa-surface" />
-            <h1 className="text-lg font-semibold text-slate-900">Sherpa AI</h1>
+            <div
+              aria-hidden="true"
+              className="flex h-9 w-9 items-center justify-center rounded-xl"
+              style={{
+                backgroundImage: 'linear-gradient(135deg, rgba(90,164,255,0.9), rgba(32,120,240,0.85))',
+                border: '1px solid var(--line)',
+                boxShadow: 'var(--shadow-1)',
+              }}
+            />
+            <h1 className="text-lg font-semibold" style={{ color: 'var(--text)' }}>
+              Sherpa AI
+            </h1>
           </div>
-          <div className="text-xs text-slate-600 flex flex-wrap items-center justify-end gap-3">
-            <span className={`inline-block w-2 h-2 rounded-full ${health === 'healthy' ? 'bg-green-500' : 'bg-yellow-500'}`} />
-            <span className="capitalize">{health}</span>
-            <code className="px-1 rounded bg-slate-50 border border-slate-200 text-slate-700">{import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000'}</code>
-            <div className="w-px h-5 bg-slate-200" />
+          <div
+            className="flex flex-wrap items-center justify-end gap-3 text-xs"
+            style={{ color: 'var(--text-muted)' }}
+          >
+            <span
+              className="inline-block h-2 w-2 rounded-full"
+              style={{ backgroundColor: health === 'healthy' ? 'var(--success)' : 'var(--warning)' }}
+            />
+            <span style={{ color: 'var(--text)', fontSize: 'var(--fs-sm)', textTransform: 'capitalize' }}>
+              {health}
+            </span>
+            <code
+              style={{
+                background: 'var(--surface-2)',
+                border: '1px solid var(--line)',
+                borderRadius: 'var(--r-md)',
+                color: 'var(--text-muted)',
+                fontSize: 'var(--fs-xs)',
+                padding: '4px 8px',
+              }}
+            >
+              {import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000'}
+            </code>
+            <div className="h-5 w-px" style={{ background: 'var(--line)' }} />
             <SettingsMenu
               selectedModel={llmModel}
               onSelectModel={setLlmModel}
               providers={llmProviders}
               loading={llmProvidersLoading}
             />
-            <button
+            <Button
+              size="sm"
+              variant="secondary"
+              className="rounded-full"
               onClick={() => setTheme((t) => (t === 'snow' ? 'default' : 'snow'))}
-              className="rounded-lg px-2 py-1 bg-white border border-slate-200 text-slate-700 hover:bg-slate-50 sherpa-surface"
               title="Toggle theme"
             >
               {theme === 'snow' ? 'Theme: Snow' : 'Theme: Default'}
-            </button>
+            </Button>
             {walletAddress ? (
               <div className="flex items-center gap-2 text-xs">
-                <span className="px-2 py-1 rounded-lg bg-white border border-slate-200 text-slate-700 sherpa-surface">{truncateAddress(walletAddress)}</span>
-                <span className="px-2 py-1 rounded-lg bg-white border border-slate-200 text-slate-500 uppercase tracking-wide sherpa-surface">{walletChain === 'solana' ? 'Solana' : 'Ethereum'}</span>
-                {totalUsd && <span className="px-2 py-1 rounded-lg bg-white border border-slate-200 text-slate-700 sherpa-surface">{totalUsd}</span>}
-                <button onClick={handleDisconnect} className="rounded-lg px-3 py-1.5 bg-white border border-slate-200 text-slate-700 hover:bg-slate-50 sherpa-surface">Disconnect</button>
+                <Badge
+                  variant="secondary"
+                  className="rounded-full px-3 py-1 text-xs"
+                  style={{ color: 'var(--text)' }}
+                >
+                  {truncateAddress(walletAddress)}
+                </Badge>
+                <Badge
+                  variant="secondary"
+                  className="rounded-full px-3 py-1 text-xs uppercase tracking-wide"
+                  style={{ color: 'var(--text)' }}
+                >
+                  {walletChain === 'solana' ? 'Solana' : 'Ethereum'}
+                </Badge>
+                {totalUsd && (
+                  <Badge
+                    variant="secondary"
+                    className="rounded-full px-3 py-1 text-xs"
+                    style={{ color: 'var(--text)' }}
+                  >
+                    {totalUsd}
+                  </Badge>
+                )}
+                <Button size="sm" variant="secondary" className="rounded-full" onClick={handleDisconnect}>
+                  Disconnect
+                </Button>
               </div>
             ) : hasModal && !isTestEnv ? (
               <AppKitButton />
             ) : (
-              <button
+              <Button
+                size="sm"
+                className="rounded-full"
                 onClick={async () => {
                   const input = window.prompt('Paste a wallet address (0x… or Solana base58)')
                   if (!input) return
@@ -334,10 +393,9 @@ function MainApp() {
                   }
                   window.alert('Address must be a 0x-prefixed EVM wallet or a Solana base58 string (32–44 characters).')
                 }}
-                className="rounded-lg px-3 py-1.5 text-white bg-gradient-to-r from-glacier-600 to-primary-600 hover:opacity-95 shadow-sm ring-1 ring-white/40 sherpa-surface"
               >
                 Use Address
-              </button>
+              </Button>
             )}
           </div>
         </div>

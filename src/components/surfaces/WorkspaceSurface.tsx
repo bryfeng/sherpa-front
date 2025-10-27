@@ -68,22 +68,28 @@ export function WorkspaceSurface({
 
   return (
     <div className="workspace-surface flex h-full flex-col">
-      <div className="border-b border-slate-200 bg-white/70 px-4 py-3 text-sm text-slate-600">
+      <div
+        className="border-b px-4 py-3 text-sm"
+        style={{ borderColor: 'var(--line)', background: 'var(--surface)', color: 'var(--text-muted)' }}
+      >
         Arrange live panels, quotes, and research in one streamlined workspace.
       </div>
       <div className="flex-1 overflow-y-auto px-4 py-4">
         {showCoachMark && (
-          <div className="mb-4 rounded-2xl border border-primary-200 bg-primary-50/60 p-4 text-sm text-slate-800 shadow-sm">
+          <div
+            className="mb-4 rounded-2xl border p-4 text-sm shadow-sm"
+            style={{ borderColor: 'rgba(90,164,255,.3)', background: 'rgba(90,164,255,.14)', color: 'var(--text)' }}
+          >
             <div className="flex flex-wrap items-center justify-between gap-3">
               <div className="flex-1">
-                <span className="font-semibold text-slate-900">Workspace tip:</span>{' '}
+                <span className="font-semibold" style={{ color: 'var(--text)' }}>Workspace tip:</span>{' '}
                 Arrange widgets, pin favourites, or expand cards for deeper analysis. Everything you request lands here.
               </div>
               {onDismissCoachMark && (
                 <button
                   type="button"
                   onClick={onDismissCoachMark}
-                  className="rounded-full border border-primary-200 bg-white px-3 py-1 text-xs font-medium text-primary-700 hover:bg-primary-100"
+                  className="btn btn-sm btn-secondary"
                 >
                   Got it
                 </button>
@@ -108,17 +114,30 @@ export function WorkspaceSurface({
             onInsertQuickPrompt={onInsertQuickPrompt}
           />
         ) : (
-          <div className="flex h-full min-h-[220px] flex-col items-center justify-center gap-3 rounded-3xl border border-dashed border-slate-300 bg-slate-50/80 p-8 text-center text-slate-500">
-            <Sparkles className="h-5 w-5 text-primary-500" />
-            <div className="text-sm font-medium text-slate-600">No workspace panels yet.</div>
-            <p className="text-xs text-slate-500">
+          <div
+            className="flex h-full min-h-[220px] flex-col items-center justify-center gap-3 rounded-3xl border border-dashed p-8 text-center"
+            style={{ borderColor: 'var(--line)', background: 'var(--surface)', color: 'var(--text-muted)' }}
+          >
+            <Sparkles className="h-5 w-5" style={{ color: 'var(--accent)' }} />
+            <div className="text-sm font-medium" style={{ color: 'var(--text)' }}>
+              No workspace panels yet.
+            </div>
+            <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
               Ask Sherpa for portfolio or market insights and they’ll land here automatically.
             </p>
           </div>
         )}
         <div className="mt-5 grid gap-4 lg:grid-cols-2">
-          <div className="rounded-2xl border border-slate-200 bg-white/80 shadow-sm">
-            <div className="border-b border-slate-200 px-4 py-3 text-sm font-medium text-slate-900">Quick actions</div>
+          <div
+            className="rounded-2xl border shadow-sm"
+            style={{ borderColor: 'var(--line)', background: 'var(--surface-2)' }}
+          >
+            <div
+              className="border-b px-4 py-3 text-sm font-medium"
+              style={{ borderColor: 'var(--line)', color: 'var(--text)' }}
+            >
+              Quick actions
+            </div>
             <div className="flex flex-col gap-2 p-4">
               <Button size="sm" variant="secondary" className="justify-start" onClick={onLoadTopCoins}>
                 <BarChart3 className="mr-2 h-3.5 w-3.5" />Top coins insight

@@ -1,77 +1,71 @@
-const CHIP_BASE = 'inline-flex items-center gap-2 rounded-full border border-white/20 bg-white/10 px-3 py-1 text-[11px] font-semibold text-white/80 backdrop-blur-sm transition hover:bg-white/18'
+const CHIP_BASE = 'inline-flex items-center gap-2 rounded-full border border-[var(--line)] bg-[var(--surface-2)] px-3 py-1 text-[11px] font-semibold text-[var(--text)] transition hover:bg-[var(--hover)]'
+
+const shared = {
+  section: 'rounded-2xl border border-[var(--line)] bg-[var(--surface)] p-4 text-[var(--text)] shadow-sm',
+  statCard: 'rounded-2xl border border-[var(--line)] bg-[var(--surface-2)] p-4 space-y-1 text-[var(--text)]',
+  statLabel: 'text-[10px] uppercase tracking-[0.24em] text-[var(--text-muted)]',
+  statValue: 'text-lg font-semibold text-[var(--text)]',
+  statHelper: 'text-xs text-[var(--text-muted)]',
+  helper: 'text-[var(--text-muted)]',
+  chip: {
+    base: CHIP_BASE,
+    active: 'bg-[var(--accent)] text-[var(--text-inverse)] border-transparent shadow-sm hover:bg-[var(--accent-600)]',
+  },
+  metaChip:
+    'inline-flex items-center gap-1 rounded-full border border-[var(--line)] bg-[var(--surface-2)] px-3 py-1 text-[10px] font-medium text-[var(--text-muted)]',
+  summaryCard:
+    'rounded-2xl border border-[var(--line)] bg-[var(--surface-2)] px-4 py-3 text-xs text-[var(--text)] flex items-center justify-between gap-3',
+  summaryValue: 'font-mono text-sm text-[var(--text)] truncate',
+  toggle:
+    'inline-flex items-center gap-1 rounded-full border border-[var(--line)] bg-[var(--surface-2)] px-2.5 py-1 text-[11px] font-semibold text-[var(--text-muted)] transition hover:bg-[var(--hover)]',
+  promptPill:
+    'inline-flex items-center gap-2 rounded-full border border-[var(--line)] bg-[var(--surface-2)] px-3 py-1.5 text-xs font-semibold text-[var(--text)] hover:bg-[var(--hover)]',
+  actionPrimary:
+    'inline-flex items-center justify-center gap-2 rounded-full bg-[var(--accent)] px-5 py-2.5 text-sm font-semibold text-[var(--text-inverse)] shadow-sm transition hover:bg-[var(--accent-600)] disabled:cursor-not-allowed disabled:opacity-60',
+  actionSecondary:
+    'inline-flex items-center justify-center gap-2 rounded-full border border-[var(--line)] bg-[var(--surface-2)] px-5 py-2.5 text-sm font-semibold text-[var(--text)] transition hover:bg-[var(--hover)] disabled:cursor-not-allowed disabled:opacity-60',
+  ghostAction:
+    'inline-flex items-center justify-center gap-2 rounded-full border border-transparent bg-transparent px-3 py-1 text-xs font-semibold text-[var(--text-muted)] hover:bg-[var(--hover)] disabled:cursor-not-allowed disabled:opacity-40',
+  warningSection:
+    'rounded-2xl border border-[rgba(255,204,102,.35)] bg-[rgba(255,204,102,.12)] p-4 text-xs text-[var(--warning)]',
+  errorText: 'text-[var(--danger)]',
+  successText: 'text-[var(--success)]',
+}
 
 export const relayQuoteThemes = {
   swap: {
-    container: 'rounded-[28px] p-5 shadow-xl text-white bg-gradient-to-br from-[#2216ff] via-[#1f63ff] to-[#3af1ff]',
-    border: 'border-white/15',
+    container:
+      'relative rounded-[24px] border border-[var(--line)] bg-[var(--surface)] p-5 text-[var(--text)] shadow-lg overflow-hidden',
+    border: 'border-[var(--line)]',
     overlays: [
-      'absolute -left-16 top-12 h-48 w-48 rounded-full bg-[#5b86ff]/30 blur-[80px]',
-      'absolute right-[-40px] top-14 h-44 w-44 rounded-full bg-[#23e3ff]/25 blur-[70px]',
-      'absolute bottom-[-60px] left-24 h-60 w-60 rounded-full bg-[#1f3fff]/25 blur-[100px]',
+      'absolute -left-16 top-12 h-48 w-48 rounded-full bg-[rgba(90,164,255,.18)] blur-[80px]',
+      'absolute right-[-40px] top-14 h-44 w-44 rounded-full bg-[rgba(41,127,240,.16)] blur-[70px]',
+      'absolute bottom-[-60px] left-24 h-60 w-60 rounded-full bg-[rgba(90,164,255,.12)] blur-[100px]',
     ] as const,
-    section: 'rounded-2xl border border-white/15 bg-white/12 backdrop-blur-md text-white/85 p-4',
-    statCard: 'rounded-2xl border border-white/18 bg-white/12 backdrop-blur-md p-4 space-y-1 text-white',
-    statLabel: 'text-[10px] uppercase tracking-[0.24em] text-white/70',
-    statValue: 'text-lg font-semibold text-white',
-    statHelper: 'text-xs text-white/65',
-    label: 'text-white/75',
-    helper: 'text-white/65',
+    label: 'text-[var(--text-muted)]',
     accent: {
-      positive: 'text-[#80fbd1]',
-      negative: 'text-[#ff9cb6]',
-      neutral: 'text-white/85',
+      positive: 'text-[var(--success)]',
+      negative: 'text-[var(--danger)]',
+      neutral: 'text-[var(--text)]',
     },
-    chip: {
-      base: CHIP_BASE,
-      active: 'bg-white text-[#153d98] border-transparent shadow-sm hover:bg-white',
-    },
-    metaChip: 'inline-flex items-center gap-1 rounded-full border border-white/25 bg-white/12 px-3 py-1 text-[10px] font-medium text-white/80 backdrop-blur-md',
-    summaryCard: 'rounded-2xl border border-white/18 bg-white/10 backdrop-blur-md px-4 py-3 text-xs text-white/75 flex items-center justify-between gap-3',
-    summaryValue: 'font-mono text-sm text-white truncate',
-    toggle: 'inline-flex items-center gap-1 rounded-full border border-white/20 bg-white/12 px-2.5 py-1 text-[11px] font-semibold text-white/75 backdrop-blur-sm transition hover:bg-white/18',
-    promptPill: 'inline-flex items-center gap-2 rounded-full border border-white/20 bg-white/12 px-3 py-1.5 text-xs font-semibold text-white/85 hover:bg-white/20 backdrop-blur-sm',
-    actionPrimary: 'inline-flex items-center justify-center gap-2 rounded-full bg-white px-5 py-2.5 text-sm font-semibold text-[#103a8b] shadow-sm transition hover:bg-white/95 disabled:cursor-not-allowed disabled:opacity-60',
-    actionSecondary: 'inline-flex items-center justify-center gap-2 rounded-full border border-white/25 bg-white/10 px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-white/20 disabled:cursor-not-allowed disabled:opacity-60',
-    ghostAction: 'inline-flex items-center justify-center gap-2 rounded-full border border-white/20 bg-white/8 px-3 py-1 text-xs font-semibold text-white/75 hover:bg-white/14 disabled:cursor-not-allowed disabled:opacity-40',
-    warningSection: 'rounded-2xl border border-amber-400/45 bg-amber-300/20 p-4 text-xs text-amber-100 backdrop-blur-sm',
-    errorText: 'text-[#ffb7cc]',
-    successText: 'text-[#8efad9]',
+    ...shared,
   },
   bridge: {
-    container: 'rounded-[28px] p-5 shadow-xl text-white bg-gradient-to-br from-[#05192e] via-[#0c4476] to-[#54d2ff]',
-    border: 'border-white/12',
+    container:
+      'relative rounded-[24px] border border-[var(--line)] bg-[var(--surface)] p-5 text-[var(--text)] shadow-lg overflow-hidden',
+    border: 'border-[var(--line)]',
     overlays: [
-      'absolute -left-24 top-10 h-52 w-52 rounded-full bg-[#1e90ff]/25 blur-[95px]',
-      'absolute right-[-60px] top-20 h-48 w-48 rounded-full bg-[#5ff4ff]/20 blur-[80px]',
-      'absolute bottom-[-80px] left-28 h-64 w-64 rounded-full bg-[#0b304f]/35 blur-[110px]',
+      'absolute -left-20 top-10 h-52 w-52 rounded-full bg-[rgba(41,127,240,.18)] blur-[90px]',
+      'absolute right-[-50px] top-20 h-48 w-48 rounded-full bg-[rgba(90,164,255,.16)] blur-[80px]',
+      'absolute bottom-[-70px] left-28 h-64 w-64 rounded-full bg-[rgba(90,164,255,.12)] blur-[100px]',
     ] as const,
-    section: 'rounded-2xl border border-white/12 bg-white/10 backdrop-blur-md text-white/85 p-4',
-    statCard: 'rounded-2xl border border-white/14 bg-white/8 backdrop-blur-md p-4 space-y-1 text-white',
-    statLabel: 'text-[10px] uppercase tracking-[0.24em] text-white/70',
-    statValue: 'text-lg font-semibold text-white',
-    statHelper: 'text-xs text-white/60',
-    label: 'text-white/70',
-    helper: 'text-white/60',
+    label: 'text-[var(--text-muted)]',
     accent: {
-      positive: 'text-[#89f7d2]',
-      negative: 'text-[#ffb2c8]',
-      neutral: 'text-white/85',
+      positive: 'text-[var(--success)]',
+      negative: 'text-[var(--danger)]',
+      neutral: 'text-[var(--text)]',
     },
-    chip: {
-      base: CHIP_BASE,
-      active: 'bg-white text-[#0b3d72] border-transparent shadow-sm hover:bg-white',
-    },
-    metaChip: 'inline-flex items-center gap-1 rounded-full border border-white/20 bg-white/10 px-3 py-1 text-[10px] font-medium text-white/75 backdrop-blur-md',
-    summaryCard: 'rounded-2xl border border-white/16 bg-white/10 backdrop-blur-md px-4 py-3 text-xs text-white/70 flex items-center justify-between gap-3',
-    summaryValue: 'font-mono text-sm text-white truncate',
-    toggle: 'inline-flex items-center gap-1 rounded-full border border-white/18 bg-white/10 px-2.5 py-1 text-[11px] font-semibold text-white/72 backdrop-blur-sm transition hover:bg-white/18',
-    promptPill: 'inline-flex items-center gap-2 rounded-full border border-white/18 bg-white/10 px-3 py-1.5 text-xs font-semibold text-white/85 hover:bg-white/20 backdrop-blur-sm',
-    actionPrimary: 'inline-flex items-center justify-center gap-2 rounded-full bg-white px-5 py-2.5 text-sm font-semibold text-[#0b3d72] shadow-sm transition hover:bg-white/95 disabled:cursor-not-allowed disabled:opacity-60',
-    actionSecondary: 'inline-flex items-center justify-center gap-2 rounded-full border border-white/22 bg-white/10 px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-white/20 disabled:cursor-not-allowed disabled:opacity-60',
-    ghostAction: 'inline-flex items-center justify-center gap-2 rounded-full border border-white/18 bg-white/6 px-3 py-1 text-xs font-semibold text-white/70 hover:bg-white/12 disabled:cursor-not-allowed disabled:opacity-40',
-    warningSection: 'rounded-2xl border border-amber-400/40 bg-amber-300/18 p-4 text-xs text-amber-100 backdrop-blur-sm',
-    errorText: 'text-[#ffb7cc]',
-    successText: 'text-[#8efad9]',
+    ...shared,
   },
 } as const
 

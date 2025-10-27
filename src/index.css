@@ -1,6 +1,7 @@
 @import './styles/tokens.css';
 @import './styles/components/card.css';
 @import './styles/components/skeleton.css';
+@import './styles/components/ui.css';
 
 @tailwind base;
 @tailwind components;
@@ -10,83 +11,14 @@ html, body, #root {
   height: 100%;
 }
 
-@layer base {
-  html, body {
-    @apply text-slate-900;
-    background: #ffffff;
-  }
-}
-
-:root {
-  color-scheme: light;
-}
-
 body {
   font-family: Inter, ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica Neue, Arial, Noto Sans, Apple Color Emoji, Segoe UI Emoji, Segoe UI Symbol;
 }
 
 :focus-visible {
-  outline: 2px solid var(--brand, #6ea8fe);
+  outline: 2px solid var(--focus-ring);
   outline-offset: 2px;
 }
-
-@media (prefers-reduced-motion: reduce) {
-  *, *::before, *::after {
-    animation-duration: 0.01ms !important;
-    animation-iteration-count: 1 !important;
-    transition-duration: 0.01ms !important;
-    scroll-behavior: auto !important;
-  }
-}
-
-/* Subtle skylight overlay for depth */
-.theme-snow body::before {
-  content: '';
-  position: fixed;
-  inset: 0;
-  pointer-events: none;
-  background:
-    radial-gradient(1200px 600px at 50% -200px, rgba(255,255,255,0.55), transparent 70%),
-    radial-gradient(1000px 500px at 10% -100px, rgba(255,255,255,0.35), transparent 70%),
-    radial-gradient(900px 450px at 90% -120px, rgba(255,255,255,0.35), transparent 70%);
-}
-
-/* Faint mountain silhouette at the bottom */
-.theme-snow body::after {
-  content: '';
-  position: fixed;
-  left: 0;
-  right: 0;
-  bottom: -2px;
-  height: 260px;
-  pointer-events: none;
-  /* Use relative path so Vite resolves at build & dev */
-  background: url('assets/mountain-silhouette.svg') center bottom / 120% 100% no-repeat;
-  opacity: 0.22;
-}
-
-/* Apply snow background only when theme-snow is active */
-.theme-snow html, .theme-snow body {
-  background: linear-gradient(180deg, #EAF2FB 0%, #F8FBFF 60%, #FFFFFF 100%);
-}
-
-/* Frosted surfaces when theme-snow is active */
-.theme-snow .sherpa-surface {
-  background-color: rgba(255, 255, 255, 0.6) !important;
-  border-color: rgba(255, 255, 255, 0.4) !important;
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
-  box-shadow: 0 2px 12px rgba(15, 23, 42, 0.06);
-}
-
-.gradient-user {
-  background: linear-gradient(135deg, #60a5fa, #2563eb);
-}
-
-.gradient-friendly { background: linear-gradient(135deg, #34d399, #10b981); }
-.gradient-technical { background: linear-gradient(135deg, #a78bfa, #8b5cf6); }
-.gradient-professional { background: linear-gradient(135deg, #1f2937, #0f172a); }
-.gradient-educational { background: linear-gradient(135deg, #fbbf24, #f59e0b); }
 
 /* Subtle scrollbars */
 *::-webkit-scrollbar { width: 8px; height: 8px; }

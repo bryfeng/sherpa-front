@@ -49,19 +49,15 @@ function SourceBadge({ src }: { src: any }) {
         target="_blank"
         rel="noreferrer"
         title={title || `Open ${label}`}
-        className="inline-flex items-center gap-1 rounded-full border border-slate-300 px-2 py-0.5 hover:bg-slate-50 text-slate-700"
+        className="chip chip--accent"
       >
         <span className="truncate max-w-[140px]">{label}</span>
-        <ExternalLink className="h-3 w-3 shrink-0 text-slate-500" aria-hidden="true" />
+        <ExternalLink className="h-3 w-3 shrink-0" aria-hidden="true" />
       </a>
     )
   }
 
-  return (
-    <span className="inline-flex items-center gap-1 rounded-full border border-slate-300 px-2 py-0.5 text-slate-600">
-      {label}
-    </span>
-  )
+  return <span className="chip">{label}</span>
 }
 
 function MarkdownRenderer({ text }: { text: string }) {
@@ -93,15 +89,34 @@ function MarkdownRenderer({ text }: { text: string }) {
     }
     flushList()
     if (line.startsWith('### ')) {
-      elements.push(<h3 key={`h3-${elements.length}`} className="font-semibold text-slate-900 mt-2">{line.slice(4)}</h3>)
+      elements.push(
+        <h3 key={`h3-${elements.length}`} className="font-semibold mt-2" style={{ color: 'var(--text)' }}>
+          {line.slice(4)}
+        </h3>,
+      )
     } else if (line.startsWith('## ')) {
-      elements.push(<h2 key={`h2-${elements.length}`} className="font-semibold text-slate-900 mt-3">{line.slice(3)}</h2>)
+      elements.push(
+        <h2 key={`h2-${elements.length}`} className="font-semibold mt-3" style={{ color: 'var(--text)' }}>
+          {line.slice(3)}
+        </h2>,
+      )
     } else if (line.startsWith('# ')) {
-      elements.push(<h1 key={`h1-${elements.length}`} className="font-semibold text-slate-900 mt-4">{line.slice(2)}</h1>)
+      elements.push(
+        <h1 key={`h1-${elements.length}`} className="font-semibold mt-4" style={{ color: 'var(--text)' }}>
+          {line.slice(2)}
+        </h1>,
+      )
     } else if (line.length === 0) {
       elements.push(<div key={`sp-${elements.length}`} className="h-2" />)
     } else {
-      elements.push(<p key={`p-${elements.length}`} className="text-slate-800" dangerouslySetInnerHTML={{ __html: applyInline(line) }} />)
+      elements.push(
+        <p
+          key={`p-${elements.length}`}
+          className="text-sm"
+          style={{ color: 'var(--text)' }}
+          dangerouslySetInnerHTML={{ __html: applyInline(line) }}
+        />,
+      )
     }
   }
   flushList()
@@ -149,21 +164,27 @@ function MessageBubble({ m, onAction }: { m: AgentMessage; onAction: (a: AgentAc
     }
   }
 
+  const bubbleClasses = isUser
+    ? 'bg-[var(--accent)] text-[var(--text-inverse)]'
+    : 'bg-[var(--surface)] border border-[var(--line)] text-[var(--text)]'
+
+  const typingColor = isUser ? 'var(--text-inverse)' : 'var(--text-muted)'
+
   return (
     <div className={`flex gap-3 ${isUser ? 'justify-end' : 'justify-start'}`}>
       {!isUser && (
-        <div className="h-8 w-8 rounded-full bg-slate-100 border border-slate-200 flex items-center justify-center">
-          <Bot className="h-4 w-4 text-slate-700" />
+        <div className="h-8 w-8 rounded-full bg-[var(--surface-2)] border border-[var(--line)] flex items-center justify-center">
+          <Bot className="h-4 w-4" style={{ color: 'var(--text-muted)' }} />
         </div>
       )}
-      <div className={`max-w-[72%] rounded-2xl p-4 shadow-sm ${isUser ? 'bg-primary-600 text-white' : 'bg-white border border-slate-200 text-slate-800 sherpa-surface'}`}>
+      <div className={`max-w-[72%] rounded-2xl p-4 shadow-sm ${bubbleClasses}`}>
         {m.typing ? (
-          <div className="text-sm text-slate-500 flex items-center gap-2">
+          <div className="text-sm flex items-center gap-2" style={{ color: typingColor }}>
             <span>Thinking</span>
             <span className="inline-flex gap-1">
-              <span className="w-1.5 h-1.5 bg-slate-400 rounded-full animate-bounce [animation-delay:-0.2s]"></span>
-              <span className="w-1.5 h-1.5 bg-slate-400 rounded-full animate-bounce [animation-delay:-0.1s]"></span>
-              <span className="w-1.5 h-1.5 bg-slate-400 rounded-full animate-bounce"></span>
+              <span className="w-1.5 h-1.5 rounded-full animate-bounce [animation-delay:-0.2s]" style={{ background: typingColor }}></span>
+              <span className="w-1.5 h-1.5 rounded-full animate-bounce [animation-delay:-0.1s]" style={{ background: typingColor }}></span>
+              <span className="w-1.5 h-1.5 rounded-full animate-bounce" style={{ background: typingColor }}></span>
             </span>
           </div>
         ) : (
@@ -172,7 +193,7 @@ function MessageBubble({ m, onAction }: { m: AgentMessage; onAction: (a: AgentAc
           </div>
         )}
         {actions.length > 0 && (
-          <div className="mt-3 flex flex-wrap gap-2" role="group" aria-label="Assistant suggestions">
+          <div className="mt-3 flex flex-wrap gap-[var(--s1)]" role="group" aria-label="Assistant suggestions">
             {actions.map((action, index) => (
               <Button
                 key={action.id}
@@ -191,8 +212,8 @@ function MessageBubble({ m, onAction }: { m: AgentMessage; onAction: (a: AgentAc
           </div>
         )}
         {m.sources && m.sources.length > 0 && (
-          <div className="mt-2 text-xs text-slate-500 flex flex-wrap items-center gap-2">
-            <span className="text-slate-600">Sources:</span>
+          <div className="mt-2 flex flex-wrap items-center gap-2 text-xs" style={{ color: 'var(--text-muted)' }}>
+            <span>Sources:</span>
             {m.sources.map((source: any, index: number) => (
               <SourceBadge key={index} src={source} />
             ))}
@@ -200,8 +221,8 @@ function MessageBubble({ m, onAction }: { m: AgentMessage; onAction: (a: AgentAc
         )}
       </div>
       {isUser && (
-        <div className="h-8 w-8 rounded-full bg-slate-100 border border-slate-200 flex items-center justify-center">
-          <User className="h-4 w-4 text-slate-700" />
+        <div className="h-8 w-8 rounded-full bg-[var(--surface-2)] border border-[var(--line)] flex items-center justify-center">
+          <User className="h-4 w-4" style={{ color: 'var(--text-muted)' }} />
         </div>
       )}
     </div>
@@ -315,14 +336,9 @@ export function ChatSurface({
                 }}
                 placeholder="Ask about a token, protocol, or action…"
                 aria-label="Chat message"
-                className="min-h-[48px] flex-1 border-0 bg-transparent p-2 focus:border-0 focus:ring-0"
+                className="flex-1 min-h-[48px]"
               />
-              <Button
-                onClick={handleSend}
-                className="h-11 rounded-xl px-[var(--s3)]"
-                style={{ boxShadow: 'var(--shadow-1)' }}
-                disabled={!canSend}
-              >
+              <Button onClick={handleSend} size="md" disabled={!canSend}>
                 <Send className="mr-2 h-4 w-4" />Send
               </Button>
             </div>
@@ -335,7 +351,7 @@ export function ChatSurface({
               </Button>
             </div>
           </div>
-          <div className="flex flex-wrap items-center justify-between gap-3 text-xs" style={{ color: 'var(--muted)' }}>
+          <div className="flex flex-wrap items-center justify-between gap-3 text-xs" style={{ color: 'var(--text-muted)' }}>
             <div className="flex items-center gap-2">
               <Badge variant="outline" className="rounded-full px-2 py-0.5">
                 {proBadgeLabel}
@@ -351,28 +367,39 @@ export function ChatSurface({
             )}
           </div>
           {showProInfo && !pro && (
-            <div className="rounded-2xl border border-primary-200/80 bg-primary-50/80 p-4 text-xs text-primary-900 shadow-sm">
+            <div
+              className="rounded-2xl border p-4 text-xs shadow-sm"
+              style={{ borderColor: 'rgba(90,164,255,.3)', background: 'rgba(90,164,255,.14)', color: 'var(--text)' }}
+            >
               <div className="flex items-start gap-3">
-                <div className="mt-[2px] rounded-full border border-primary-200 bg-white/60 p-1">
-                  <Star className="h-3.5 w-3.5 text-primary-600" />
+                <div
+                  className="mt-[2px] rounded-full border p-1"
+                  style={{ borderColor: 'var(--accent)', background: 'rgba(90,164,255,.2)' }}
+                >
+                  <Star className="h-3.5 w-3.5" style={{ color: 'var(--accent)' }} />
                 </div>
                 <div className="flex-1 space-y-2">
                   <div className="flex items-start justify-between gap-2">
                     <div>
-                      <p className="text-sm font-semibold text-primary-900">Unlock Sherpa Pro</p>
-                      <p className="mt-1 text-[11px] leading-relaxed text-primary-900/80">{proRequirement}</p>
+                      <p className="text-sm font-semibold" style={{ color: 'var(--text)' }}>
+                        Unlock Sherpa Pro
+                      </p>
+                      <p className="mt-1 text-[11px] leading-relaxed" style={{ color: 'var(--text-muted)' }}>
+                        {proRequirement}
+                      </p>
                     </div>
                     <button
                       onClick={onDismissProInfo}
-                      className="rounded-full p-1 text-primary-700 hover:bg-primary-100"
+                      className="rounded-full p-1"
+                      style={{ color: 'var(--accent)' }}
                       aria-label="Dismiss Pro info"
                     >
                       <X className="h-4 w-4" />
                     </button>
                   </div>
                   {proTokenAddress && (
-                    <div className="flex flex-wrap items-center gap-2 text-[11px] text-primary-900">
-                      <code className="rounded-lg border border-primary-200 bg-white/80 px-2 py-1 font-mono text-[11px] tracking-tight">
+                    <div className="flex flex-wrap items-center gap-2 text-[11px]" style={{ color: 'var(--text)' }}>
+                      <code className="rounded-lg border px-2 py-1 font-mono text-[11px] tracking-tight" style={{ borderColor: 'var(--accent)', background: 'rgba(90,164,255,.16)' }}>
                         {proContractDisplay}
                       </code>
                       <Button size="sm" variant="secondary" onClick={onCopyToken} className="rounded-full px-3 py-1 text-[11px]">
@@ -383,7 +410,7 @@ export function ChatSurface({
                           href={proExplorerUrl}
                           target="_blank"
                           rel="noreferrer"
-                          className="inline-flex items-center gap-1 rounded-full border border-primary-200 px-2 py-1 text-[11px] text-primary-800 hover:bg-primary-100"
+                          className="chip chip--accent"
                         >
                           View explorer
                         </a>
@@ -392,8 +419,11 @@ export function ChatSurface({
                   )}
                 </div>
               </div>
-              <div className="mt-3 text-[11px] text-primary-900/70">
-                <span className="font-medium text-primary-900">Pro perks:</span> deeper simulations, fee benchmarking, and guided DeFi workflows tailored to your wallet state.
+              <div className="mt-3 text-[11px]" style={{ color: 'var(--text-muted)' }}>
+                <span className="font-medium" style={{ color: 'var(--text)' }}>
+                  Pro perks:
+                </span>{' '}
+                deeper simulations, fee benchmarking, and guided DeFi workflows tailored to your wallet state.
               </div>
             </div>
           )}

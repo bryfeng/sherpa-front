@@ -386,13 +386,16 @@ export function useDeFiChatController({ props, shellState, dispatch }: UseDeFiCh
       density: 'full',
     }
 
-    const existed = widgets.some((candidate) => candidate.id === 'trending_tokens')
-    setWidgets((previous) => upsertWidgets(previous, [widget]))
+    let existed = false
+    setWidgets((previous) => {
+      existed = previous.some((candidate) => candidate.id === 'trending_tokens')
+      return upsertWidgets(previous, [widget])
+    })
 
     if (forceHighlight || !existed) {
       setHighlight(['trending_tokens'])
     }
-  }, [setHighlight, widgets])
+  }, [setHighlight])
 
   useEffect(() => {
     loadTrendingTokensPanel({ highlight: true }).catch(() => {})

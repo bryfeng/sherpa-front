@@ -32,14 +32,6 @@ export function DeFiChatShell({
     workspace: null,
   })
 
-  const surfaceButtonClass = React.useCallback(
-    (surface: SurfaceId) =>
-      `rounded-full px-3 py-1.5 text-xs font-medium transition ${
-        activeSurface === surface ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-700'
-      }`,
-    [activeSurface],
-  )
-
   const handleTabKeyDown = React.useCallback(
     (event: React.KeyboardEvent<HTMLDivElement>) => {
       const order: SurfaceId[] = ['conversation', 'workspace']
@@ -78,14 +70,17 @@ export function DeFiChatShell({
   )
 
   return (
-    <div className="min-h-[calc(100vh-64px)] w-full bg-slate-50/80 px-4 py-8">
+    <div className="app-chrome min-h-[calc(100vh-64px)] w-full px-4 py-8">
       <div className="mx-auto flex w-full max-w-6xl flex-col gap-6">
         <HeaderBar {...header} />
 
-        <Card className="overflow-hidden border-slate-200/80 bg-white/95 shadow-lg">
-          <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 bg-white/60 px-4 py-3">
+        <Card className="overflow-hidden">
+          <div
+            className="flex flex-wrap items-center justify-between gap-3 border-b px-[var(--s3)] py-[var(--s2)]"
+            style={{ borderColor: 'var(--line)', background: 'var(--surface-2)' }}
+          >
             <div
-              className="inline-flex items-center rounded-full bg-slate-100 p-1"
+              className="tabs"
               role="tablist"
               aria-label="Surface selection"
               onKeyDown={handleTabKeyDown}
@@ -99,7 +94,7 @@ export function DeFiChatShell({
                 }}
                 aria-selected={activeSurface === 'conversation'}
                 aria-controls="surface-panel-conversation"
-                className={surfaceButtonClass('conversation')}
+                className="tab"
                 onClick={() => onSelectSurface('conversation')}
               >
                 Conversation
@@ -113,7 +108,7 @@ export function DeFiChatShell({
                 }}
                 aria-selected={activeSurface === 'workspace'}
                 aria-controls="surface-panel-workspace"
-                className={surfaceButtonClass('workspace')}
+                className="tab"
                 onClick={() => onSelectSurface('workspace')}
               >
                 {workspaceButtonLabel}
@@ -121,9 +116,9 @@ export function DeFiChatShell({
             </div>
             <div className="flex flex-wrap items-center gap-3">
               {railChip}
-              <div className="flex items-center gap-2 text-xs text-slate-500">
+              <div className="flex items-center gap-2 text-xs" style={{ color: 'var(--text-muted)' }}>
                 <span className="hidden sm:inline">Session</span>
-                <span className="rounded-full border border-slate-200 bg-white px-2 py-1 font-medium text-slate-700 shadow-sm">
+                <span className="badge badge--outline">
                   {conversationDisplay}
                 </span>
               </div>

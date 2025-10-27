@@ -35,9 +35,11 @@ export function TrendingTokensList({
   }
 
   if (!tokens.length) {
-    return <div className="text-sm" style={{ color: 'var(--muted)' }}>
-      No trending tokens right now. Ask Sherpa for fresh market intel.
-    </div>
+    return (
+      <div className="text-sm" style={{ color: 'var(--text-muted)' }}>
+        No trending tokens right now. Ask Sherpa for fresh market intel.
+      </div>
+    )
   }
 
   const formatUsd = (amount: number | null | undefined, opts?: Intl.NumberFormatOptions) => {

@@ -168,7 +168,7 @@ function PersonaDropdown({ persona, onSelect }: PersonaDropdownProps) {
         <span className="capitalize font-medium" style={{ color: personaStyles[persona].accent }}>
           {persona}
         </span>
-        <span className="text-xs" style={{ color: 'var(--muted)' }}>
+        <span className="text-xs" style={{ color: 'var(--text-muted)' }}>
           Change
         </span>
       </button>
@@ -190,7 +190,7 @@ function PersonaDropdown({ persona, onSelect }: PersonaDropdownProps) {
           >
             <div
               className="px-3 py-2 font-semibold uppercase tracking-[0.2em]"
-              style={{ fontSize: 'var(--fs-xs)', color: 'var(--muted)' }}
+              style={{ fontSize: 'var(--fs-xs)', color: 'var(--text-muted)' }}
             >
               Personas
             </div>
@@ -273,7 +273,7 @@ function HeaderBarComponent({
           <h1 className="font-semibold" style={{ fontSize: 'var(--fs-2xl)', color: 'var(--text)' }}>
             Sherpa AI workspace
           </h1>
-          <p style={{ fontSize: 'var(--fs-sm)', color: 'var(--muted)' }}>
+          <p style={{ fontSize: 'var(--fs-sm)', color: 'var(--text-muted)' }}>
             Guide strategy, chat, and insights without juggling side rails.
           </p>
         </div>
@@ -314,7 +314,7 @@ function HeaderBarComponent({
       >
         <span
           className="font-semibold uppercase tracking-[0.2em]"
-          style={{ fontSize: 'var(--fs-xs)', color: 'var(--muted)' }}
+          style={{ fontSize: 'var(--fs-xs)', color: 'var(--text-muted)' }}
         >
           Focus
         </span>

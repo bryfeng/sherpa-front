@@ -66,7 +66,7 @@ export function HeaderActionMenu({ actions }: HeaderActionMenuProps) {
           role="menu"
           className="absolute right-0 z-40 mt-2 w-56 rounded-2xl border border-[var(--line)] bg-[var(--bg-elev)]/95 p-2 shadow-2xl backdrop-blur"
         >
-          <div className="px-3 py-2 text-[var(--fs-xs)] font-semibold uppercase tracking-[0.16em] text-[var(--muted)]">
+          <div className="px-3 py-2 text-[var(--fs-xs)] font-semibold uppercase tracking-[0.16em] text-[var(--text-muted)]">
             Workspace tools
           </div>
           <div className="flex flex-col gap-1">
@@ -81,11 +81,11 @@ export function HeaderActionMenu({ actions }: HeaderActionMenuProps) {
                   action.onSelect()
                 }}
                 disabled={action.disabled}
-                className="flex w-full flex-col rounded-xl border border-transparent px-3 py-2 text-left text-[var(--fs-sm)] text-[var(--text)] transition hover:border-[var(--brand)] hover:bg-[var(--bg)] disabled:cursor-not-allowed disabled:opacity-60"
+                className="flex w-full flex-col rounded-xl border border-transparent px-3 py-2 text-left text-[var(--fs-sm)] text-[var(--text)] transition hover:border-[var(--accent)] hover:bg-[var(--bg)] disabled:cursor-not-allowed disabled:opacity-60"
               >
                 <span className="font-medium">{action.label}</span>
                 {action.description && (
-                  <span className="text-[var(--fs-xs)] text-[var(--muted)]">{action.description}</span>
+                  <span className="text-[var(--fs-xs)] text-[var(--text-muted)]">{action.description}</span>
                 )}
               </button>
             ))}

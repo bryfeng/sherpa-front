@@ -36,7 +36,7 @@ export function ErrorView({
           {title}
         </span>
       </div>
-      <p className="text-sm" style={{ color: 'var(--muted)' }}>
+      <p className="text-sm" style={{ color: 'var(--text-muted)' }}>
         {message}
       </p>
       {onRetry && (
