@@ -1,10 +1,11 @@
-import React, { Suspense } from 'react'
+import React, { Suspense, useEffect, useState } from 'react'
 import { Minimize2 } from 'lucide-react'
 
 import type { Widget } from '../../types/widgets'
 import { PortfolioOverview } from './PortfolioOverview'
 import { TopCoinsPanel } from './TopCoinsPanel'
 import { CardSkeleton } from './CardSkeleton'
+import { readThemeTokens, withAlpha, type ThemeTokens } from '../../utils/theme'
 
 const ChartPanel = React.lazy(() => import('./ChartPanel'))
 const RelayQuoteWidget = React.lazy(() => import('../widgets/RelayQuoteWidget'))
@@ -36,6 +37,17 @@ export function ExpandedPanelModal({
   onInsertQuickPrompt,
 }: ExpandedPanelModalProps) {
   if (!widget) return null
+
+  const [theme, setTheme] = useState<ThemeTokens>(() => readThemeTokens())
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    const updateTheme = () => setTheme(readThemeTokens())
+    updateTheme()
+    const observer = new MutationObserver(updateTheme)
+    observer.observe(document.documentElement, { attributes: true, attributeFilter: ['class', 'style'] })
+    return () => observer.disconnect()
+  }, [])
 
   const renderContent = () => {
     if (widget.kind === 'chart') return <ChartPanel widget={widget} />
@@ -94,16 +106,34 @@ export function ExpandedPanelModal({
     return <div className="text-sm text-slate-400">{JSON.stringify(widget.payload)}</div>
   }
 
+  const panelBorder = withAlpha(theme.line, 0.8)
+  const headerBorder = withAlpha(theme.line, 0.6)
+  const mutedColor = theme.textMuted || '#94a3b8'
+
   return (
-    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/30 p-3">
-      <div className="w-full max-w-3xl max-h-[80vh] rounded-2xl bg-white shadow-xl border border-slate-200 flex flex-col">
-        <div className="px-4 py-3 border-b border-slate-200 flex items-center justify-between">
-          <div className="font-semibold text-slate-900">{widget.title}</div>
-          <button onClick={onClose} className="h-8 w-8 rounded-lg hover:bg-slate-100 text-slate-600" title="Close" aria-label="Close">
+    <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/60 backdrop-blur-sm p-3 sm:items-center sm:p-6">
+      <div
+        className="w-full max-w-4xl max-h-[85vh] rounded-3xl shadow-2xl border flex flex-col"
+        style={{ backgroundColor: theme.surface, borderColor: panelBorder, color: theme.text }}
+      >
+        <div
+          className="px-5 py-4 flex items-center justify-between"
+          style={{ borderBottom: `1px solid ${headerBorder}` }}
+        >
+          <div className="text-lg font-semibold" style={{ color: theme.text }}>
+            {widget.title}
+          </div>
+          <button
+            onClick={onClose}
+            className="h-9 w-9 rounded-full transition"
+            style={{ color: theme.text, backgroundColor: withAlpha(theme.line, 0.2) }}
+            title="Close"
+            aria-label="Close"
+          >
             <Minimize2 className="h-4 w-4 mx-auto" />
           </button>
         </div>
-        <div className="p-4 flex-1 overflow-y-auto">
+        <div className="p-5 flex-1 overflow-y-auto">
           <Suspense fallback={<CardSkeleton density="full" />}>
             {renderContent()}
           </Suspense>

@@ -8,8 +8,9 @@ import type { PortfolioSummaryViewModel, WorkspaceRequestStatus } from '../works
 import { api } from '../services/api'
 import { transformBackendPanels } from '../services/panels'
 import type { Widget, WidgetDensity } from '../types/widgets'
+import { TOKEN_PRICE_WIDGET_ID } from '../constants/widgets'
 import { getSwapQuote } from '../services/quotes'
-import { getTopPrices } from '../services/prices'
+import { getTopPrices, type TokenChartResponse } from '../services/prices'
 import { getTrendingTokens, type TrendingToken } from '../services/trending'
 import { truncateAddress } from '../services/wallet'
 import { getFlag, setFlag } from '../utils/prefs'
@@ -27,7 +28,16 @@ import { erc20Abi } from 'viem'
 
 import type { ShellUIState, ShellUIAction } from './useShellUIReducer'
 
-const seedWidgets: Widget[] = []
+const seedWidgets: Widget[] = [
+  {
+    id: TOKEN_PRICE_WIDGET_ID,
+    kind: 'chart',
+    title: 'Token price chart',
+    payload: { template: TOKEN_PRICE_WIDGET_ID },
+    sources: [{ label: 'CoinGecko', href: 'https://www.coingecko.com' }],
+    density: 'full',
+  },
+]
 
 const seedIntro: AgentMessage[] = [
   {
@@ -41,6 +51,18 @@ const seedIntro: AgentMessage[] = [
     ],
   },
 ]
+
+function isTokenPriceChartPayload(payload: any): payload is TokenChartResponse {
+  if (!payload || typeof payload !== 'object') return false
+  const series = (payload as { series?: { prices?: unknown } }).series
+  if (!series || typeof series !== 'object') return false
+  return Array.isArray((series as { prices?: unknown[] }).prices)
+}
+
+function normalizeWidgetId(value?: string | null): string | undefined {
+  if (!value) return undefined
+  return value.endsWith('_price_chart') ? TOKEN_PRICE_WIDGET_ID : value
+}
 
 function uid(prefix = 'id') {
   return `${prefix}_${Math.random().toString(36).slice(2, 9)}`
@@ -83,18 +105,24 @@ function toSourceLinks(sources?: PanelSource[]): Array<{ label: string; href?: s
 
 function inferDensity(panel: Panel): WidgetDensity {
   if (panel.kind === 'portfolio') return 'full'
+  if (panel.kind === 'chart') {
+    if (isTokenPriceChartPayload(panel.payload)) return 'full'
+    if (panel.metadata?.layout === 'full') return 'full'
+  }
   if (panel.metadata?.layout === 'banner') return 'full'
   return 'rail'
 }
 
 function panelToWidget(panel: Panel): Widget {
+  const payload = panel.payload ?? {}
+  const tokenChart = panel.kind === 'chart' && isTokenPriceChartPayload(payload)
   return {
-    id: panel.id,
+    id: tokenChart ? TOKEN_PRICE_WIDGET_ID : panel.id,
     kind: panel.kind,
     title: panel.title,
-    payload: panel.payload,
+    payload,
     sources: toSourceLinks(panel.sources),
-    density: inferDensity(panel),
+    density: tokenChart ? 'full' : inferDensity(panel),
   }
 }
 
@@ -199,6 +227,14 @@ export function useDeFiChatController({ props, shellState, dispatch }: UseDeFiCh
 
   const [messages, setMessages] = useState<AgentMessage[]>(seedIntro)
   const [widgets, setWidgets] = useState<Widget[]>(seedWidgets)
+  const hasLiveWidgets = useMemo(
+    () =>
+      widgets.some((widget) => {
+        const template = (widget.payload as { template?: string } | undefined)?.template
+        return template !== TOKEN_PRICE_WIDGET_ID
+      }),
+    [widgets],
+  )
   const [hasNudgedWorkspace, setHasNudgedWorkspace] = useState(() => getFlag('ws.nudged'))
   const [coachMarkDismissed, setCoachMarkDismissed] = useState(() => getFlag('ws.tip.dismissed'))
   const [input, setInput] = useState('')
@@ -416,12 +452,12 @@ export function useDeFiChatController({ props, shellState, dispatch }: UseDeFiCh
   }, [storageKey, walletAddress])
 
   useEffect(() => {
-    if (widgets.length > 0 && !hasNudgedWorkspace) {
+    if (hasLiveWidgets && !hasNudgedWorkspace) {
       setFlag('ws.nudged', true)
       setHasNudgedWorkspace(true)
       setActiveSurface('workspace')
     }
-  }, [widgets.length, hasNudgedWorkspace, setActiveSurface])
+  }, [hasLiveWidgets, hasNudgedWorkspace, setActiveSurface])
 
   const mergeWidgetsLocal = useCallback((current: Widget[], incoming: Widget[]): Widget[] => upsertWidgets(current, incoming), [])
 
@@ -862,7 +898,8 @@ export function useDeFiChatController({ props, shellState, dispatch }: UseDeFiCh
 
     switch (action.type) {
       case 'show_panel': {
-        const panelId = action.params?.panel_id
+        const rawPanelId = action.params?.panel_id
+        const panelId = normalizeWidgetId(rawPanelId)
         if (panelId === 'portfolio_overview' && !walletAddress) {
           setMessages((previous) => [
             ...previous,
@@ -886,7 +923,7 @@ export function useDeFiChatController({ props, shellState, dispatch }: UseDeFiCh
         if (panelId) {
           setMessages((previous) => [
             ...previous,
-            { id: uid('msg'), role: 'assistant', text: `Opened: ${panelId}` },
+            { id: uid('msg'), role: 'assistant', text: `Opened: ${rawPanelId ?? panelId}` },
           ])
         }
         break

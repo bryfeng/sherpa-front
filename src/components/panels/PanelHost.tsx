@@ -2,6 +2,7 @@ import React, { Suspense, useMemo } from 'react'
 import { BarChart3, Star, TrendingUp } from 'lucide-react'
 
 import type { Widget } from '../../types/widgets'
+import { TOKEN_PRICE_WIDGET_ID } from '../../constants/widgets'
 import '../../styles/panel-host.css'
 import { emit } from '../../utils/events'
 import { PortfolioOverview } from './PortfolioOverview'
@@ -36,6 +37,8 @@ export interface PanelHostProps {
 
 function orderWidgets(widgets: Widget[]): Widget[] {
   return [...widgets].sort((a, b) => {
+    if (a.id === TOKEN_PRICE_WIDGET_ID && b.id !== TOKEN_PRICE_WIDGET_ID) return -1
+    if (b.id === TOKEN_PRICE_WIDGET_ID && a.id !== TOKEN_PRICE_WIDGET_ID) return 1
     const orderA = typeof a.order === 'number' ? a.order : Number.MAX_SAFE_INTEGER
     const orderB = typeof b.order === 'number' ? b.order : Number.MAX_SAFE_INTEGER
     if (orderA === orderB) return a.title.localeCompare(b.title)
