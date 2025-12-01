@@ -15,16 +15,6 @@ type HistoryBucket = NonNullable<HistorySummaryResponse['buckets']>[number]
 
 export function HistorySummaryPanel({ widget }: HistorySummaryPanelProps) {
   const summary = widget.payload
-  if (!summary) {
-    return (
-      <div className="text-sm" style={{ color: 'var(--text-muted)' }}>
-        No history data available for this wallet.
-      </div>
-    )
-  }
-
-  const totals = summary.totals
-  const topBuckets = (summary.buckets ?? []).slice(0, 3)
   const {
     events,
     readyExports,
@@ -35,6 +25,17 @@ export function HistorySummaryPanel({ widget }: HistorySummaryPanelProps) {
     isWindowClamped,
     limitCount,
   } = useHistorySummary(summary)
+
+  if (!summary) {
+    return (
+      <div className="text-sm" style={{ color: 'var(--text-muted)' }}>
+        No history data available for this wallet.
+      </div>
+    )
+  }
+
+  const totals = summary.totals
+  const topBuckets = (summary.buckets ?? []).slice(0, 3)
   const headingId = `history-summary-${widget.id}`
   const subtitleId = isLimitSample ? undefined : `${headingId}-range`
   const coverageLabel = formatRange(summary.timeWindow.start, summary.timeWindow.end)
@@ -229,10 +230,11 @@ function BucketCard({ bucket }: { bucket: HistoryBucket }) {
         </div>
       </div>
       {sample.length > 0 && (
-        <div className="grid gap-[var(--s-1)] text-xs" aria-label="Sample transactions">
+          <div className="grid gap-[var(--s-1)] text-xs" aria-label="Sample transactions">
           {sample.map((tx, idx) => {
             const amountColor = tx.direction === 'inflow' ? 'var(--success)' : 'var(--danger)'
-            const label = tx.symbol || tx.protocol || tx.protocol_name || tx.tx_type || 'Txn'
+            const txAny = tx as any
+            const label = tx.symbol || txAny.protocol || txAny.protocol_name || txAny.tx_type || 'Txn'
             return (
               <div
                 key={tx.tx_hash ?? `${bucket.start}-${idx}`}

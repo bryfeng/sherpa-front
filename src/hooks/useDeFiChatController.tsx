@@ -108,7 +108,7 @@ function inferDensity(panel: Panel): WidgetDensity {
   if (metadataDensity === 'full' || metadataDensity === 'rail') {
     return metadataDensity
   }
-  if (panel.kind === 'history-summary') {
+  if (panel.kind === ('history-summary' as Panel['kind'])) {
     return 'full'
   }
   if (panel.kind === 'portfolio') return 'full'

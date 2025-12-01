@@ -35,7 +35,7 @@ export default function ChartPanelComponent({ widget }: { widget: Widget }) {
     const initialData: TokenChartResponse = {
       success: payload.success ?? true,
       metadata: payload.metadata ?? {},
-      coin_id: payload.coin_id ?? payload.metadata?.id ?? '',
+      coin_id: payload.coin_id ?? '',
       range: payload.range ?? '7d',
       vs_currency: payload.vs_currency ?? 'usd',
       series: payload.series as TokenChartResponse['series'],
@@ -50,9 +50,9 @@ export default function ChartPanelComponent({ widget }: { widget: Widget }) {
       <Suspense fallback={<ChartPlaceholder label="Loading token chart…" />}>
         <TokenPriceChart
           coinId={payload.coin_id}
-          symbol={payload.metadata?.symbol ?? payload.symbol}
-          address={payload.metadata?.contract_address ?? payload.contract_address}
-          chain={payload.metadata?.chain ?? payload.chain ?? 'ethereum'}
+          symbol={payload.metadata?.symbol ?? undefined}
+          address={payload.metadata?.contract_address ?? undefined}
+          chain={payload.metadata?.chain ?? 'ethereum'}
           vsCurrency={initialData.vs_currency}
           initialRange={initialData.range as TokenChartParams['range']}
           initialData={initialData}

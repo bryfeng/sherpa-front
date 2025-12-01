@@ -36,8 +36,6 @@ export function ExpandedPanelModal({
   onRefreshSwapQuote,
   onInsertQuickPrompt,
 }: ExpandedPanelModalProps) {
-  if (!widget) return null
-
   const [theme, setTheme] = useState<ThemeTokens>(() => readThemeTokens())
 
   useEffect(() => {
@@ -48,6 +46,8 @@ export function ExpandedPanelModal({
     observer.observe(document.documentElement, { attributes: true, attributeFilter: ['class', 'style'] })
     return () => observer.disconnect()
   }, [])
+
+  if (!widget) return null
 
   const renderContent = () => {
     if (widget.kind === 'chart') return <ChartPanel widget={widget} />
@@ -108,7 +108,6 @@ export function ExpandedPanelModal({
 
   const panelBorder = withAlpha(theme.line, 0.8)
   const headerBorder = withAlpha(theme.line, 0.6)
-  const mutedColor = theme.textMuted || '#94a3b8'
 
   return (
     <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/60 backdrop-blur-sm p-3 sm:items-center sm:p-6">

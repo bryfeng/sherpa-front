@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react'
-import { createChart, ColorType, type IChartApi, type ISeriesApi } from 'lightweight-charts'
+import { createChart, ColorType, type IChartApi, type ISeriesApi, type UTCTimestamp } from 'lightweight-charts'
 
 import {
   getTokenChart,
@@ -26,15 +26,15 @@ type TokenPriceChartProps = {
   onRangeChange?: (range: TokenChartParams['range']) => void
 }
 
-type CandleDatum = TokenCandle & { time: number }
+type CandleDatum = TokenCandle & { time: UTCTimestamp }
 
-type LineDatum = { time: number; value: number }
+type LineDatum = { time: UTCTimestamp; value: number }
 
-type VolumeDatum = { time: number; value: number; color?: string }
+type VolumeDatum = { time: UTCTimestamp; value: number; color?: string }
 
-function toSeconds(timestamp: number | undefined | null): number | undefined {
+function toSeconds(timestamp: number | undefined | null): UTCTimestamp | undefined {
   if (!timestamp) return undefined
-  return Math.floor(timestamp / 1000)
+  return Math.floor(timestamp / 1000) as UTCTimestamp
 }
 
 function formatCurrency(value: number | undefined | null, currency: string = 'usd'): string {
@@ -65,9 +65,11 @@ function buildLineSeries(prices: TokenChartPoint[] | undefined): LineDatum[] {
     .map((point) => {
       if (!point) return null
       if (typeof point.time !== 'number' || typeof point.price !== 'number') return null
-      return { time: toSeconds(point.time) ?? 0, value: point.price }
+      const time = toSeconds(point.time)
+      if (!time) return null
+      return { time, value: point.price }
     })
-    .filter((entry): entry is LineDatum => Boolean(entry) && Number.isFinite(entry.value))
+    .filter((entry): entry is LineDatum => entry !== null && Number.isFinite(entry.value))
 }
 
 function buildCandleSeries(candles: TokenCandle[] | undefined): CandleDatum[] {
