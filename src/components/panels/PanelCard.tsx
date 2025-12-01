@@ -6,7 +6,8 @@ import { ChevronDown, ChevronUp, Maximize2 } from 'lucide-react'
 import type { WidgetAction, WidgetDensity } from '../../types/widgets'
 import { ErrorView } from '../ErrorView'
 import { Skeleton } from '../Skeleton'
-import { Card, CardContent, CardHeader, CardTitle } from '../ui/primitives'
+import { Card, CardContent } from '../ui/primitives'
+import { WidgetButton } from '../widgets/widget-kit'
 
 interface SourceLink {
   label: string
@@ -17,10 +18,15 @@ function SourcesFooter({ sources }: { sources?: SourceLink[] }) {
   if (!sources || sources.length === 0) return null
 
   return (
-    <div className="mt-3 flex flex-wrap items-center gap-2 text-xs text-slate-500">
-      <span className="text-slate-600">Sources:</span>
+    <div
+      className="mt-[var(--s2)] flex flex-wrap items-center gap-[var(--s-1)] text-[11px]"
+      style={{ color: 'var(--text-muted)' }}
+    >
+      <span className="uppercase tracking-[0.2em]">Sources</span>
       {sources.map((source, index) => {
         const key = `${source.label}-${index}`
+        const baseClass =
+          'inline-flex items-center gap-[var(--s-1)] rounded-full border px-[var(--s1)] py-[var(--s-1)] text-[11px] font-semibold'
         if (source.href) {
           return (
             <a
@@ -28,7 +34,8 @@ function SourcesFooter({ sources }: { sources?: SourceLink[] }) {
               href={source.href}
               target="_blank"
               rel="noreferrer"
-              className="inline-flex items-center gap-1 rounded-full border border-slate-200 bg-white px-2 py-0.5 text-xs text-slate-600 transition hover:border-slate-300 hover:text-slate-800"
+              className={`${baseClass} bg-[var(--surface-2)] text-[var(--text)] hover:bg-[var(--hover)]`}
+              style={{ borderColor: 'var(--line)' }}
             >
               {source.label}
             </a>
@@ -37,7 +44,8 @@ function SourcesFooter({ sources }: { sources?: SourceLink[] }) {
         return (
           <span
             key={key}
-            className="inline-flex items-center gap-1 rounded-full border border-slate-200 bg-white px-2 py-0.5 text-xs text-slate-500"
+            className={`${baseClass} text-[var(--text-muted)]`}
+            style={{ borderColor: 'var(--line)', background: 'var(--surface-2)' }}
           >
             {source.label}
           </span>
@@ -82,56 +90,83 @@ function PanelCardComponent({
   onRetry,
   retryLabel,
 }: PanelCardProps) {
+  const densityLabel = density === 'full' ? 'Full-width widget' : 'Rail widget'
+  const filteredActions = (actions ?? []).filter(
+    (action) => action && !action.id?.startsWith('pin-') && !action.id?.startsWith('expand-'),
+  )
+
   const renderActions = () => {
-    if (!actions || actions.length === 0) return null
-    return actions.map((action) => (
-      <button
+    if (!filteredActions.length) return null
+    return filteredActions.map((action) => (
+      <WidgetButton
         key={action.id}
-        type="button"
+        variant="ghost"
+        size="sm"
+        className="uppercase tracking-[0.12em] text-[10px] font-semibold text-[var(--text-muted)]"
         onClick={action.onClick}
         disabled={status === 'loading'}
-        className="rounded-lg border border-slate-200 px-2 py-1 text-xs font-medium text-slate-600 hover:border-slate-300 hover:text-slate-900"
         aria-label={action.ariaLabel || action.label}
       >
         {action.label}
-      </button>
+      </WidgetButton>
     ))
   }
 
   return (
     <Card
       data-panel-id={id}
-      className={`card rounded-2xl density-${density}${highlighted ? ' ring-2 ring-primary-300' : ''}`}
+      data-highlighted={highlighted ? 'true' : undefined}
+      className={`card rounded-2xl density-${density}`}
     >
-      <CardHeader className="pb-2">
-        <CardTitle className="text-sm flex items-center gap-2">
-          {icon}
-          <span>{title}</span>
-        </CardTitle>
-        <div className="ml-auto flex items-center gap-1">
-          {onToggleCollapse && (
-            <button
-              onClick={onToggleCollapse}
-              className="h-8 w-8 rounded-lg hover:bg-slate-100 text-slate-600"
-              title={collapsed ? 'Expand' : 'Minimize'}
-              aria-label={collapsed ? 'Expand panel' : 'Minimize panel'}
+      <div className="flex flex-wrap items-start justify-between gap-[var(--s1)] border-b border-[var(--line)] px-[var(--s3)] py-[var(--s2)]">
+        <div className="flex items-center gap-[var(--s1)]">
+          {icon ? (
+            <span
+              className="inline-flex h-10 w-10 items-center justify-center rounded-2xl"
+              style={{ background: 'rgba(90,164,255,.12)', color: 'var(--accent)' }}
+              aria-hidden
             >
-              {collapsed ? <ChevronDown className="h-4 w-4 mx-auto" /> : <ChevronUp className="h-4 w-4 mx-auto" />}
-            </button>
-          )}
-          {onExpand && (
-            <button
-              onClick={onExpand}
-              className="h-8 w-8 rounded-lg hover:bg-slate-100 text-slate-600"
-              title="Expand"
-              aria-label="Expand panel"
-            >
-              <Maximize2 className="h-4 w-4 mx-auto" />
-            </button>
-          )}
-          {renderActions()}
+              {icon}
+            </span>
+          ) : null}
+          <div className="space-y-[2px]">
+            <p className="text-sm font-semibold" style={{ color: 'var(--text)' }}>
+              {title}
+            </p>
+            <p className="text-[11px] uppercase tracking-[0.2em]" style={{ color: 'var(--text-muted)' }}>
+              {densityLabel}
+            </p>
+          </div>
         </div>
-      </CardHeader>
+        <div className="flex flex-wrap items-center justify-end gap-[var(--s-1)]">
+          {renderActions()}
+          {onToggleCollapse ? (
+            <WidgetButton
+              variant="ghost"
+              size="sm"
+              className="h-8 w-8 rounded-full p-0 text-[var(--text-muted)]"
+              onClick={onToggleCollapse}
+              aria-label={collapsed ? 'Expand panel' : 'Collapse panel'}
+              title={collapsed ? 'Expand' : 'Collapse'}
+              disabled={status === 'loading'}
+            >
+              {collapsed ? <ChevronDown className="h-4 w-4" /> : <ChevronUp className="h-4 w-4" />}
+            </WidgetButton>
+          ) : null}
+          {onExpand ? (
+            <WidgetButton
+              variant="ghost"
+              size="sm"
+              className="h-8 w-8 rounded-full p-0 text-[var(--text-muted)]"
+              onClick={onExpand}
+              aria-label="Expand panel"
+              title="Expand panel"
+            >
+              <Maximize2 className="h-4 w-4" />
+            </WidgetButton>
+          ) : null}
+        </div>
+      </div>
       {!collapsed && (
         <CardContent>
           {status === 'loading' ? (

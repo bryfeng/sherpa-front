@@ -31,6 +31,7 @@ export function DeFiChatShell({
     conversation: null,
     workspace: null,
   })
+  const isWorkspaceView = activeSurface === 'workspace'
 
   const handleTabKeyDown = React.useCallback(
     (event: React.KeyboardEvent<HTMLDivElement>) => {
@@ -70,8 +71,8 @@ export function DeFiChatShell({
   )
 
   return (
-    <div className="app-chrome min-h-[calc(100vh-64px)] w-full px-4 py-8">
-      <div className="mx-auto flex w-full max-w-6xl flex-col gap-6">
+    <div className="app-chrome min-h-[calc(100vh-64px)] w-full py-8">
+      <div className="flex w-full flex-col gap-6">
         <HeaderBar {...header} />
 
         <Card className="overflow-hidden">
@@ -81,37 +82,36 @@ export function DeFiChatShell({
           >
             <div
               className="tabs"
-              role="tablist"
+              role="group"
               aria-label="Surface selection"
               onKeyDown={handleTabKeyDown}
             >
               <button
                 type="button"
-                role="tab"
                 id="surface-tab-conversation"
                 ref={(el) => {
                   surfaceRefs.current.conversation = el
                 }}
-                aria-selected={activeSurface === 'conversation'}
-                aria-controls="surface-panel-conversation"
+                aria-pressed={activeSurface === 'conversation'}
                 className="tab"
                 onClick={() => onSelectSurface('conversation')}
               >
-                Conversation
+                Conversation view
               </button>
               <button
                 type="button"
-                role="tab"
                 id="surface-tab-workspace"
                 ref={(el) => {
                   surfaceRefs.current.workspace = el
                 }}
-                aria-selected={activeSurface === 'workspace'}
-                aria-controls="surface-panel-workspace"
+                aria-pressed={activeSurface === 'workspace'}
                 className="tab"
                 onClick={() => onSelectSurface('workspace')}
               >
-                {workspaceButtonLabel}
+                <span className="flex items-center gap-1">
+                  <span>{workspaceButtonLabel}</span>
+                  <span className="text-[11px] text-[var(--text-muted)]">(docked)</span>
+                </span>
               </button>
             </div>
             <div className="flex flex-wrap items-center gap-3">
@@ -124,22 +124,51 @@ export function DeFiChatShell({
               </div>
             </div>
           </div>
-          <div
-            role="tabpanel"
-            id="surface-panel-conversation"
-            aria-labelledby="surface-tab-conversation"
-            hidden={activeSurface !== 'conversation'}
-          >
-            {activeSurface === 'conversation' && <ChatSurface {...chat} />}
-          </div>
-          <div
-            role="tabpanel"
-            id="surface-panel-workspace"
-            aria-labelledby="surface-tab-workspace"
-            hidden={activeSurface !== 'workspace'}
-          >
-            {activeSurface === 'workspace' && <WorkspaceSurface {...workspace} />}
-          </div>
+          {isWorkspaceView ? (
+            <div className="grid grid-cols-1 lg:grid-cols-[minmax(320px,380px)_1fr]">
+              <section
+                id="surface-panel-conversation"
+                aria-labelledby="surface-tab-conversation"
+                className="border-b bg-[var(--surface-2)]/40 lg:border-b-0 lg:border-r lg:bg-[var(--surface-2)]/30"
+                style={{ borderColor: 'var(--line)' }}
+              >
+                <div className="flex h-full min-h-[420px] flex-col lg:max-h-[calc(100vh-260px)]">
+                  <div
+                    className="flex items-center justify-between gap-2 border-b px-4 py-3 text-xs tracking-wide uppercase"
+                    style={{ borderColor: 'var(--line)', color: 'var(--text-muted)' }}
+                  >
+                    <span>Chat docked</span>
+                    <span className="badge badge--secondary">Active</span>
+                  </div>
+                  <ChatSurface {...chat} />
+                </div>
+              </section>
+              <section
+                id="surface-panel-workspace"
+                aria-labelledby="surface-tab-workspace"
+                className="flex h-full min-h-[520px] flex-col lg:max-h-[calc(100vh-260px)]"
+              >
+                <WorkspaceSurface {...workspace} />
+              </section>
+            </div>
+          ) : (
+            <>
+              <section
+                id="surface-panel-conversation"
+                aria-labelledby="surface-tab-conversation"
+                role="region"
+              >
+                <ChatSurface {...chat} />
+              </section>
+              <section
+                id="surface-panel-workspace"
+                aria-labelledby="surface-tab-workspace"
+                role="region"
+                hidden
+                aria-hidden="true"
+              />
+            </>
+          )}
         </Card>
       </div>
     </div>

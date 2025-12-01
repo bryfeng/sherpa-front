@@ -123,111 +123,114 @@ function MarkdownRenderer({ text }: { text: string }) {
   return <div className="space-y-1">{elements}</div>
 }
 
-function MessageBubble({ m, onAction }: { m: AgentMessage; onAction: (a: AgentAction) => void }) {
-  const isUser = m.role === 'user'
-  const actions = m.actions || []
-  const actionRefs = React.useRef<Array<HTMLButtonElement | null>>([])
+const MessageBubble = React.memo(
+  function MessageBubble({ m, onAction }: { m: AgentMessage; onAction: (a: AgentAction) => void }) {
+    const isUser = m.role === 'user'
+    const actions = m.actions || []
+    const actionRefs = React.useRef<Array<HTMLButtonElement | null>>([])
 
-  React.useEffect(() => {
-    actionRefs.current = actionRefs.current.slice(0, actions.length)
-  }, [actions.length])
+    React.useEffect(() => {
+      actionRefs.current = actionRefs.current.slice(0, actions.length)
+    }, [actions.length])
 
-  const focusAction = (index: number) => {
-    if (!actions.length) return
-    const normalized = (index + actions.length) % actions.length
-    const el = actionRefs.current[normalized]
-    el?.focus()
-  }
-
-  const handleActionKeyDown = (event: React.KeyboardEvent<HTMLButtonElement>, index: number) => {
-    switch (event.key) {
-      case 'ArrowRight':
-      case 'ArrowDown':
-        event.preventDefault()
-        focusAction(index + 1)
-        break
-      case 'ArrowLeft':
-      case 'ArrowUp':
-        event.preventDefault()
-        focusAction(index - 1)
-        break
-      case 'Home':
-        event.preventDefault()
-        focusAction(0)
-        break
-      case 'End':
-        event.preventDefault()
-        focusAction(actions.length - 1)
-        break
-      default:
-        break
+    const focusAction = (index: number) => {
+      if (!actions.length) return
+      const normalized = (index + actions.length) % actions.length
+      const el = actionRefs.current[normalized]
+      el?.focus()
     }
-  }
 
-  const bubbleClasses = isUser
-    ? 'bg-[var(--accent)] text-[var(--text-inverse)]'
-    : 'bg-[var(--surface)] border border-[var(--line)] text-[var(--text)]'
+    const handleActionKeyDown = (event: React.KeyboardEvent<HTMLButtonElement>, index: number) => {
+      switch (event.key) {
+        case 'ArrowRight':
+        case 'ArrowDown':
+          event.preventDefault()
+          focusAction(index + 1)
+          break
+        case 'ArrowLeft':
+        case 'ArrowUp':
+          event.preventDefault()
+          focusAction(index - 1)
+          break
+        case 'Home':
+          event.preventDefault()
+          focusAction(0)
+          break
+        case 'End':
+          event.preventDefault()
+          focusAction(actions.length - 1)
+          break
+        default:
+          break
+      }
+    }
 
-  const typingColor = isUser ? 'var(--text-inverse)' : 'var(--text-muted)'
+    const bubbleClasses = isUser
+      ? 'bg-[var(--accent)] text-[var(--text-inverse)]'
+      : 'bg-[var(--surface)] border border-[var(--line)] text-[var(--text)]'
 
-  return (
-    <div className={`flex gap-3 ${isUser ? 'justify-end' : 'justify-start'}`}>
-      {!isUser && (
-        <div className="h-8 w-8 rounded-full bg-[var(--surface-2)] border border-[var(--line)] flex items-center justify-center">
-          <Bot className="h-4 w-4" style={{ color: 'var(--text-muted)' }} />
+    const typingColor = isUser ? 'var(--text-inverse)' : 'var(--text-muted)'
+
+    return (
+      <div className={`flex gap-3 ${isUser ? 'justify-end' : 'justify-start'}`}>
+        {!isUser && (
+          <div className="h-8 w-8 rounded-full bg-[var(--surface-2)] border border-[var(--line)] flex items-center justify-center">
+            <Bot className="h-4 w-4" style={{ color: 'var(--text-muted)' }} />
+          </div>
+        )}
+        <div className={`max-w-[72%] rounded-2xl p-4 shadow-sm ${bubbleClasses}`}>
+          {m.typing ? (
+            <div className="text-sm flex items-center gap-2" style={{ color: typingColor }}>
+              <span>Thinking</span>
+              <span className="inline-flex gap-1">
+                <span className="w-1.5 h-1.5 rounded-full animate-bounce [animation-delay:-0.2s]" style={{ background: typingColor }}></span>
+                <span className="w-1.5 h-1.5 rounded-full animate-bounce [animation-delay:-0.1s]" style={{ background: typingColor }}></span>
+                <span className="w-1.5 h-1.5 rounded-full animate-bounce" style={{ background: typingColor }}></span>
+              </span>
+            </div>
+          ) : (
+            <div className="text-sm leading-relaxed">
+              {isUser ? <span className="whitespace-pre-wrap">{m.text}</span> : <MarkdownRenderer text={m.text} />}
+            </div>
+          )}
+          {actions.length > 0 && (
+            <div className="mt-3 flex flex-wrap gap-[var(--s1)]" role="group" aria-label="Assistant suggestions">
+              {actions.map((action, index) => (
+                <Button
+                  key={action.id}
+                  ref={(el) => {
+                    actionRefs.current[index] = el
+                  }}
+                  size="sm"
+                  variant={isUser ? 'secondary' : 'default'}
+                  onClick={() => onAction(action)}
+                  onKeyDown={(event) => handleActionKeyDown(event, index)}
+                  className="rounded-full"
+                >
+                  {action.label}
+                </Button>
+              ))}
+            </div>
+          )}
+          {m.sources && m.sources.length > 0 && (
+            <div className="mt-2 flex flex-wrap items-center gap-2 text-xs" style={{ color: 'var(--text-muted)' }}>
+              <span>Sources:</span>
+              {m.sources.map((source: any, index: number) => (
+                <SourceBadge key={index} src={source} />
+              ))}
+            </div>
+          )}
         </div>
-      )}
-      <div className={`max-w-[72%] rounded-2xl p-4 shadow-sm ${bubbleClasses}`}>
-        {m.typing ? (
-          <div className="text-sm flex items-center gap-2" style={{ color: typingColor }}>
-            <span>Thinking</span>
-            <span className="inline-flex gap-1">
-              <span className="w-1.5 h-1.5 rounded-full animate-bounce [animation-delay:-0.2s]" style={{ background: typingColor }}></span>
-              <span className="w-1.5 h-1.5 rounded-full animate-bounce [animation-delay:-0.1s]" style={{ background: typingColor }}></span>
-              <span className="w-1.5 h-1.5 rounded-full animate-bounce" style={{ background: typingColor }}></span>
-            </span>
-          </div>
-        ) : (
-          <div className="text-sm leading-relaxed">
-            {isUser ? <span className="whitespace-pre-wrap">{m.text}</span> : <MarkdownRenderer text={m.text} />}
-          </div>
-        )}
-        {actions.length > 0 && (
-          <div className="mt-3 flex flex-wrap gap-[var(--s1)]" role="group" aria-label="Assistant suggestions">
-            {actions.map((action, index) => (
-              <Button
-                key={action.id}
-                ref={(el) => {
-                  actionRefs.current[index] = el
-                }}
-                size="sm"
-                variant={isUser ? 'secondary' : 'default'}
-                onClick={() => onAction(action)}
-                onKeyDown={(event) => handleActionKeyDown(event, index)}
-                className="rounded-full"
-              >
-                {action.label}
-              </Button>
-            ))}
-          </div>
-        )}
-        {m.sources && m.sources.length > 0 && (
-          <div className="mt-2 flex flex-wrap items-center gap-2 text-xs" style={{ color: 'var(--text-muted)' }}>
-            <span>Sources:</span>
-            {m.sources.map((source: any, index: number) => (
-              <SourceBadge key={index} src={source} />
-            ))}
+        {isUser && (
+          <div className="h-8 w-8 rounded-full bg-[var(--surface-2)] border border-[var(--line)] flex items-center justify-center">
+            <User className="h-4 w-4" style={{ color: 'var(--text-muted)' }} />
           </div>
         )}
       </div>
-      {isUser && (
-        <div className="h-8 w-8 rounded-full bg-[var(--surface-2)] border border-[var(--line)] flex items-center justify-center">
-          <User className="h-4 w-4" style={{ color: 'var(--text-muted)' }} />
-        </div>
-      )}
-    </div>
-  )
-}
+    )
+  },
+  (prev, next) => prev.m === next.m && prev.onAction === next.onAction,
+)
 
 export interface ChatSurfaceProps {
   containerRef: React.RefObject<HTMLDivElement>

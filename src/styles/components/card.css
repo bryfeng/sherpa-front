@@ -1,3 +1,2 @@
-.card{background:var(--card);border:1px solid var(--line);border-radius:var(--r-xl);box-shadow:var(--shadow-2);}
-.card header{display:flex;align-items:center;gap:var(--s2);justify-content:space-between;margin-bottom:var(--s2)}
-.card .overline{font-size:var(--fs-xs);letter-spacing:.06em;text-transform:uppercase;color:var(--text-muted)}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:var(--r-xl);box-shadow:var(--shadow-2);position:relative;}
+.card[data-highlighted="true"]{border-color:var(--accent-600);box-shadow:0 0 0 1px rgba(90,164,255,.5),var(--shadow-2);}

@@ -81,3 +81,9 @@ interface TierMetadata {
 ## Usage expectations
 - The CLI status tool will parse `registry.json` and emit warnings for missing tiers, stale timestamps, or contract violations.
 - Contribution docs will point to this schema and require new workspace modules to register themselves before merge.
+
+## Runtime layout hints
+- Panels emitted by the backend may include `metadata.density` to guide the workspace grid.
+  - Accepted values: `"full"` (span the entire row) or `"rail"` (stacked columnar card).
+  - If omitted, the UI falls back to kind-specific defaults (portfolio, charts, and history summaries occupy full width).
+- New widgets should always set this metadata so the grid can render predictable layouts without bespoke code.

@@ -35,7 +35,7 @@ export const WidgetButton = React.forwardRef<HTMLButtonElement, WidgetButtonProp
 
 WidgetButton.displayName = 'WidgetButton'
 
-export type WidgetSurfaceTone = 'default' | 'accent' | 'muted' | 'warning' | 'danger'
+export type WidgetSurfaceTone = 'default' | 'accent' | 'muted' | 'warning' | 'danger' | 'success'
 
 export type WidgetSurfaceProps = React.HTMLAttributes<HTMLDivElement> & {
   tone?: WidgetSurfaceTone
@@ -50,6 +50,7 @@ const surfaceToneStyles: Record<WidgetSurfaceTone, string> = {
   muted: 'bg-[var(--surface)] text-[var(--text-muted)]',
   warning: 'bg-[rgba(255,204,102,.12)] text-[var(--warning)]',
   danger: 'bg-[rgba(255,107,107,.12)] text-[var(--danger)]',
+  success: 'bg-[rgba(95,211,154,.12)] text-[var(--success)]',
 }
 
 const surfaceBorderStyles: Record<WidgetSurfaceTone, string> = {
@@ -58,6 +59,7 @@ const surfaceBorderStyles: Record<WidgetSurfaceTone, string> = {
   muted: 'border-[var(--line)]',
   warning: 'border-[rgba(255,204,102,.35)]',
   danger: 'border-[rgba(255,107,107,.35)]',
+  success: 'border-[rgba(95,211,154,.35)]',
 }
 
 const paddingStyles: Record<NonNullable<WidgetSurfaceProps['padding']>, string> = {

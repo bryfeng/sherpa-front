@@ -291,7 +291,7 @@ function MainApp() {
         className="sticky top-0 z-30 border-b"
         style={{ background: 'var(--bg)', borderColor: 'var(--line)' }}
       >
-        <div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-3">
+        <div className="flex w-full items-center justify-between px-6 py-3">
           <div className="flex items-center gap-3">
             <div
               aria-hidden="true"
@@ -402,7 +402,7 @@ function MainApp() {
       </header>
 
       <main className="flex-1">
-        <div className="mx-auto max-w-7xl">
+        <div className="w-full px-6">
           <DeFiChatAdaptiveUI
             persona={persona as any}
             setPersona={setPersona as any}

@@ -2,6 +2,7 @@ import React, { Suspense, useMemo } from 'react'
 import { BarChart3, Star, TrendingUp } from 'lucide-react'
 
 import type { Widget } from '../../types/widgets'
+import type { HistorySummaryResponse, HistoryComparisonReport } from '../../types/history'
 import { TOKEN_PRICE_WIDGET_ID } from '../../constants/widgets'
 import '../../styles/panel-host.css'
 import { emit } from '../../utils/events'
@@ -9,6 +10,8 @@ import { PortfolioOverview } from './PortfolioOverview'
 import { TopCoinsPanel } from './TopCoinsPanel'
 import { PanelCard, type PanelCardProps } from './PanelCard'
 import { CardSkeleton } from './CardSkeleton'
+import { HistorySummaryPanel } from './history/HistorySummaryPanel'
+import { HistoryComparisonTable } from './history/HistoryComparisonTable'
 
 const ChartPanel = React.lazy(() => import('./ChartPanel'))
 const RelayQuoteWidget = React.lazy(() => import('../widgets/RelayQuoteWidget'))
@@ -159,6 +162,14 @@ export function PanelHost({
         }
 
         switch (widget.kind) {
+          case 'history-summary':
+            widgetContent = <HistorySummaryPanel widget={widget as Widget<HistorySummaryResponse>} />
+            break
+          case 'history-comparison':
+            widgetContent = (
+              <HistoryComparisonTable report={(widget as Widget<HistoryComparisonReport>).payload} />
+            )
+            break
           case 'portfolio':
             widgetContent = (
               <PortfolioOverview

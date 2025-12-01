@@ -104,12 +104,20 @@ function toSourceLinks(sources?: PanelSource[]): Array<{ label: string; href?: s
 }
 
 function inferDensity(panel: Panel): WidgetDensity {
+  const metadataDensity = typeof panel.metadata?.density === 'string' ? panel.metadata.density as WidgetDensity : undefined
+  if (metadataDensity === 'full' || metadataDensity === 'rail') {
+    return metadataDensity
+  }
+  if (panel.kind === 'history-summary') {
+    return 'full'
+  }
   if (panel.kind === 'portfolio') return 'full'
   if (panel.kind === 'chart') {
     if (isTokenPriceChartPayload(panel.payload)) return 'full'
     if (panel.metadata?.layout === 'full') return 'full'
   }
-  if (panel.metadata?.layout === 'banner') return 'full'
+  const layout = typeof panel.metadata?.layout === 'string' ? panel.metadata.layout.toLowerCase() : undefined
+  if (layout === 'full' || layout === 'banner') return 'full'
   return 'rail'
 }
 
