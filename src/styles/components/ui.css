@@ -1,13 +1,7 @@
 /* Flat UI Design System */
 
-body{
-  background:var(--bg);
-  color:var(--text);
-}
-
 .app-chrome{
-  background:var(--bg-elev);
-  border-bottom:1px solid var(--line);
+  background:var(--bg);
 }
 
 /* Buttons - Flat, solid colors */

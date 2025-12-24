@@ -55,16 +55,16 @@ export function HeaderActionMenu({ actions }: HeaderActionMenuProps) {
         aria-haspopup="menu"
         aria-expanded={open}
         onClick={() => setOpen((value) => !value)}
-        className="h-10 w-10 rounded-full border border-[var(--line)] bg-[var(--bg-elev)] text-[var(--text)] shadow-sm transition hover:bg-[var(--bg)]"
+        className="h-8 w-8 rounded-md border border-[var(--line)] bg-[var(--bg-elev)] text-[var(--text)] shadow-sm transition hover:bg-[var(--bg)]"
       >
-        <MoreVertical className="mx-auto h-5 w-5" aria-hidden="true" />
+        <MoreVertical className="mx-auto h-4 w-4" aria-hidden="true" />
         <span className="sr-only">Open more actions</span>
       </button>
       {open && (
         <div
           ref={menuRef}
           role="menu"
-          className="absolute right-0 z-40 mt-2 w-56 rounded-2xl border border-[var(--line)] bg-[var(--bg-elev)]/95 p-2 shadow-2xl backdrop-blur"
+          className="absolute right-0 z-40 mt-2 w-56 rounded-lg border border-[var(--line)] bg-[var(--bg-elev)]/95 p-2 shadow-2xl backdrop-blur"
         >
           <div className="px-3 py-2 text-[var(--fs-xs)] font-semibold uppercase tracking-[0.16em] text-[var(--text-muted)]">
             Workspace tools
@@ -81,11 +81,11 @@ export function HeaderActionMenu({ actions }: HeaderActionMenuProps) {
                   action.onSelect()
                 }}
                 disabled={action.disabled}
-                className="flex w-full flex-col rounded-xl border border-transparent px-3 py-2 text-left text-[var(--fs-sm)] text-[var(--text)] transition hover:border-[var(--accent)] hover:bg-[var(--bg)] disabled:cursor-not-allowed disabled:opacity-60"
+                className="flex w-full flex-col rounded-md border border-transparent px-2.5 py-1.5 text-left text-[var(--fs-xs)] text-[var(--text)] transition hover:border-[var(--accent)] hover:bg-[var(--bg)] disabled:cursor-not-allowed disabled:opacity-60"
               >
-                <span className="font-medium">{action.label}</span>
+                <span className="font-medium text-[var(--fs-sm)]">{action.label}</span>
                 {action.description && (
-                  <span className="text-[var(--fs-xs)] text-[var(--text-muted)]">{action.description}</span>
+                  <span className="text-[10px] text-[var(--text-muted)]">{action.description}</span>
                 )}
               </button>
             ))}

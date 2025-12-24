@@ -17,8 +17,8 @@ function resolveChange(summary?: PortfolioSummaryViewModel | null) {
   const metrics = raw?.performance ?? raw?.metrics ?? raw?.delta
   if (typeof metrics?.change_24h_percent === 'number') return metrics.change_24h_percent
   if (typeof metrics?.day_change_percent === 'number') return metrics.day_change_percent
-  const top = summary.topPositions?.[0]
-  return typeof top?.allocationPercent === 'number' ? top.allocationPercent : undefined
+  // Don't fall back to allocationPercent - it's not a gain/loss metric
+  return undefined
 }
 
 export function PortfolioRailChip({ summary, status, refreshing = false, onOpenWorkspace, onRefresh }: PortfolioRailChipProps) {
@@ -39,7 +39,7 @@ export function PortfolioRailChip({ summary, status, refreshing = false, onOpenW
     <button
       type="button"
       onClick={handleClick}
-      className={`group relative flex min-w-[220px] max-w-xs items-center gap-[var(--s1)] rounded-full border px-[var(--s1)] py-[var(--s-1)] text-left transition ${
+      className={`group relative flex min-w-[220px] max-w-xs items-center gap-[var(--s1)] rounded-lg border px-[var(--s1)] py-[var(--s-1)] text-left transition ${
         errored
           ? 'border-[var(--warning)] bg-[rgba(255,204,102,.12)] text-[var(--warning)]'
           : 'border-[var(--line)] bg-[var(--surface-2)] text-[var(--text)]'
@@ -47,7 +47,7 @@ export function PortfolioRailChip({ summary, status, refreshing = false, onOpenW
       title={errored ? 'Portfolio unavailable. Tap to retry.' : 'Open portfolio workspace'}
     >
       <div
-        className={`flex h-9 w-9 items-center justify-center rounded-full ${
+        className={`flex h-9 w-9 items-center justify-center rounded-md ${
           errored ? 'bg-[rgba(255,204,102,.25)] text-[var(--warning)]' : 'bg-[rgba(90,164,255,.12)] text-[var(--accent)]'
         } shadow-inner`}
         aria-hidden="true"
@@ -81,7 +81,7 @@ export function PortfolioRailChip({ summary, status, refreshing = false, onOpenW
         )}
       </div>
       <div
-        className={`flex h-7 w-7 items-center justify-center rounded-full border ${
+        className={`flex h-7 w-7 items-center justify-center rounded-md border ${
           errored
             ? 'border-[var(--warning)] bg-[rgba(255,204,102,.18)] text-[var(--warning)]'
             : 'border-[var(--accent)]/40 bg-[rgba(90,164,255,.1)] text-[var(--accent)]'

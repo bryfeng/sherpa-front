@@ -26,8 +26,8 @@ function metricPercent(summary: PortfolioSummaryViewModel): number | undefined {
       ? perf.day_change_percent
       : undefined
   if (typeof perfPct === 'number') return perfPct
-  const top = summary.topPositions[0]
-  return typeof top?.allocationPercent === 'number' ? top.allocationPercent : undefined
+  // Don't fall back to allocationPercent - it's not a gain/loss metric
+  return undefined
 }
 
 export function PortfolioInlineCard({
@@ -114,7 +114,7 @@ export function PortfolioInlineCard({
             <button
               type="button"
               onClick={onRefresh}
-              className="rounded-full border border-[var(--line)] p-2 text-[var(--text-muted)] transition hover:bg-[var(--hover)]"
+              className="rounded-md border border-[var(--line)] p-2 text-[var(--text-muted)] transition hover:bg-[var(--hover)]"
               title="Refresh portfolio"
             >
               <RefreshCw className={`h-4 w-4 ${refreshing ? 'animate-spin' : ''}`} />
@@ -124,7 +124,7 @@ export function PortfolioInlineCard({
             <button
               type="button"
               onClick={onDismiss}
-              className="rounded-full border border-[var(--line)] p-2 text-[var(--text-muted)] transition hover:bg-[var(--hover)]"
+              className="rounded-md border border-[var(--line)] p-2 text-[var(--text-muted)] transition hover:bg-[var(--hover)]"
               title="Hide snapshot"
             >
               <X className="h-4 w-4" />
@@ -165,7 +165,7 @@ export function PortfolioInlineCard({
         </div>
         <div className="mt-[var(--s2)] flex flex-wrap items-center justify-between gap-[var(--s1)] text-sm" style={{ color: 'var(--text-muted)' }}>
           <p className="flex-1">{resolvedDescription}</p>
-          <Button size="sm" variant="secondary" onClick={onOpenWorkspace} className="rounded-full">
+          <Button size="sm" variant="secondary" onClick={onOpenWorkspace} className="rounded-md">
             View details
             <ArrowRight className="h-4 w-4" />
           </Button>

@@ -39,7 +39,7 @@ function PersonaBadge({ persona }: { persona: Persona }) {
   return (
     <Badge
       variant="outline"
-      className="rounded-full"
+      className="rounded-md"
       style={{
         borderColor: style.accent,
         color: style.accent,
@@ -153,7 +153,7 @@ function PersonaDropdown({ persona, onSelect }: PersonaDropdownProps) {
         aria-haspopup="menu"
         aria-expanded={open}
         aria-controls={open ? menuId : undefined}
-        className="rounded-full inline-flex items-center gap-2 px-3 py-1.5 text-sm font-medium transition-colors duration-150"
+        className="rounded-md inline-flex items-center gap-1.5 px-2.5 py-1 text-xs font-medium transition-colors duration-150"
         style={{
           background: 'var(--bg-elev)',
           border: '1px solid var(--line)',
@@ -177,7 +177,7 @@ function PersonaDropdown({ persona, onSelect }: PersonaDropdownProps) {
           <div
             id={menuId}
             role="menu"
-            className="z-[60] rounded-2xl p-2 shadow-xl"
+            className="z-[60] rounded-lg p-2 shadow-xl"
             style={{
               position: 'absolute',
               top: coords.top,
@@ -208,22 +208,23 @@ function PersonaDropdown({ persona, onSelect }: PersonaDropdownProps) {
                     setOpen(false)
                   }}
                   onKeyDown={(event) => handlePersonaKey(event, index, option)}
-                  className="w-full text-left px-2 py-2 rounded-lg flex items-center gap-2 transition-colors duration-150"
+                  className="w-full text-left px-2 py-1.5 rounded-md flex items-center gap-2 transition-colors duration-150"
                   style={{
                     background: persona === option ? personaStyles[option].soft : 'transparent',
                     border: `1px solid ${persona === option ? personaStyles[option].accent : 'transparent'}`,
                     color: 'var(--text)',
+                    fontSize: 'var(--fs-sm)',
                   }}
                 >
                   <span
-                    className="inline-flex h-2.5 w-2.5 rounded-full"
+                    className="inline-flex h-2 w-2 rounded-full"
                     style={{ backgroundColor: personaStyles[option].accent }}
                   />
-                  <span className="capitalize font-medium" style={{ color: personaStyles[option].accent }}>
+                  <span className="capitalize font-medium" style={{ color: personaStyles[option].accent, fontSize: 'var(--fs-sm)' }}>
                     {option}
                   </span>
                   {persona === option && (
-                    <span className="ml-auto text-xs" style={{ color: personaStyles[option].accent }}>
+                    <span className="ml-auto" style={{ color: personaStyles[option].accent, fontSize: 'var(--fs-xs)' }}>
                       Current
                     </span>
                   )}
@@ -279,7 +280,7 @@ function HeaderBarComponent({
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <div
-            className="inline-flex items-center gap-2 rounded-full px-3 py-1.5"
+            className="inline-flex items-center gap-2 rounded-md px-2.5 py-1"
             style={{
               background: 'var(--bg-elev)',
               border: '1px solid var(--line)',
@@ -291,13 +292,13 @@ function HeaderBarComponent({
               <PersonaDropdown persona={persona} onSelect={onPersonaChange} />
             </div>
           </div>
-          <Badge variant={walletConnected ? 'secondary' : 'outline'} className="rounded-full px-3 py-1 text-xs">
+          <Badge variant={walletConnected ? 'secondary' : 'outline'} className="rounded-md px-2.5 py-0.5 text-xs">
             {walletLabel}
           </Badge>
-          <Badge variant="outline" className="rounded-full px-3 py-1 text-xs">
+          <Badge variant="outline" className="rounded-md px-2.5 py-0.5 text-xs">
             {proLabel}
           </Badge>
-          <Button size="sm" variant="secondary" onClick={onNewChat} className="rounded-full">
+          <Button size="sm" variant="secondary" onClick={onNewChat} className="rounded-md">
             <Sparkles className="mr-1 h-3 w-3" />New chat
           </Button>
           <HeaderActionMenu actions={menuActions} />
@@ -305,7 +306,7 @@ function HeaderBarComponent({
       </header>
 
       <div
-        className="flex flex-wrap items-center gap-2 rounded-2xl p-3"
+        className="flex flex-wrap items-center gap-2 rounded-lg p-3"
         style={{
           background: 'var(--bg-elev)',
           border: '1px solid var(--line)',
@@ -324,21 +325,21 @@ function HeaderBarComponent({
               size="sm"
               variant="secondary"
               onClick={() => onRequestPro?.('action')}
-              className="rounded-full"
+              className="rounded-md"
               aria-label="Plan workflow (requires Pro)"
             >
               <Wand2 className="mr-1 h-3 w-3" />Plan workflow
             </Button>
           }
         >
-          <Button size="sm" variant="secondary" onClick={onPlanWorkflow} className="rounded-full">
+          <Button size="sm" variant="secondary" onClick={onPlanWorkflow} className="rounded-md">
             <Wand2 className="mr-1 h-3 w-3" />Plan workflow
           </Button>
         </Entitled>
-        <Button size="sm" variant="secondary" onClick={onShowTrending} className="rounded-full">
+        <Button size="sm" variant="secondary" onClick={onShowTrending} className="rounded-md">
           <TrendingUp className="mr-1 h-3 w-3" />Trending tokens
         </Button>
-        <Button size="sm" variant="outline" onClick={onOpenWorkspace} className="rounded-full">
+        <Button size="sm" variant="outline" onClick={onOpenWorkspace} className="rounded-md">
           <BarChart3 className="mr-1 h-3 w-3" />Open workspace
         </Button>
         <span className="sr-only">Active persona {personaLabel}</span>
