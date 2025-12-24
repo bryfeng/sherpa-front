@@ -218,6 +218,23 @@ function PanelItemComponent({
     handleExpand,
   ])
 
+  // Chart widgets get minimal wrapper - they handle their own chrome
+  if (widget.kind === 'chart') {
+    return (
+      <div
+        data-panel-id={widget.id}
+        data-highlighted={isHighlighted ? 'true' : undefined}
+        className="chart-panel-container"
+      >
+        <PanelErrorBoundary panelId={widget.id} panelTitle={widget.title}>
+          <Suspense fallback={<CardSkeleton density={density} />}>
+            {widgetContent}
+          </Suspense>
+        </PanelErrorBoundary>
+      </div>
+    )
+  }
+
   return (
     <PanelCard
       id={widget.id}

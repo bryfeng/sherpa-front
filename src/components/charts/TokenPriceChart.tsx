@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState, useCallback } from 'react'
 import { createChart, ColorType, type IChartApi, type ISeriesApi, type UTCTimestamp } from 'lightweight-charts'
+import { Settings2, Maximize2 } from 'lucide-react'
 
 import {
   getTokenChart,
@@ -29,9 +30,7 @@ type TokenPriceChartProps = {
 }
 
 type CandleDatum = TokenCandle & { time: UTCTimestamp }
-
 type LineDatum = { time: UTCTimestamp; value: number }
-
 type VolumeDatum = { time: UTCTimestamp; value: number; color?: string }
 
 function toSeconds(timestamp: number | undefined | null): UTCTimestamp | undefined {
@@ -50,7 +49,7 @@ function formatCurrency(value: number | undefined | null, currency: string = 'us
 
 function formatPercent(value: number | undefined | null): string {
   if (typeof value !== 'number' || Number.isNaN(value)) return '—'
-  const sign = value > 0 ? '+' : value < 0 ? '' : ''
+  const sign = value > 0 ? '+' : ''
   return `${sign}${value.toFixed(2)}%`
 }
 
@@ -103,7 +102,6 @@ function buildVolumeSeries(totalVolumes: { time: number; volume: number }[] | un
     .filter((entry): entry is VolumeDatum => Boolean(entry))
   if (!volumes.length) return volumes
   const maxVolume = Math.max(...volumes.map((entry) => entry.value)) || 1
-  // Scale volumes to billions for display readability
   return volumes.map((entry) => ({
     ...entry,
     value: entry.value / 1_000_000_000,
@@ -169,31 +167,20 @@ export function TokenPriceChart({
   const changePct = stats?.change_pct ?? (changeAbs && lineData.length ? (changeAbs / lineData[0].value) * 100 : undefined)
   const changeClass = classifyChange(changePct)
 
-  const chartBackground = theme.surface
+  // Theme colors
   const chartTextColor = theme.text
   const chartMutedColor = theme.textMuted || '#94a3b8'
-  const borderColor = withAlpha(theme.line, 0.8)
-  const softBorderColor = withAlpha(theme.line, 0.4)
-  const gridColor = withAlpha(theme.line, 0.35)
-  const gridSubtleColor = withAlpha(theme.line, 0.2)
+  const borderColor = withAlpha(theme.line, 0.6)
+  const gridColor = withAlpha(theme.line, 0.25)
+  const gridSubtleColor = withAlpha(theme.line, 0.12)
   const accentColor = theme.accent || '#3b82f6'
   const positiveColor = theme.success || '#22c55e'
-  const negativeColor = theme.danger || '#f87171'
-  const areaTopColor = withAlpha(accentColor, 0.35)
-  const areaBottomColor = withAlpha(accentColor, 0.06)
-  const histogramColor = withAlpha(accentColor, 0.35)
+  const negativeColor = theme.danger || '#ef4444'
+  const areaTopColor = withAlpha(accentColor, 0.25)
+  const areaBottomColor = withAlpha(accentColor, 0.02)
+  const histogramColor = withAlpha(accentColor, 0.4)
   const histogramBorder = withAlpha(theme.line, 0.2)
   const surfaceElevated = theme.surfaceElevated || theme.surface
-
-  const formattedUpdatedAt = useMemo(() => {
-    const ts = stats?.range_end ?? data?.series?.prices?.[data.series.prices.length - 1]?.time
-    if (!ts) return null
-    try {
-      return new Date(ts).toLocaleString()
-    } catch {
-      return null
-    }
-  }, [data?.series?.prices, stats?.range_end])
 
   useEffect(() => {
     if (initialData) {
@@ -262,6 +249,7 @@ export function TokenPriceChart({
     }
   }, [address, chain, coinId, includeCandles, range, symbol, vsCurrency])
 
+  // Chart creation
   useEffect(() => {
     if (!containerRef.current) return
     if (chartRef.current) {
@@ -273,27 +261,32 @@ export function TokenPriceChart({
     }
 
     const chart = createChart(containerRef.current, {
-      height: 360,
+      height: 400,
       layout: {
-        background: { type: ColorType.Solid, color: chartBackground },
-        textColor: chartTextColor,
+        background: { type: ColorType.Solid, color: 'transparent' },
+        textColor: chartMutedColor,
+        fontFamily: 'inherit',
       },
       grid: {
-        horzLines: { color: gridColor },
-        vertLines: { color: gridSubtleColor },
+        horzLines: { color: gridColor, visible: true },
+        vertLines: { color: gridSubtleColor, visible: true },
       },
       rightPriceScale: {
-        borderColor: borderColor,
-        scaleMargins: { top: 0.1, bottom: 0.2 },
+        borderVisible: false,
+        scaleMargins: { top: 0.08, bottom: 0.15 },
       },
       timeScale: {
-        borderColor: borderColor,
+        borderVisible: false,
         timeVisible: true,
         secondsVisible: false,
       },
       crosshair: {
         mode: 1,
+        horzLine: { color: chartMutedColor, labelBackgroundColor: surfaceElevated },
+        vertLine: { color: chartMutedColor, labelBackgroundColor: surfaceElevated },
       },
+      handleScale: { axisPressedMouseMove: true },
+      handleScroll: { vertTouchDrag: false },
     })
 
     chartRef.current = chart
@@ -311,8 +304,10 @@ export function TokenPriceChart({
 
     const areaSeries = chart.addAreaSeries({
       lineColor: accentColor,
+      lineWidth: 2,
       topColor: areaTopColor,
       bottomColor: areaBottomColor,
+      crosshairMarkerRadius: 4,
     })
     areaSeriesRef.current = areaSeries
 
@@ -322,7 +317,7 @@ export function TokenPriceChart({
       priceScaleId: 'vol',
     })
     volumeSeries.priceScale().applyOptions({
-      scaleMargins: { top: 0.75, bottom: 0 },
+      scaleMargins: { top: 0.85, bottom: 0 },
       borderColor: histogramBorder,
     })
     volumeSeriesRef.current = volumeSeries
@@ -350,8 +345,9 @@ export function TokenPriceChart({
       areaSeriesRef.current = null
       volumeSeriesRef.current = null
     }
-  }, [chartBackground, chartTextColor, gridColor, gridSubtleColor, borderColor, accentColor, areaTopColor, areaBottomColor, positiveColor, negativeColor, histogramColor, histogramBorder])
+  }, [chartMutedColor, gridColor, gridSubtleColor, accentColor, areaTopColor, areaBottomColor, positiveColor, negativeColor, histogramColor, histogramBorder, surfaceElevated])
 
+  // Data updates
   useEffect(() => {
     const chart = chartRef.current
     if (!chart) return
@@ -387,141 +383,152 @@ export function TokenPriceChart({
 
   if (error) {
     return (
-      <div className="w-full space-y-5">
+      <div
+        className="rounded-2xl border p-6"
+        style={{ borderColor: borderColor, background: surfaceElevated }}
+      >
         {showSelector && (
-          <TokenSelector selectedToken={selectedToken} onSelectToken={handleTokenSelect} />
+          <div className="mb-4">
+            <TokenSelector selectedToken={selectedToken} onSelectToken={handleTokenSelect} />
+          </div>
         )}
         <ErrorView message={error} />
       </div>
     )
   }
 
+  const tokenName = metadata?.name || selectedToken?.name || symbol || coinId || 'Token'
+
   return (
-    <div className="w-full space-y-5">
-      {showSelector && (
-        <TokenSelector selectedToken={selectedToken} onSelectToken={handleTokenSelect} />
-      )}
-      <div className="flex flex-wrap items-start justify-between gap-4">
-        <div className="space-y-1">
-          <div className="text-xs uppercase tracking-wide" style={{ color: chartMutedColor }}>
-            {metadata?.name || metadata?.symbol || coinId || 'Token'}
+    <div
+      className="relative overflow-hidden rounded-2xl border"
+      style={{ borderColor: borderColor, background: surfaceElevated }}
+    >
+      {/* Header */}
+      <div
+        className="flex items-start justify-between gap-4 px-5 pt-5 pb-3"
+      >
+        <div className="min-w-0 flex-1">
+          {/* Token selector + name */}
+          <div className="flex items-center gap-2 mb-1">
+            {showSelector && (
+              <TokenSelector selectedToken={selectedToken} onSelectToken={handleTokenSelect} />
+            )}
+            <span className="text-base font-medium truncate" style={{ color: chartTextColor }}>
+              {tokenName}
+            </span>
           </div>
-          <div className="flex flex-wrap items-baseline gap-2">
-            <span className="text-3xl font-semibold" style={{ color: chartTextColor }}>
+
+          {/* Price */}
+          <div className="flex items-baseline gap-2.5">
+            <span className="text-3xl font-semibold tracking-tight" style={{ color: chartTextColor }}>
               {formatCurrency(latestPrice, vsCurrency)}
             </span>
             <span
-              className={`text-base font-semibold ${
-                changeClass === 'up' ? 'text-emerald-500' : changeClass === 'down' ? 'text-rose-500' : 'text-slate-400'
+              className={`text-sm font-semibold ${
+                changeClass === 'up' ? 'text-emerald-500' : changeClass === 'down' ? 'text-rose-500' : ''
               }`}
+              style={changeClass === 'flat' ? { color: chartMutedColor } : undefined}
             >
               {formatPercent(changePct)}
             </span>
-          </div>
-          {changeAbs !== undefined && (
-            <div className="text-sm" style={{ color: chartMutedColor }}>
-              {formatCurrency(changeAbs, vsCurrency)} since {range?.toUpperCase()}
-            </div>
-          )}
-        </div>
-        <div className="flex flex-col items-end gap-2 text-xs" style={{ color: chartMutedColor }}>
-          <div>Updated {formattedUpdatedAt || '—'}</div>
-          <div>Source · <a href="https://www.coingecko.com" target="_blank" rel="noreferrer" className="underline" style={{ color: accentColor }}>CoinGecko</a></div>
-        </div>
-      </div>
-
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div
-          className="flex flex-wrap items-center gap-2 rounded-2xl px-2 py-1"
-          style={{ backgroundColor: withAlpha(theme.line, 0.2), border: `1px solid ${withAlpha(theme.line, 0.3)}` }}
-        >
-          {RANGE_OPTIONS.map((option) => (
-            <button
-              key={option}
-              type="button"
-              onClick={() => handleRangeChange(option)}
-              disabled={loading && option === range}
-              className="rounded-lg px-3 py-1 text-xs font-semibold transition"
-              style={
-                option === range
-                  ? {
-                      backgroundColor: accentColor,
-                      color: '#ffffff',
-                      boxShadow: '0 6px 12px rgba(0,0,0,0.18)',
-                    }
-                  : {
-                      color: chartMutedColor,
-                      backgroundColor: 'transparent',
-                    }
-              }
-            >
-              {option?.toUpperCase()}
-            </button>
-          ))}
-        </div>
-      </div>
-
-      <div className="grid gap-4 lg:grid-cols-12">
-        <div className="lg:col-span-8">
-          <div
-            className="relative h-[320px] w-full overflow-hidden rounded-3xl"
-            style={{ backgroundColor: surfaceElevated, border: `1px solid ${borderColor}` }}
-          >
-            {loading && (
-              <div
-                className="absolute inset-0 z-10 flex items-center justify-center"
-                style={{ backgroundColor: withAlpha(theme.background, 0.8) }}
-              >
-                <div className="h-5 w-5 animate-spin rounded-full border-2 border-primary-500 border-t-transparent" aria-hidden="true" />
-              </div>
+            {changeAbs !== undefined && (
+              <span className="text-sm" style={{ color: chartMutedColor }}>
+                ({formatCurrency(changeAbs, vsCurrency)})
+              </span>
             )}
-            <div ref={containerRef} className="h-full w-full" />
           </div>
         </div>
-        <div className="space-y-3 lg:col-span-4">
-          <div
-            className="rounded-2xl p-4"
-            style={{ backgroundColor: withAlpha(surfaceElevated, 0.9), border: `1px solid ${softBorderColor}` }}
+
+        {/* Actions */}
+        <div className="flex items-center gap-1">
+          <button
+            type="button"
+            className="p-2 rounded-lg transition hover:bg-[var(--hover)]"
+            style={{ color: chartMutedColor }}
+            aria-label="Chart settings"
           >
-            <div className="text-[11px] uppercase tracking-wide" style={{ color: chartMutedColor }}>
-              High / Low (range)
-            </div>
-            <div className="text-lg font-semibold" style={{ color: chartTextColor }}>
-              {formatCurrency(stats?.high, vsCurrency)}
-            </div>
-            <div className="text-sm" style={{ color: chartMutedColor }}>
-              {formatCurrency(stats?.low, vsCurrency)}
-            </div>
+            <Settings2 className="h-4 w-4" />
+          </button>
+          <button
+            type="button"
+            className="p-2 rounded-lg transition hover:bg-[var(--hover)]"
+            style={{ color: chartMutedColor }}
+            aria-label="Expand chart"
+          >
+            <Maximize2 className="h-4 w-4" />
+          </button>
+        </div>
+      </div>
+
+      {/* Chart container */}
+      <div className="relative px-2">
+        {loading && (
+          <div
+            className="absolute inset-0 z-10 flex items-center justify-center"
+            style={{ backgroundColor: withAlpha(surfaceElevated, 0.9) }}
+          >
+            <div className="h-6 w-6 animate-spin rounded-full border-2 border-t-transparent" style={{ borderColor: accentColor }} />
           </div>
+        )}
+        <div ref={containerRef} className="w-full" style={{ height: 400 }} />
+
+        {/* Range selector - overlaid at bottom of chart */}
+        <div className="absolute bottom-4 left-4 z-10">
           <div
-            className="rounded-2xl p-4"
-            style={{ backgroundColor: withAlpha(surfaceElevated, 0.9), border: `1px solid ${softBorderColor}` }}
+            className="inline-flex items-center gap-0.5 rounded-lg p-1"
+            style={{
+              backgroundColor: withAlpha(surfaceElevated, 0.95),
+              backdropFilter: 'blur(8px)',
+              boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
+            }}
           >
-            <div className="text-[11px] uppercase tracking-wide" style={{ color: chartMutedColor }}>
-              Open / Close
-            </div>
-            <div className="text-lg font-semibold" style={{ color: chartTextColor }}>
-              {formatCurrency(stats?.open, vsCurrency)}
-            </div>
-            <div className="text-sm" style={{ color: chartMutedColor }}>
-              {formatCurrency(stats?.close, vsCurrency)}
-            </div>
-          </div>
-          <div
-            className="rounded-2xl p-4"
-            style={{ backgroundColor: withAlpha(surfaceElevated, 0.9), border: `1px solid ${softBorderColor}` }}
-          >
-            <div className="text-[11px] uppercase tracking-wide" style={{ color: chartMutedColor }}>
-              Candles (OHLC)
-            </div>
-            <div className="text-lg font-semibold" style={{ color: chartTextColor }}>
-              {candleData.length ? `${candleData.length} samples` : '—'}
-            </div>
-            <div className="text-sm" style={{ color: chartMutedColor }}>
-              Interval {data?.interval || 'n/a'}
-            </div>
+            {RANGE_OPTIONS.map((option) => (
+              <button
+                key={option}
+                type="button"
+                onClick={() => handleRangeChange(option)}
+                disabled={loading && option === range}
+                className="rounded-md px-2.5 py-1 text-[11px] font-semibold transition"
+                style={
+                  option === range
+                    ? {
+                        backgroundColor: accentColor,
+                        color: '#ffffff',
+                      }
+                    : {
+                        color: chartMutedColor,
+                        backgroundColor: 'transparent',
+                      }
+                }
+              >
+                {option?.toUpperCase()}
+              </button>
+            ))}
           </div>
         </div>
+      </div>
+
+      {/* Footer */}
+      <div
+        className="flex items-center justify-between gap-4 px-5 py-3 text-[11px] border-t"
+        style={{ borderColor: withAlpha(theme.line, 0.3), color: chartMutedColor }}
+      >
+        <div className="flex items-center gap-4">
+          <span>H: <strong style={{ color: chartTextColor }}>{formatCurrency(stats?.high, vsCurrency)}</strong></span>
+          <span>L: <strong style={{ color: chartTextColor }}>{formatCurrency(stats?.low, vsCurrency)}</strong></span>
+          <span>O: <strong style={{ color: chartTextColor }}>{formatCurrency(stats?.open, vsCurrency)}</strong></span>
+          <span>C: <strong style={{ color: chartTextColor }}>{formatCurrency(stats?.close, vsCurrency)}</strong></span>
+        </div>
+        <a
+          href="https://www.coingecko.com"
+          target="_blank"
+          rel="noreferrer"
+          className="hover:underline"
+          style={{ color: chartMutedColor }}
+        >
+          via CoinGecko
+        </a>
       </div>
     </div>
   )
