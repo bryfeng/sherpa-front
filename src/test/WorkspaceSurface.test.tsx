@@ -14,7 +14,7 @@ function renderWorkspaceSurface(overrides: Partial<WorkspaceSurfaceProps> = {}) 
     portfolioRefreshing: false,
     onToggleCollapse: vi.fn(),
     onExpand: vi.fn(),
-    onMove: vi.fn(),
+    onReorder: vi.fn(),
     onBridge: vi.fn(),
     onSwap: vi.fn(),
     onRefreshBridgeQuote: vi.fn(),

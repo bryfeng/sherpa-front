@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react'
+import React, { useEffect, useMemo, useRef, useState, useCallback } from 'react'
 import { createChart, ColorType, type IChartApi, type ISeriesApi, type UTCTimestamp } from 'lightweight-charts'
 
 import {
@@ -11,6 +11,7 @@ import {
 } from '../../services/prices'
 import { ErrorView } from '../ErrorView'
 import { readThemeTokens, withAlpha, type ThemeTokens } from '../../utils/theme'
+import { TokenSelector, type TokenOption } from './TokenSelector'
 
 const RANGE_OPTIONS: Array<TokenChartParams['range']> = ['1d', '7d', '30d', '90d', '180d', '365d', 'max']
 
@@ -24,6 +25,7 @@ type TokenPriceChartProps = {
   initialRange?: TokenChartParams['range']
   initialData?: TokenChartResponse | null
   onRangeChange?: (range: TokenChartParams['range']) => void
+  showSelector?: boolean
 }
 
 type CandleDatum = TokenCandle & { time: UTCTimestamp }
@@ -110,8 +112,8 @@ function buildVolumeSeries(totalVolumes: { time: number; volume: number }[] | un
 }
 
 export function TokenPriceChart({
-  coinId,
-  symbol,
+  coinId: initialCoinId,
+  symbol: initialSymbol,
   address,
   chain = 'ethereum',
   vsCurrency = 'usd',
@@ -119,12 +121,34 @@ export function TokenPriceChart({
   initialRange = '7d',
   initialData = null,
   onRangeChange,
+  showSelector = false,
 }: TokenPriceChartProps) {
+  const [selectedToken, setSelectedToken] = useState<TokenOption | null>(() => {
+    if (initialCoinId || initialSymbol) {
+      return {
+        id: initialCoinId || '',
+        symbol: initialSymbol || '',
+        name: initialSymbol || initialCoinId || '',
+      }
+    }
+    return null
+  })
+
+  const coinId = selectedToken?.id || initialCoinId
+  const symbol = selectedToken?.symbol || initialSymbol
+
   const [range, setRange] = useState<TokenChartParams['range']>(initialRange)
   const [data, setData] = useState<TokenChartResponse | null>(initialData)
   const [loading, setLoading] = useState<boolean>(!initialData)
   const [error, setError] = useState<string | null>(null)
   const [theme, setTheme] = useState<ThemeTokens>(() => readThemeTokens())
+
+  const handleTokenSelect = useCallback((token: TokenOption) => {
+    setSelectedToken(token)
+    setData(null)
+    setLoading(true)
+    setError(null)
+  }, [])
 
   const containerRef = useRef<HTMLDivElement | null>(null)
   const chartRef = useRef<IChartApi | null>(null)
@@ -362,11 +386,21 @@ export function TokenPriceChart({
   }
 
   if (error) {
-    return <ErrorView message={error} />
+    return (
+      <div className="w-full space-y-5">
+        {showSelector && (
+          <TokenSelector selectedToken={selectedToken} onSelectToken={handleTokenSelect} />
+        )}
+        <ErrorView message={error} />
+      </div>
+    )
   }
 
   return (
     <div className="w-full space-y-5">
+      {showSelector && (
+        <TokenSelector selectedToken={selectedToken} onSelectToken={handleTokenSelect} />
+      )}
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div className="space-y-1">
           <div className="text-xs uppercase tracking-wide" style={{ color: chartMutedColor }}>

@@ -8,6 +8,7 @@ import { PanelCard, type PanelCardProps } from './PanelCard'
 import { CardSkeleton } from './CardSkeleton'
 import { PanelErrorBoundary } from './PanelErrorBoundary'
 import { usePanelActions, type PanelControlsConfig } from './PanelControls'
+import { useQuickActions } from './useQuickActions'
 import { PortfolioOverview } from './PortfolioOverview'
 import { TopCoinsPanel } from './TopCoinsPanel'
 import { HistorySummaryPanel } from './history/HistorySummaryPanel'
@@ -32,7 +33,6 @@ export interface PanelItemProps {
   walletReady?: boolean
   onToggleCollapse: (id: string) => void
   onExpand: (id: string) => void
-  onMove: (id: string, direction: 'up' | 'down') => void
   onBridge?: (widget: Widget) => Promise<string | void>
   onSwap?: (widget: Widget) => Promise<string | void>
   onRefreshBridgeQuote?: () => Promise<void>
@@ -63,7 +63,6 @@ function PanelItemComponent({
   walletReady,
   onToggleCollapse,
   onExpand,
-  onMove,
   onBridge,
   onSwap,
   onRefreshBridgeQuote,
@@ -91,25 +90,19 @@ function PanelItemComponent({
     onExpand(widget.id)
   }, [widget.id, widget.title, onExpand])
 
-  const handleMove = (direction: 'up' | 'down') => {
-    const fromIndex = index
-    const toIndex = direction === 'up' ? Math.max(0, index - 1) : Math.min(totalCount - 1, index + 1)
-    emit({
-      name: 'panel.reorder',
-      payload: { id: widget.id, title: widget.title, direction, from: fromIndex, to: toIndex },
-    })
-    onMove(widget.id, direction)
-  }
-
   const actions = usePanelActions({
     widgetId: widget.id,
     widgetTitle: widget.title,
-    index,
-    totalCount,
     collapsed,
     onToggleCollapse: handleToggleCollapse,
     onExpand: handleExpand,
-    onMove: handleMove,
+  })
+
+  const quickActions = useQuickActions({
+    widget,
+    onRefresh: widget.kind === 'trending' || widget.kind === 'prices' || widget.kind === 'portfolio'
+      ? () => onInsertQuickPrompt?.(`Refresh ${widget.title}`)
+      : undefined,
   })
 
   const controls: PanelControlsConfig = useMemo(() => ({
@@ -234,6 +227,7 @@ function PanelItemComponent({
       onToggleCollapse={handleToggleCollapse}
       onExpand={handleExpand}
       actions={actions}
+      quickActions={quickActions}
       sources={widget.sources}
       highlighted={isHighlighted}
       status={panelStatus}

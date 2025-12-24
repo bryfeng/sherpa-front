@@ -1,10 +1,11 @@
 // TODO: Workstream 1 — Shell Split (Monolith → Feature Slices)
 
 import React from 'react'
-import { ChevronDown, ChevronUp, Maximize2 } from 'lucide-react'
+import { ChevronDown, Copy, Maximize2, RefreshCw, Share2 } from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion'
 
 import type { WidgetAction, WidgetDensity } from '../../types/widgets'
+import type { QuickAction } from './useQuickActions'
 import { ErrorView } from '../ErrorView'
 import { Skeleton } from '../Skeleton'
 import { Card, CardContent } from '../ui/primitives'
@@ -12,8 +13,8 @@ import { WidgetButton } from '../widgets/widget-kit'
 
 const springTransition = {
   type: 'spring',
-  stiffness: 400,
-  damping: 35,
+  stiffness: 350,
+  damping: 30,
   mass: 0.8,
 }
 
@@ -21,13 +22,18 @@ const contentVariants = {
   collapsed: {
     height: 0,
     opacity: 0,
-    transition: { ...springTransition, opacity: { duration: 0.15 } }
+    transition: { ...springTransition, opacity: { duration: 0.12 } }
   },
   expanded: {
     height: 'auto',
     opacity: 1,
-    transition: { ...springTransition, opacity: { delay: 0.05, duration: 0.2 } }
+    transition: { ...springTransition, opacity: { delay: 0.04, duration: 0.18 } }
   },
+}
+
+const chevronVariants = {
+  collapsed: { rotate: 0 },
+  expanded: { rotate: 180 },
 }
 
 interface SourceLink {
@@ -85,6 +91,7 @@ export interface PanelCardProps {
   onToggleCollapse?: () => void
   onExpand?: () => void
   actions?: WidgetAction[]
+  quickActions?: QuickAction[]
   sources?: SourceLink[]
   highlighted?: boolean
   children?: React.ReactNode
@@ -92,6 +99,12 @@ export interface PanelCardProps {
   errorMessage?: string
   onRetry?: () => void
   retryLabel?: string
+}
+
+const quickActionIcons = {
+  refresh: RefreshCw,
+  copy: Copy,
+  share: Share2,
 }
 
 function PanelCardComponent({
@@ -103,6 +116,7 @@ function PanelCardComponent({
   onToggleCollapse,
   onExpand,
   actions,
+  quickActions,
   sources,
   highlighted,
   children,
@@ -131,6 +145,27 @@ function PanelCardComponent({
         {action.label}
       </WidgetButton>
     ))
+  }
+
+  const renderQuickActions = () => {
+    if (!quickActions?.length) return null
+    return quickActions.map((qa) => {
+      const Icon = quickActionIcons[qa.icon]
+      return (
+        <WidgetButton
+          key={qa.id}
+          variant="ghost"
+          size="sm"
+          className="h-7 w-7 rounded-md p-0 text-[var(--text-muted)] hover:text-[var(--text)] hover:bg-[var(--hover)]"
+          onClick={qa.onClick}
+          disabled={status === 'loading'}
+          aria-label={qa.ariaLabel}
+          title={qa.label}
+        >
+          <Icon className="h-3.5 w-3.5" />
+        </WidgetButton>
+      )
+    })
   }
 
   return (
@@ -166,6 +201,10 @@ function PanelCardComponent({
           </div>
         </div>
         <div className="flex flex-wrap items-center justify-end gap-[var(--s-1)]">
+          {renderQuickActions()}
+          {quickActions?.length && filteredActions.length ? (
+            <span className="mx-1 h-4 w-px bg-[var(--line)]" aria-hidden />
+          ) : null}
           {renderActions()}
           {onToggleCollapse ? (
             <WidgetButton
@@ -177,7 +216,15 @@ function PanelCardComponent({
               title={collapsed ? 'Expand' : 'Collapse'}
               disabled={status === 'loading'}
             >
-              {collapsed ? <ChevronDown className="h-4 w-4" /> : <ChevronUp className="h-4 w-4" />}
+              <motion.span
+                initial={false}
+                animate={collapsed ? 'collapsed' : 'expanded'}
+                variants={chevronVariants}
+                transition={springTransition}
+                style={{ display: 'flex', willChange: 'transform' }}
+              >
+                <ChevronDown className="h-4 w-4" />
+              </motion.span>
             </WidgetButton>
           ) : null}
           {onExpand ? (
@@ -202,7 +249,7 @@ function PanelCardComponent({
             animate="expanded"
             exit="collapsed"
             variants={contentVariants}
-            style={{ overflow: 'hidden' }}
+            style={{ overflow: 'hidden', willChange: 'height, opacity' }}
           >
             <CardContent>
               {status === 'loading' ? (

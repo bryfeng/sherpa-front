@@ -9,14 +9,19 @@ import TokenPriceChartTemplate from './TokenPriceChartTemplate'
 const TokenPriceChart = React.lazy(() => import('../charts/TokenPriceChart'))
 const ProtocolChartPanel = React.lazy(() => import('./ProtocolChartPanel'))
 
-function isTokenChartPayload(payload: any): payload is Partial<TokenChartResponse> {
+type TokenChartPayload = Partial<TokenChartResponse> & { symbol?: string }
+
+function isTokenChartPayload(payload: any): payload is TokenChartPayload {
   if (!payload || typeof payload !== 'object') return false
+  // Check if it has coin_id or a symbol - means it's a token chart request
+  if (payload.coin_id || payload.symbol || payload.metadata?.symbol) {
+    return true
+  }
   const series = payload.series
   if (!series || typeof series !== 'object') return false
   if (!Array.isArray(series.prices)) return false
   if (!series.prices.length) return false
   if (!Array.isArray(payload.candles)) return false
-  if (typeof payload.coin_id !== 'string' && typeof payload.metadata?.symbol !== 'string') return false
   return true
 }
 
@@ -32,7 +37,8 @@ export default function ChartPanelComponent({ widget }: { widget: Widget }) {
   }
 
   if (isTokenChartPayload(payload)) {
-    const initialData: TokenChartResponse = {
+    const hasPriceData = (payload.series?.prices?.length ?? 0) > 0
+    const initialData: TokenChartResponse | null = hasPriceData ? {
       success: payload.success ?? true,
       metadata: payload.metadata ?? {},
       coin_id: payload.coin_id ?? '',
@@ -44,18 +50,19 @@ export default function ChartPanelComponent({ widget }: { widget: Widget }) {
       sources: payload.sources ?? [],
       interval: payload.interval ?? null,
       cached: payload.cached ?? false,
-    }
+    } : null
 
     return (
       <Suspense fallback={<ChartPlaceholder label="Loading token chart…" />}>
         <TokenPriceChart
           coinId={payload.coin_id}
-          symbol={payload.metadata?.symbol ?? undefined}
+          symbol={payload.symbol ?? payload.metadata?.symbol ?? undefined}
           address={payload.metadata?.contract_address ?? undefined}
           chain={payload.metadata?.chain ?? 'ethereum'}
-          vsCurrency={initialData.vs_currency}
-          initialRange={initialData.range as TokenChartParams['range']}
+          vsCurrency={payload.vs_currency ?? 'usd'}
+          initialRange={(payload.range ?? '7d') as TokenChartParams['range']}
           initialData={initialData}
+          showSelector
         />
       </Suspense>
     )

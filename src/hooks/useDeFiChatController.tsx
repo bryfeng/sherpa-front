@@ -33,7 +33,7 @@ const seedWidgets: Widget[] = [
     id: TOKEN_PRICE_WIDGET_ID,
     kind: 'chart',
     title: 'Token price chart',
-    payload: { template: TOKEN_PRICE_WIDGET_ID },
+    payload: { coin_id: 'ethereum', symbol: 'ETH' },
     sources: [{ label: 'CoinGecko', href: 'https://www.coingecko.com' }],
     density: 'full',
   },
@@ -148,14 +148,13 @@ function removeWidgetById(current: Widget[], id: string): Widget[] {
   return applyOrder(current.filter((widget) => widget.id !== id))
 }
 
-function moveWidgetInList(current: Widget[], id: string, direction: 'up' | 'down'): Widget[] {
-  const index = current.findIndex((widget) => widget.id === id)
-  if (index < 0) return current
-  const targetIndex = direction === 'up' ? Math.max(0, index - 1) : Math.min(current.length - 1, index + 1)
-  if (index === targetIndex) return current
+function reorderWidgetList(current: Widget[], activeId: string, overId: string): Widget[] {
+  const oldIndex = current.findIndex((widget) => widget.id === activeId)
+  const newIndex = current.findIndex((widget) => widget.id === overId)
+  if (oldIndex < 0 || newIndex < 0 || oldIndex === newIndex) return current
   const next = current.slice()
-  const [item] = next.splice(index, 1)
-  next.splice(targetIndex, 0, item)
+  const [item] = next.splice(oldIndex, 1)
+  next.splice(newIndex, 0, item)
   return applyOrder(next)
 }
 
@@ -197,10 +196,11 @@ export interface UseDeFiChatControllerResult {
   chatSurfaceProps: ChatSurfaceProps
   workspaceSurfaceProps: WorkspaceSurfaceProps
   surface: {
-    active: ShellUIState['activeSurface']
+    workspaceVisible: boolean
     workspaceLabel: string
     conversationLabel: string
-    onSurfaceChange: (surface: ShellUIState['activeSurface']) => void
+    onToggleWorkspace: () => void
+    onShowWorkspace: () => void
     portfolioChip: React.ReactNode
   }
   modals: React.ReactNode
@@ -265,7 +265,7 @@ export function useDeFiChatController({ props, shellState, dispatch }: UseDeFiCh
   const isAssistantTyping = useMemo(() => messages.some((msg) => msg.typing), [messages])
 
   const {
-    activeSurface,
+    workspaceVisible,
     highlight,
     panelUI,
     expandedPanelId,
@@ -286,7 +286,8 @@ export function useDeFiChatController({ props, shellState, dispatch }: UseDeFiCh
   const setShowSwap = useCallback((value: { from?: string; to?: string } | null) => dispatch({ type: 'setShowSwap', value }), [dispatch])
   const setShowBridge = useCallback((value: boolean) => dispatch({ type: 'setShowBridge', value }), [dispatch])
   const setShowRelay = useCallback((value: boolean) => dispatch({ type: 'setShowRelay', value }), [dispatch])
-  const setActiveSurface = useCallback((surface: ShellUIState['activeSurface']) => dispatch({ type: 'setActiveSurface', surface }), [dispatch])
+  const toggleWorkspace = useCallback(() => dispatch({ type: 'toggleWorkspace' }), [dispatch])
+  const showWorkspace = useCallback(() => dispatch({ type: 'setWorkspaceVisible', visible: true }), [dispatch])
   const setAriaAnnouncement = useCallback((value: string) => dispatch({ type: 'setAriaAnnouncement', value }), [dispatch])
   const resetPanelUI = useCallback(() => dispatch({ type: 'resetPanelUI' }), [dispatch])
   const setPanelCollapsed = useCallback(
@@ -463,9 +464,9 @@ export function useDeFiChatController({ props, shellState, dispatch }: UseDeFiCh
     if (hasLiveWidgets && !hasNudgedWorkspace) {
       setFlag('ws.nudged', true)
       setHasNudgedWorkspace(true)
-      setActiveSurface('workspace')
+      showWorkspace()
     }
-  }, [hasLiveWidgets, hasNudgedWorkspace, setActiveSurface])
+  }, [hasLiveWidgets, hasNudgedWorkspace, showWorkspace])
 
   const mergeWidgetsLocal = useCallback((current: Widget[], incoming: Widget[]): Widget[] => upsertWidgets(current, incoming), [])
 
@@ -556,9 +557,9 @@ export function useDeFiChatController({ props, shellState, dispatch }: UseDeFiCh
   const openPortfolioWorkspace = useCallback(
     (forceRefresh = false) => {
       ensurePortfolioPanel({ refresh: forceRefresh || !portfolioSummary, highlight: true })
-      setActiveSurface('workspace')
+      showWorkspace()
     },
-    [ensurePortfolioPanel, portfolioSummary, setActiveSurface],
+    [ensurePortfolioPanel, portfolioSummary, showWorkspace],
   )
 
   const dismissCoachMark = useCallback(() => {
@@ -570,9 +571,9 @@ export function useDeFiChatController({ props, shellState, dispatch }: UseDeFiCh
     if (!widgets.length) return
     const latest = widgets[0]
     setPanelCollapsed(latest.id, false)
-    setActiveSurface('workspace')
+    showWorkspace()
     setHighlight([latest.id])
-  }, [setActiveSurface, setHighlight, setPanelCollapsed, widgets])
+  }, [showWorkspace, setHighlight, setPanelCollapsed, widgets])
 
   const sendPrompt = useCallback(async (raw: string) => {
     const question = raw.trim()
@@ -887,8 +888,8 @@ export function useDeFiChatController({ props, shellState, dispatch }: UseDeFiCh
     dispatch({ type: 'togglePanelCollapse', panelId: id })
   }, [dispatch])
 
-  const moveWidgetPosition = useCallback((id: string, direction: 'up' | 'down') => {
-    setWidgets((previous) => moveWidgetInList(previous, id, direction))
+  const reorderWidgets = useCallback((activeId: string, overId: string) => {
+    setWidgets((previous) => reorderWidgetList(previous, activeId, overId))
   }, [])
 
   const handleAction = useCallback((action: AgentAction) => {
@@ -1002,9 +1003,9 @@ export function useDeFiChatController({ props, shellState, dispatch }: UseDeFiCh
     onPlanWorkflow: () => handleInsertQuickPrompt('Outline the next best DeFi workflow for my wallet.'),
     onShowTrending: () => {
       loadTrendingTokensPanel({ highlight: true }).catch(() => {})
-      setActiveSurface('workspace')
+      showWorkspace()
     },
-    onOpenWorkspace: () => setActiveSurface('workspace'),
+    onOpenWorkspace: showWorkspace,
     onRequestPro: handleProUpsell,
     menuActions: [
       {
@@ -1053,7 +1054,7 @@ export function useDeFiChatController({ props, shellState, dispatch }: UseDeFiCh
     inputValue: input,
     onInputChange: setInput,
     onSend: () => { void send() },
-    onOpenWorkspace: () => setActiveSurface('workspace'),
+    onOpenWorkspace: showWorkspace,
     onPinLatest: handlePinLatestPanel,
     canPinLatest: widgets.length > 0,
     proBadgeLabel,
@@ -1083,7 +1084,7 @@ export function useDeFiChatController({ props, shellState, dispatch }: UseDeFiCh
     portfolioRefreshing,
     onToggleCollapse: toggleCollapse,
     onExpand: (id) => setExpandedPanelId(id),
-    onMove: moveWidgetPosition,
+    onReorder: reorderWidgets,
     onBridge: handleRelayExecution,
     onSwap: handleRelayExecution,
     onRefreshBridgeQuote: requestBridgeQuoteRefresh,
@@ -1091,12 +1092,12 @@ export function useDeFiChatController({ props, shellState, dispatch }: UseDeFiCh
     onInsertQuickPrompt: handleInsertQuickPrompt,
     onLoadTopCoins: () => {
       loadTopCoinsPanel().catch(() => {})
-      setActiveSurface('workspace')
+      showWorkspace()
     },
     onOpenPortfolio: () => openPortfolioWorkspace(true),
     onOpenRelayQuote: () => {
       setShowRelay(true)
-      setActiveSurface('workspace')
+      showWorkspace()
     },
     onExplainProtocol: () => handleInsertQuickPrompt('Explain this protocol like a playbook I can follow.'),
     showCoachMark: widgets.length > 0 && !coachMarkDismissed,
@@ -1198,10 +1199,11 @@ export function useDeFiChatController({ props, shellState, dispatch }: UseDeFiCh
     chatSurfaceProps,
     workspaceSurfaceProps,
     surface: {
-      active: activeSurface,
+      workspaceVisible,
       workspaceLabel: workspaceButtonLabel,
       conversationLabel: conversationDisplay,
-      onSurfaceChange: setActiveSurface,
+      onToggleWorkspace: toggleWorkspace,
+      onShowWorkspace: showWorkspace,
       portfolioChip: railChip,
     },
     modals,

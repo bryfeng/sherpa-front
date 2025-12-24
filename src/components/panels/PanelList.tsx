@@ -1,35 +1,24 @@
 import React, { useMemo } from 'react'
-import { motion, AnimatePresence } from 'framer-motion'
+import { AnimatePresence } from 'framer-motion'
+import {
+  DndContext,
+  closestCenter,
+  KeyboardSensor,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  type DragEndEvent,
+} from '@dnd-kit/core'
+import {
+  SortableContext,
+  sortableKeyboardCoordinates,
+  verticalListSortingStrategy,
+} from '@dnd-kit/sortable'
+
 import type { Widget } from '../../types/widgets'
 import { TOKEN_PRICE_WIDGET_ID } from '../../constants/widgets'
 import { PanelItem } from './PanelItem'
-
-const panelSpring = {
-  type: 'spring',
-  stiffness: 400,
-  damping: 30,
-  mass: 0.8,
-}
-
-const panelVariants = {
-  initial: {
-    opacity: 0,
-    y: 20,
-    scale: 0.95,
-  },
-  animate: {
-    opacity: 1,
-    y: 0,
-    scale: 1,
-    transition: panelSpring,
-  },
-  exit: {
-    opacity: 0,
-    y: -10,
-    scale: 0.98,
-    transition: { duration: 0.2, ease: 'easeOut' },
-  },
-}
+import { SortablePanelItem } from './SortablePanelItem'
 
 export interface PanelListProps {
   widgets: Widget[]
@@ -39,7 +28,7 @@ export interface PanelListProps {
   walletReady?: boolean
   onToggleCollapse: (id: string) => void
   onExpand: (id: string) => void
-  onMove: (id: string, direction: 'up' | 'down') => void
+  onReorder: (activeId: string, overId: string) => void
   onBridge?: (widget: Widget) => Promise<string | void>
   onSwap?: (widget: Widget) => Promise<string | void>
   onRefreshBridgeQuote?: () => Promise<void>
@@ -66,7 +55,7 @@ export function PanelList({
   walletReady,
   onToggleCollapse,
   onExpand,
-  onMove,
+  onReorder,
   onBridge,
   onSwap,
   onRefreshBridgeQuote,
@@ -83,6 +72,26 @@ export function PanelList({
     return [...priority, ...remainder]
   }, [widgets, highlight, highlightedIds])
 
+  const widgetIds = useMemo(() => orderedWidgets.map((w) => w.id), [orderedWidgets])
+
+  const sensors = useSensors(
+    useSensor(PointerSensor, {
+      activationConstraint: {
+        distance: 8,
+      },
+    }),
+    useSensor(KeyboardSensor, {
+      coordinateGetter: sortableKeyboardCoordinates,
+    })
+  )
+
+  const handleDragEnd = (event: DragEndEvent) => {
+    const { active, over } = event
+    if (over && active.id !== over.id) {
+      onReorder(String(active.id), String(over.id))
+    }
+  }
+
   const liveMessage = useMemo(() => {
     if (!highlight?.length) return ''
     const titles = highlight
@@ -93,41 +102,38 @@ export function PanelList({
   }, [highlight, widgets])
 
   return (
-    <>
-      <AnimatePresence mode="popLayout" initial={false}>
-        {orderedWidgets.map((widget, index) => (
-          <motion.div
-            key={widget.id}
-            layout
-            variants={panelVariants}
-            initial="initial"
-            animate="animate"
-            exit="exit"
-            transition={panelSpring}
-          >
-            <PanelItem
-              widget={widget}
-              index={index}
-              totalCount={orderedWidgets.length}
-              collapsed={Boolean(panelUI[widget.id]?.collapsed)}
-              isHighlighted={highlightedIds.has(widget.id)}
-              walletAddress={walletAddress}
-              walletReady={walletReady}
-              onToggleCollapse={onToggleCollapse}
-              onExpand={onExpand}
-              onMove={onMove}
-              onBridge={onBridge}
-              onSwap={onSwap}
-              onRefreshBridgeQuote={onRefreshBridgeQuote}
-              onRefreshSwapQuote={onRefreshSwapQuote}
-              onInsertQuickPrompt={onInsertQuickPrompt}
-            />
-          </motion.div>
-        ))}
-      </AnimatePresence>
+    <DndContext
+      sensors={sensors}
+      collisionDetection={closestCenter}
+      onDragEnd={handleDragEnd}
+    >
+      <SortableContext items={widgetIds} strategy={verticalListSortingStrategy}>
+        <AnimatePresence mode="popLayout" initial={false}>
+          {orderedWidgets.map((widget, index) => (
+            <SortablePanelItem key={widget.id} id={widget.id}>
+              <PanelItem
+                widget={widget}
+                index={index}
+                totalCount={orderedWidgets.length}
+                collapsed={Boolean(panelUI[widget.id]?.collapsed)}
+                isHighlighted={highlightedIds.has(widget.id)}
+                walletAddress={walletAddress}
+                walletReady={walletReady}
+                onToggleCollapse={onToggleCollapse}
+                onExpand={onExpand}
+                onBridge={onBridge}
+                onSwap={onSwap}
+                onRefreshBridgeQuote={onRefreshBridgeQuote}
+                onRefreshSwapQuote={onRefreshSwapQuote}
+                onInsertQuickPrompt={onInsertQuickPrompt}
+              />
+            </SortablePanelItem>
+          ))}
+        </AnimatePresence>
+      </SortableContext>
       <div className="sr-only" aria-live="polite">
         {liveMessage}
       </div>
-    </>
+    </DndContext>
   )
 }

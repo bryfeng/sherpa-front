@@ -1,9 +1,7 @@
 import type { Panel } from '../types/defi-ui'
 
-export type SurfaceId = 'conversation' | 'workspace'
-
 export interface ShellUIState {
-  activeSurface: SurfaceId
+  workspaceVisible: boolean
   highlight?: string[]
   panelUI: Record<string, { collapsed?: boolean }>
   expandedPanelId: string | null
@@ -17,7 +15,7 @@ export interface ShellUIState {
 }
 
 export const initialShellUIState: ShellUIState = {
-  activeSurface: 'conversation',
+  workspaceVisible: true,
   highlight: undefined,
   panelUI: {},
   expandedPanelId: null,
@@ -31,7 +29,8 @@ export const initialShellUIState: ShellUIState = {
 }
 
 export type ShellUIAction =
-  | { type: 'setActiveSurface'; surface: SurfaceId }
+  | { type: 'toggleWorkspace' }
+  | { type: 'setWorkspaceVisible'; visible: boolean }
   | { type: 'setHighlight'; highlight?: string[] }
   | { type: 'togglePanelCollapse'; panelId: string }
   | { type: 'setPanelCollapsed'; panelId: string; collapsed: boolean }
@@ -48,8 +47,10 @@ export type ShellUIAction =
 
 export function shellUIReducer(state: ShellUIState, action: ShellUIAction): ShellUIState {
   switch (action.type) {
-    case 'setActiveSurface':
-      return { ...state, activeSurface: action.surface }
+    case 'toggleWorkspace':
+      return { ...state, workspaceVisible: !state.workspaceVisible }
+    case 'setWorkspaceVisible':
+      return { ...state, workspaceVisible: action.visible }
     case 'setHighlight':
       return { ...state, highlight: action.highlight }
     case 'togglePanelCollapse': {

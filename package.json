@@ -17,6 +17,9 @@
     "workspace:status": "node scripts/workspace-status.js"
   },
   "dependencies": {
+    "@dnd-kit/core": "^6.3.1",
+    "@dnd-kit/sortable": "^10.0.0",
+    "@dnd-kit/utilities": "^3.2.2",
     "@reown/appkit": "^1.8.2",
     "@reown/appkit-adapter-solana": "^1.8.11",
     "@reown/appkit-adapter-wagmi": "^1.8.2",

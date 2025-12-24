@@ -11,7 +11,7 @@ export interface PanelHostProps {
   walletReady?: boolean
   onToggleCollapse: (id: string) => void
   onExpand: (id: string) => void
-  onMove: (id: string, direction: 'up' | 'down') => void
+  onReorder: (activeId: string, overId: string) => void
   onBridge?: (widget: Widget) => Promise<string | void>
   onSwap?: (widget: Widget) => Promise<string | void>
   onRefreshBridgeQuote?: () => Promise<void>
@@ -27,7 +27,7 @@ export function PanelHost({
   walletReady,
   onToggleCollapse,
   onExpand,
-  onMove,
+  onReorder,
   onBridge,
   onSwap,
   onRefreshBridgeQuote,
@@ -44,7 +44,7 @@ export function PanelHost({
         walletReady={walletReady}
         onToggleCollapse={onToggleCollapse}
         onExpand={onExpand}
-        onMove={onMove}
+        onReorder={onReorder}
         onBridge={onBridge}
         onSwap={onSwap}
         onRefreshBridgeQuote={onRefreshBridgeQuote}

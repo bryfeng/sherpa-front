@@ -20,7 +20,7 @@ export interface WorkspaceSurfaceProps {
   portfolioRefreshing: boolean
   onToggleCollapse: (id: string) => void
   onExpand: (id: string) => void
-  onMove: (id: string, direction: 'up' | 'down') => void
+  onReorder: (activeId: string, overId: string) => void
   onBridge?: (widget: Widget) => Promise<string | void>
   onSwap?: (widget: Widget) => Promise<string | void>
   onRefreshBridgeQuote?: () => Promise<void>
@@ -48,7 +48,7 @@ function WorkspaceSurfaceComponent({
   portfolioRefreshing,
   onToggleCollapse,
   onExpand,
-  onMove,
+  onReorder,
   onBridge,
   onSwap,
   onRefreshBridgeQuote,
@@ -106,7 +106,7 @@ function WorkspaceSurfaceComponent({
             walletReady={walletReady}
             onToggleCollapse={onToggleCollapse}
             onExpand={onExpand}
-            onMove={onMove}
+            onReorder={onReorder}
             onBridge={onBridge}
             onSwap={onSwap}
             onRefreshBridgeQuote={onRefreshBridgeQuote}
