@@ -2,12 +2,33 @@
 
 import React from 'react'
 import { ChevronDown, ChevronUp, Maximize2 } from 'lucide-react'
+import { motion, AnimatePresence } from 'framer-motion'
 
 import type { WidgetAction, WidgetDensity } from '../../types/widgets'
 import { ErrorView } from '../ErrorView'
 import { Skeleton } from '../Skeleton'
 import { Card, CardContent } from '../ui/primitives'
 import { WidgetButton } from '../widgets/widget-kit'
+
+const springTransition = {
+  type: 'spring',
+  stiffness: 400,
+  damping: 35,
+  mass: 0.8,
+}
+
+const contentVariants = {
+  collapsed: {
+    height: 0,
+    opacity: 0,
+    transition: { ...springTransition, opacity: { duration: 0.15 } }
+  },
+  expanded: {
+    height: 'auto',
+    opacity: 1,
+    transition: { ...springTransition, opacity: { delay: 0.05, duration: 0.2 } }
+  },
+}
 
 interface SourceLink {
   label: string
@@ -116,14 +137,20 @@ function PanelCardComponent({
     <Card
       data-panel-id={id}
       data-highlighted={highlighted ? 'true' : undefined}
-      className={`card rounded-2xl density-${density}`}
+      className={`card density-${density}`}
     >
-      <div className="flex flex-wrap items-start justify-between gap-[var(--s1)] border-b border-[var(--line)] px-[var(--s3)] py-[var(--s2)]">
+      <div
+        className="flex flex-wrap items-start justify-between gap-[var(--s1)] border-b px-[var(--s3)] py-[var(--s2)]"
+        style={{ borderColor: 'var(--line)' }}
+      >
         <div className="flex items-center gap-[var(--s1)]">
           {icon ? (
             <span
-              className="inline-flex h-10 w-10 items-center justify-center rounded-2xl"
-              style={{ background: 'rgba(90,164,255,.12)', color: 'var(--accent)' }}
+              className="inline-flex h-8 w-8 items-center justify-center rounded-md"
+              style={{
+                background: 'var(--accent-muted)',
+                color: 'var(--accent)',
+              }}
               aria-hidden
             >
               {icon}
@@ -167,25 +194,36 @@ function PanelCardComponent({
           ) : null}
         </div>
       </div>
-      {!collapsed && (
-        <CardContent>
-          {status === 'loading' ? (
-            <div className="flex flex-col gap-[var(--s1)]">
-              <Skeleton height="1rem" width="35%" />
-              <Skeleton height="0.75rem" />
-              <Skeleton height="0.75rem" width="70%" />
-              <Skeleton height="0.75rem" width="55%" />
-            </div>
-          ) : status === 'error' ? (
-            <ErrorView message={errorMessage} onRetry={onRetry} retryLabel={retryLabel} />
-          ) : (
-            <>
-              {children}
-              <SourcesFooter sources={sources} />
-            </>
-          )}
-        </CardContent>
-      )}
+      <AnimatePresence initial={false}>
+        {!collapsed && (
+          <motion.div
+            key="panel-content"
+            initial="collapsed"
+            animate="expanded"
+            exit="collapsed"
+            variants={contentVariants}
+            style={{ overflow: 'hidden' }}
+          >
+            <CardContent>
+              {status === 'loading' ? (
+                <div className="flex flex-col gap-[var(--s1)]">
+                  <Skeleton height="1rem" width="35%" />
+                  <Skeleton height="0.75rem" />
+                  <Skeleton height="0.75rem" width="70%" />
+                  <Skeleton height="0.75rem" width="55%" />
+                </div>
+              ) : status === 'error' ? (
+                <ErrorView message={errorMessage} onRetry={onRetry} retryLabel={retryLabel} />
+              ) : (
+                <>
+                  {children}
+                  <SourcesFooter sources={sources} />
+                </>
+              )}
+            </CardContent>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </Card>
   )
 }

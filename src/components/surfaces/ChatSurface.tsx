@@ -5,7 +5,8 @@ import { AnimatePresence, motion } from 'framer-motion'
 import { Bot, ExternalLink, Send, Star, User, X, BarChart3, Pin } from 'lucide-react'
 
 import type { AgentAction, AgentMessage } from '../../types/defi-ui'
-import { Badge, Button, Textarea } from '../ui/primitives'
+import { Button, Textarea } from '../ui/primitives'
+import { useToastContext } from '../../providers/ToastProvider'
 
 function SourceBadge({ src }: { src: any }) {
   let label = ''
@@ -165,23 +166,39 @@ const MessageBubble = React.memo(
       }
     }
 
-    const bubbleClasses = isUser
-      ? 'bg-[var(--accent)] text-[var(--text-inverse)]'
-      : 'bg-[var(--surface)] border border-[var(--line)] text-[var(--text)]'
-
-    const typingColor = isUser ? 'var(--text-inverse)' : 'var(--text-muted)'
+    const typingColor = isUser ? 'var(--text-inverse)' : 'var(--accent)'
 
     return (
-      <div className={`flex gap-3 ${isUser ? 'justify-end' : 'justify-start'}`}>
-        {!isUser && (
-          <div className="h-8 w-8 rounded-full bg-[var(--surface-2)] border border-[var(--line)] flex items-center justify-center">
-            <Bot className="h-4 w-4" style={{ color: 'var(--text-muted)' }} />
+      <div className={`flex gap-3 ${isUser ? 'flex-row-reverse' : 'flex-row'}`}>
+        {/* Avatar - Flat design */}
+        {isUser ? (
+          <div
+            className="h-8 w-8 flex-shrink-0 rounded-md flex items-center justify-center"
+            style={{ background: 'var(--accent)' }}
+          >
+            <User className="h-4 w-4" style={{ color: 'var(--text-inverse)' }} />
+          </div>
+        ) : (
+          <div
+            className="h-8 w-8 flex-shrink-0 rounded-md flex items-center justify-center"
+            style={{ background: 'var(--accent-muted)', border: '1px solid var(--line)' }}
+          >
+            <Bot className="h-4 w-4" style={{ color: 'var(--accent)' }} />
           </div>
         )}
-        <div className={`max-w-[72%] rounded-2xl p-4 shadow-sm ${bubbleClasses}`}>
+
+        {/* Message bubble - Flat design */}
+        <div
+          className="max-w-[75%] rounded-lg px-4 py-3"
+          style={{
+            background: isUser ? 'var(--accent)' : 'var(--surface-2)',
+            color: isUser ? 'var(--text-inverse)' : 'var(--text)',
+            border: isUser ? 'none' : '1px solid var(--line)',
+          }}
+        >
           {m.typing ? (
             <div className="text-sm flex items-center gap-2" style={{ color: typingColor }}>
-              <span>Thinking</span>
+              <span style={{ color: isUser ? 'var(--text-inverse)' : 'var(--text-muted)' }}>Thinking</span>
               <span className="inline-flex gap-1">
                 <span className="w-1.5 h-1.5 rounded-full animate-bounce [animation-delay:-0.2s]" style={{ background: typingColor }}></span>
                 <span className="w-1.5 h-1.5 rounded-full animate-bounce [animation-delay:-0.1s]" style={{ background: typingColor }}></span>
@@ -194,26 +211,29 @@ const MessageBubble = React.memo(
             </div>
           )}
           {actions.length > 0 && (
-            <div className="mt-3 flex flex-wrap gap-[var(--s1)]" role="group" aria-label="Assistant suggestions">
+            <div className="mt-3 flex flex-wrap gap-2" role="group" aria-label="Assistant suggestions">
               {actions.map((action, index) => (
-                <Button
+                <button
                   key={action.id}
                   ref={(el) => {
                     actionRefs.current[index] = el
                   }}
-                  size="sm"
-                  variant={isUser ? 'secondary' : 'default'}
                   onClick={() => onAction(action)}
                   onKeyDown={(event) => handleActionKeyDown(event, index)}
-                  className="rounded-full"
+                  className="rounded-md px-3 py-1.5 text-xs font-medium transition-colors"
+                  style={{
+                    background: isUser ? 'rgba(255,255,255,0.15)' : 'var(--accent-muted)',
+                    color: isUser ? 'var(--text-inverse)' : 'var(--accent)',
+                    border: isUser ? '1px solid rgba(255,255,255,0.2)' : '1px solid transparent',
+                  }}
                 >
                   {action.label}
-                </Button>
+                </button>
               ))}
             </div>
           )}
           {m.sources && m.sources.length > 0 && (
-            <div className="mt-2 flex flex-wrap items-center gap-2 text-xs" style={{ color: 'var(--text-muted)' }}>
+            <div className="mt-2 flex flex-wrap items-center gap-2 text-xs" style={{ color: isUser ? 'rgba(255,255,255,0.7)' : 'var(--text-muted)' }}>
               <span>Sources:</span>
               {m.sources.map((source: any, index: number) => (
                 <SourceBadge key={index} src={source} />
@@ -221,11 +241,6 @@ const MessageBubble = React.memo(
             </div>
           )}
         </div>
-        {isUser && (
-          <div className="h-8 w-8 rounded-full bg-[var(--surface-2)] border border-[var(--line)] flex items-center justify-center">
-            <User className="h-4 w-4" style={{ color: 'var(--text-muted)' }} />
-          </div>
-        )}
       </div>
     )
   },
@@ -259,7 +274,7 @@ export interface ChatSurfaceProps {
   onCopyToken: () => void
 }
 
-export function ChatSurface({
+function ChatSurfaceComponent({
   containerRef,
   inputRef,
   messages,
@@ -285,11 +300,36 @@ export function ChatSurface({
   copiedToken,
   onCopyToken,
 }: ChatSurfaceProps) {
+  const { showToast } = useToastContext()
   const canSend = inputValue.trim().length > 0
+
+  const placeholderExamples = [
+    'Ask about a token, protocol, or action…',
+    'Show me the ETH price chart',
+    'What are trending tokens right now?',
+    'Analyze my portfolio performance',
+    'Compare gas fees across chains',
+    'Explain how Uniswap works',
+  ]
+
+  const [placeholderIndex, setPlaceholderIndex] = React.useState(0)
+
+  React.useEffect(() => {
+    if (inputValue.trim().length > 0) return
+    const interval = setInterval(() => {
+      setPlaceholderIndex((prev) => (prev + 1) % placeholderExamples.length)
+    }, 4000)
+    return () => clearInterval(interval)
+  }, [inputValue, placeholderExamples.length])
 
   const handleSend = () => {
     if (!canSend) return
     onSend()
+  }
+
+  const handleCopyWithToast = () => {
+    onCopyToken()
+    showToast('Contract address copied to clipboard', 'success')
   }
 
   return (
@@ -320,13 +360,17 @@ export function ChatSurface({
       <div className="sr-only" aria-live="polite" aria-atomic="false">
         {ariaAnnouncement}
       </div>
-      <div className="border-t border-[var(--line)] bg-[var(--bg-elev)]/80 px-4 py-[var(--s2)]">
-        <div className="space-y-[var(--s2)]">
+      <div
+        className="border-t px-4 py-4"
+        style={{ borderColor: 'var(--line)', background: 'var(--bg-elev)' }}
+      >
+        <div className="space-y-3">
+          {/* Main input container - Flat design */}
           <div
-            className="rounded-2xl border bg-[var(--bg)]/80 p-[var(--s2)] shadow-inner"
-            style={{ borderColor: 'var(--line)' }}
+            className="rounded-lg p-3"
+            style={{ background: 'var(--surface)', border: '1px solid var(--line)' }}
           >
-            <div className="flex flex-col gap-[var(--s1)] sm:flex-row sm:items-end">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
               <Textarea
                 ref={inputRef}
                 value={inputValue}
@@ -337,42 +381,69 @@ export function ChatSurface({
                     handleSend()
                   }
                 }}
-                placeholder="Ask about a token, protocol, or action…"
+                placeholder={placeholderExamples[placeholderIndex]}
                 aria-label="Chat message"
-                className="flex-1 min-h-[48px]"
+                className="flex-1 min-h-[52px] text-base"
+                style={{ fontSize: '15px' }}
               />
-              <Button onClick={handleSend} size="md" disabled={!canSend}>
-                <Send className="mr-2 h-4 w-4" />Send
-              </Button>
+              <button
+                onClick={handleSend}
+                disabled={!canSend}
+                className="flex items-center justify-center gap-2 rounded-md px-4 py-2.5 font-medium transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                style={{
+                  background: canSend ? 'var(--accent)' : 'var(--surface-2)',
+                  color: canSend ? 'var(--text-inverse)' : 'var(--text-muted)',
+                }}
+              >
+                <Send className="h-4 w-4" />
+                <span>Send</span>
+              </button>
             </div>
-            <div className="mt-[var(--s1)] flex flex-wrap items-center gap-[var(--s1)]">
-              <Button size="sm" variant="outline" onClick={onOpenWorkspace}>
-                <BarChart3 className="mr-1 h-3.5 w-3.5" />Open workspace
-              </Button>
-              <Button size="sm" variant="outline" onClick={onPinLatest} disabled={!canPinLatest}>
-                <Pin className="mr-1 h-3.5 w-3.5" />Pin latest panel
-              </Button>
+            {/* Quick actions row */}
+            <div className="mt-3 flex flex-wrap items-center gap-2 border-t pt-3" style={{ borderColor: 'var(--line)' }}>
+              <button
+                onClick={onOpenWorkspace}
+                className="flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-xs font-medium transition-colors"
+                style={{ color: 'var(--text-muted)', background: 'var(--surface-2)', border: '1px solid var(--line)' }}
+              >
+                <BarChart3 className="h-3.5 w-3.5" />
+                <span>Workspace</span>
+              </button>
+              <button
+                onClick={onPinLatest}
+                disabled={!canPinLatest}
+                className="flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-xs font-medium transition-colors disabled:opacity-40"
+                style={{ color: 'var(--text-muted)', background: 'var(--surface-2)', border: '1px solid var(--line)' }}
+              >
+                <Pin className="h-3.5 w-3.5" />
+                <span>Pin panel</span>
+              </button>
             </div>
           </div>
-          <div className="flex flex-wrap items-center justify-between gap-3 text-xs" style={{ color: 'var(--text-muted)' }}>
-            <div className="flex items-center gap-2">
-              <Badge variant="outline" className="rounded-full px-2 py-0.5">
-                {proBadgeLabel}
-              </Badge>
-              <span>Adaptive CTAs are generated by the agent.</span>
-            </div>
+
+          {/* Pro badge row - simplified */}
+          <div className="flex flex-wrap items-center justify-between gap-3 px-1">
+            <span className="text-xs" style={{ color: 'var(--text-muted)' }}>
+              {proBadgeLabel}
+            </span>
             {!pro && (
-              <div className="flex items-center gap-2">
-                <Button size="sm" variant="outline" onClick={() => onProUpsell('cta')} className="rounded-full">
-                  <Star className="mr-1 h-3 w-3" />Upgrade to Pro
-                </Button>
-              </div>
+              <button
+                onClick={() => onProUpsell('cta')}
+                className="flex items-center gap-1.5 rounded-md px-3 py-1 text-xs font-medium transition-colors"
+                style={{
+                  color: 'var(--accent)',
+                  background: 'var(--accent-muted)',
+                }}
+              >
+                <Star className="h-3 w-3" />
+                <span>Upgrade to Pro</span>
+              </button>
             )}
           </div>
           {showProInfo && !pro && (
             <div
-              className="rounded-2xl border p-4 text-xs shadow-sm"
-              style={{ borderColor: 'rgba(90,164,255,.3)', background: 'rgba(90,164,255,.14)', color: 'var(--text)' }}
+              className="rounded-lg border p-4 text-xs"
+              style={{ borderColor: 'var(--line)', background: 'var(--accent-muted)', color: 'var(--text)' }}
             >
               <div className="flex items-start gap-3">
                 <div
@@ -405,7 +476,7 @@ export function ChatSurface({
                       <code className="rounded-lg border px-2 py-1 font-mono text-[11px] tracking-tight" style={{ borderColor: 'var(--accent)', background: 'rgba(90,164,255,.16)' }}>
                         {proContractDisplay}
                       </code>
-                      <Button size="sm" variant="secondary" onClick={onCopyToken} className="rounded-full px-3 py-1 text-[11px]">
+                      <Button size="sm" variant="secondary" onClick={handleCopyWithToast} className="rounded-full px-3 py-1 text-[11px]">
                         {copiedToken ? 'Copied' : 'Copy contract'}
                       </Button>
                       {proExplorerUrl && (
@@ -435,3 +506,6 @@ export function ChatSurface({
     </div>
   )
 }
+
+export const ChatSurface = React.memo(ChatSurfaceComponent)
+ChatSurface.displayName = 'ChatSurface'

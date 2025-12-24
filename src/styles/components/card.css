@@ -1,2 +1,17 @@
-.card{background:var(--surface);border:1px solid var(--line);border-radius:var(--r-xl);box-shadow:var(--shadow-2);position:relative;}
-.card[data-highlighted="true"]{border-color:var(--accent-600);box-shadow:0 0 0 1px rgba(90,164,255,.5),var(--shadow-2);}
+/* Flat card design - clean, minimal, professional */
+.card{
+  background:var(--surface);
+  border:1px solid var(--line);
+  border-radius:var(--r-lg);
+  position:relative;
+}
+
+.card[data-highlighted="true"]{
+  border-color:var(--accent);
+}
+
+/* Density variants */
+.card.density-full,
+.card.density-rail{
+  border-radius:var(--r-lg);
+}

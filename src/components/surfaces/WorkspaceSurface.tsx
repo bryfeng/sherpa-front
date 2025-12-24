@@ -37,7 +37,7 @@ export interface WorkspaceSurfaceProps {
   onRequestPro?: (source: 'cta' | 'action') => void
 }
 
-export function WorkspaceSurface({
+function WorkspaceSurfaceComponent({
   widgets,
   highlight,
   panelUI,
@@ -69,16 +69,16 @@ export function WorkspaceSurface({
   return (
     <div className="workspace-surface flex h-full flex-col">
       <div
-        className="border-b px-4 py-3 text-sm"
+        className="border-b px-6 py-4 text-sm"
         style={{ borderColor: 'var(--line)', background: 'var(--surface)', color: 'var(--text-muted)' }}
       >
         Arrange live panels, quotes, and research in one streamlined workspace.
       </div>
-      <div className="flex-1 overflow-y-auto px-4 py-4">
+      <div className="flex-1 overflow-y-auto px-6 py-6">
         {showCoachMark && (
           <div
-            className="mb-4 rounded-2xl border p-4 text-sm shadow-sm"
-            style={{ borderColor: 'rgba(90,164,255,.3)', background: 'rgba(90,164,255,.14)', color: 'var(--text)' }}
+            className="mb-4 rounded-lg border p-4 text-sm"
+            style={{ borderColor: 'var(--line)', background: 'var(--accent-muted)', color: 'var(--text)' }}
           >
             <div className="flex flex-wrap items-center justify-between gap-3">
               <div className="flex-1">
@@ -115,7 +115,7 @@ export function WorkspaceSurface({
           />
         ) : (
           <div
-            className="flex h-full min-h-[220px] flex-col items-center justify-center gap-3 rounded-3xl border border-dashed p-8 text-center"
+            className="flex h-full min-h-[220px] flex-col items-center justify-center gap-3 rounded-lg border border-dashed p-8 text-center"
             style={{ borderColor: 'var(--line)', background: 'var(--surface)', color: 'var(--text-muted)' }}
           >
             <Sparkles className="h-5 w-5" style={{ color: 'var(--accent)' }} />
@@ -127,18 +127,18 @@ export function WorkspaceSurface({
             </p>
           </div>
         )}
-        <div className="mt-5 grid gap-4 lg:grid-cols-2">
+        <div className="mt-8 grid gap-6 lg:grid-cols-2">
           <div
-            className="rounded-2xl border shadow-sm"
+            className="rounded-lg border"
             style={{ borderColor: 'var(--line)', background: 'var(--surface-2)' }}
           >
             <div
-              className="border-b px-4 py-3 text-sm font-medium"
+              className="border-b px-5 py-4 text-sm font-semibold"
               style={{ borderColor: 'var(--line)', color: 'var(--text)' }}
             >
               Quick actions
             </div>
-            <div className="flex flex-col gap-2 p-4">
+            <div className="flex flex-col gap-3 p-5">
               <Button size="sm" variant="secondary" className="justify-start" onClick={onLoadTopCoins}>
                 <BarChart3 className="mr-2 h-3.5 w-3.5" />Top coins insight
               </Button>
@@ -185,3 +185,6 @@ export function WorkspaceSurface({
     </div>
   )
 }
+
+export const WorkspaceSurface = React.memo(WorkspaceSurfaceComponent)
+WorkspaceSurface.displayName = 'WorkspaceSurface'

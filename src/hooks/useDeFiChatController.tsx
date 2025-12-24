@@ -469,15 +469,17 @@ export function useDeFiChatController({ props, shellState, dispatch }: UseDeFiCh
 
   const mergeWidgetsLocal = useCallback((current: Widget[], incoming: Widget[]): Widget[] => upsertWidgets(current, incoming), [])
 
+  const portfolioWidgetExistsRef = useRef(false)
+
   useEffect(() => {
     if (!portfolioSummary) {
       prevPortfolioFetchRef.current = null
+      portfolioWidgetExistsRef.current = false
       setWidgets((prev) => removeWidgetById(prev, 'portfolio_overview'))
       return
     }
 
     const fetchedKey = portfolioSummary.fetchedAt || `${portfolioSummary.totalUsd}`
-    const existed = widgets.some((candidate) => candidate.id === 'portfolio_overview')
     const needsUpdate = prevPortfolioFetchRef.current !== fetchedKey
 
     if (needsUpdate) {
@@ -504,13 +506,16 @@ export function useDeFiChatController({ props, shellState, dispatch }: UseDeFiCh
       density: 'full',
     }
 
-    setWidgets((prev) => upsertWidgets(prev, [widget]))
-
-    if ((needsUpdate || !existed || portfolioHighlightPending.current) && portfolioHighlightPending.current) {
-      setHighlight(['portfolio_overview'])
-      portfolioHighlightPending.current = false
-    }
-  }, [portfolioSummary, setHighlight, widgets])
+    setWidgets((prev) => {
+      const existed = prev.some((candidate) => candidate.id === 'portfolio_overview')
+      portfolioWidgetExistsRef.current = true
+      if ((needsUpdate || !existed || portfolioHighlightPending.current) && portfolioHighlightPending.current) {
+        setHighlight(['portfolio_overview'])
+        portfolioHighlightPending.current = false
+      }
+      return upsertWidgets(prev, [widget])
+    })
+  }, [portfolioSummary, setHighlight])
 
   const handleProUpsell = useCallback((source: 'cta' | 'action') => {
     onRequestPro(source)
@@ -904,11 +909,20 @@ export function useDeFiChatController({ props, shellState, dispatch }: UseDeFiCh
       return
     }
 
+    // Helper to add user message representing the action they took
+    const addUserMessage = (text: string) => {
+      setMessages((previous) => [
+        ...previous,
+        { id: uid('msg'), role: 'user', text },
+      ])
+    }
+
     switch (action.type) {
       case 'show_panel': {
         const rawPanelId = action.params?.panel_id
         const panelId = normalizeWidgetId(rawPanelId)
         if (panelId === 'portfolio_overview' && !walletAddress) {
+          addUserMessage('Show my portfolio')
           setMessages((previous) => [
             ...previous,
             { id: uid('msg'), role: 'assistant', text: 'Please connect your wallet to view your portfolio.' },
@@ -916,15 +930,30 @@ export function useDeFiChatController({ props, shellState, dispatch }: UseDeFiCh
           break
         }
         if (panelId === 'top_coins') {
+          addUserMessage('Show me the top coins today')
           loadTopCoinsPanel().catch(() => {})
+          setMessages((previous) => [
+            ...previous,
+            { id: uid('msg'), role: 'assistant', text: 'Here are the top coins by market cap, excluding stablecoins.' },
+          ])
           break
         }
         if (panelId === 'trending_tokens') {
+          addUserMessage('What are the trending tokens right now?')
           loadTrendingTokensPanel({ highlight: true }).catch(() => {})
+          setMessages((previous) => [
+            ...previous,
+            { id: uid('msg'), role: 'assistant', text: 'Here are the trending tokens based on recent trading activity.' },
+          ])
           break
         }
         if (panelId === 'portfolio_overview' && walletAddress) {
+          addUserMessage('Show my portfolio')
           openPortfolioWorkspace(true)
+          setMessages((previous) => [
+            ...previous,
+            { id: uid('msg'), role: 'assistant', text: 'Opening your portfolio snapshot in the workspace.' },
+          ])
           break
         }
         setHighlight(panelId ? [panelId] : undefined)

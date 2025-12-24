@@ -5,6 +5,7 @@ import { HeaderBar, type HeaderBarProps } from '../header/HeaderBar'
 import { ChatSurface, type ChatSurfaceProps } from '../surfaces/ChatSurface'
 import { WorkspaceSurface, type WorkspaceSurfaceProps } from '../surfaces/WorkspaceSurface'
 import { Card } from '../ui/primitives'
+import { ResizablePanel } from '../ui/ResizablePanel'
 
 export interface DeFiChatShellProps {
   header: HeaderBarProps
@@ -71,13 +72,13 @@ export function DeFiChatShell({
   )
 
   return (
-    <div className="app-chrome min-h-[calc(100vh-64px)] w-full py-8">
-      <div className="flex w-full flex-col gap-6">
+    <div className="app-chrome min-h-[calc(100vh-64px)] w-full py-10">
+      <div className="flex w-full flex-col gap-8">
         <HeaderBar {...header} />
 
         <Card className="overflow-hidden">
           <div
-            className="flex flex-wrap items-center justify-between gap-3 border-b px-[var(--s3)] py-[var(--s2)]"
+            className="flex flex-wrap items-center justify-between gap-4 border-b px-[var(--s4)] py-[var(--s3)]"
             style={{ borderColor: 'var(--line)', background: 'var(--surface-2)' }}
           >
             <div
@@ -125,14 +126,37 @@ export function DeFiChatShell({
             </div>
           </div>
           {isWorkspaceView ? (
-            <div className="grid grid-cols-1 lg:grid-cols-[minmax(320px,380px)_1fr]">
+            <div className="flex flex-col lg:flex-row">
+              <ResizablePanel
+                defaultWidth={380}
+                minWidth={280}
+                maxWidth={600}
+                side="left"
+                className="hidden lg:block border-r"
+              >
+                <section
+                  id="surface-panel-conversation"
+                  aria-labelledby="surface-tab-conversation"
+                  className="h-full bg-[var(--surface-2)]/30"
+                  style={{ borderColor: 'var(--line)' }}
+                >
+                  <div className="flex h-full min-h-[420px] flex-col lg:max-h-[calc(100vh-260px)]">
+                    <div
+                      className="flex items-center justify-between gap-2 border-b px-4 py-3 text-xs tracking-wide uppercase"
+                      style={{ borderColor: 'var(--line)', color: 'var(--text-muted)' }}
+                    >
+                      <span>Chat docked</span>
+                      <span className="badge badge--secondary">Active</span>
+                    </div>
+                    <ChatSurface {...chat} />
+                  </div>
+                </section>
+              </ResizablePanel>
               <section
-                id="surface-panel-conversation"
-                aria-labelledby="surface-tab-conversation"
-                className="border-b bg-[var(--surface-2)]/40 lg:border-b-0 lg:border-r lg:bg-[var(--surface-2)]/30"
+                className="lg:hidden border-b bg-[var(--surface-2)]/40"
                 style={{ borderColor: 'var(--line)' }}
               >
-                <div className="flex h-full min-h-[420px] flex-col lg:max-h-[calc(100vh-260px)]">
+                <div className="flex min-h-[420px] flex-col">
                   <div
                     className="flex items-center justify-between gap-2 border-b px-4 py-3 text-xs tracking-wide uppercase"
                     style={{ borderColor: 'var(--line)', color: 'var(--text-muted)' }}
@@ -146,7 +170,7 @@ export function DeFiChatShell({
               <section
                 id="surface-panel-workspace"
                 aria-labelledby="surface-tab-workspace"
-                className="flex h-full min-h-[520px] flex-col lg:max-h-[calc(100vh-260px)]"
+                className="flex-1 flex h-full min-h-[520px] flex-col lg:max-h-[calc(100vh-260px)]"
               >
                 <WorkspaceSurface {...workspace} />
               </section>

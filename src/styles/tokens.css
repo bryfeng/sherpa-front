@@ -1,35 +1,37 @@
 :root{
   --bg:#0b0d12;
-  --bg-elev:#11161d;
-  --surface:#131a22;
-  --surface-2:#171f29;
-  --line:#1e2733;
+  --bg-elev:#0f1318;
+  --surface:#13181f;
+  --surface-2:#1a2028;
+  --line:#252d38;
 
   --text:#e7eef7;
-  --text-muted:#a8b3c2;
+  --text-muted:#8896a8;
   --text-inverse:#0b0d12;
 
-  --accent:#5aa4ff;
-  --accent-600:#3e93ff;
-  --accent-700:#297ff0;
-  --accent-800:#1e68c7;
+  --accent:#5a9cf5;
+  --accent-hover:#4a8ce5;
+  --accent-active:#3a7cd5;
+  --accent-muted:rgba(90,156,245,.12);
 
-  --success:#5fd39a;
-  --warning:#ffcc66;
-  --danger:#ff6b6b;
+  --success:#4ade80;
+  --warning:#fbbf24;
+  --danger:#f87171;
 
   --hover:rgba(255,255,255,.04);
-  --active:rgba(255,255,255,.06);
-  --focus-ring:#5aa4ff;
+  --active:rgba(255,255,255,.08);
+  --focus-ring:#5a9cf5;
 
-  --r-sm:8px;
-  --r-md:12px;
-  --r-lg:16px;
-  --r-xl:20px;
+  /* Flat border radius - tight and crisp */
+  --r-sm:4px;
+  --r-md:6px;
+  --r-lg:8px;
+  --r-xl:8px;
 
-  --shadow-1:0 1px 2px rgba(0,0,0,.38);
-  --shadow-2:0 6px 18px rgba(0,0,0,.32);
-  --shadow-inset:inset 0 1px 0 rgba(255,255,255,.04);
+  /* Minimal shadows - flat design */
+  --shadow-1:0 1px 2px rgba(0,0,0,.2);
+  --shadow-2:0 1px 3px rgba(0,0,0,.15);
+  --shadow-3:0 2px 4px rgba(0,0,0,.12);
 
   --s-1:4px;
   --s0:8px;
@@ -40,11 +42,42 @@
   --s5:32px;
   --s6:40px;
 
-  --fs-xs:12px;
+  --fs-xs:11px;
   --fs-sm:13px;
-  --fs-md:15px;
-  --fs-lg:17px;
-  --fs-xl:20px;
-  --fs-2xl:24px;
-  --fs-3xl:28px;
+  --fs-md:14px;
+  --fs-lg:16px;
+  --fs-xl:18px;
+  --fs-2xl:22px;
+  --fs-3xl:26px;
+}
+
+/* Light Theme (Snow) */
+.theme-snow,
+[data-theme="snow"] {
+  --bg:#f9fafb;
+  --bg-elev:#ffffff;
+  --surface:#ffffff;
+  --surface-2:#f3f4f6;
+  --line:#e5e7eb;
+
+  --text:#111827;
+  --text-muted:#6b7280;
+  --text-inverse:#ffffff;
+
+  --accent:#2563eb;
+  --accent-hover:#1d4ed8;
+  --accent-active:#1e40af;
+  --accent-muted:rgba(37,99,235,.08);
+
+  --success:#16a34a;
+  --warning:#d97706;
+  --danger:#dc2626;
+
+  --hover:rgba(0,0,0,.04);
+  --active:rgba(0,0,0,.06);
+  --focus-ring:#2563eb;
+
+  --shadow-1:0 1px 2px rgba(0,0,0,.05);
+  --shadow-2:0 1px 3px rgba(0,0,0,.08);
+  --shadow-3:0 2px 4px rgba(0,0,0,.06);
 }

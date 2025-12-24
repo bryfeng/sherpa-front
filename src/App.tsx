@@ -13,8 +13,9 @@ import DeFiChatAdaptiveUI from './pages/DeFiChatAdaptiveUI'
 import WidgetPlayground from './pages/WidgetPlayground'
 import { usePortfolioSummary } from './workspace/hooks'
 import { SettingsMenu } from './components/header/SettingsMenu'
-import { Button, Badge } from './components/ui/primitives'
+import { Button } from './components/ui/primitives'
 import type { LLMProviderInfo } from './types/llm'
+import { ToastProvider } from './providers/ToastProvider'
 
 export type PersonaId = 'friendly' | 'technical' | 'professional' | 'educational'
 
@@ -295,82 +296,64 @@ function MainApp() {
           <div className="flex items-center gap-3">
             <div
               aria-hidden="true"
-              className="flex h-9 w-9 items-center justify-center rounded-xl"
-              style={{
-                backgroundImage: 'linear-gradient(135deg, rgba(90,164,255,0.9), rgba(32,120,240,0.85))',
-                border: '1px solid var(--line)',
-                boxShadow: 'var(--shadow-1)',
-              }}
+              className="flex h-8 w-8 items-center justify-center rounded-md"
+              style={{ background: 'var(--accent)' }}
             />
-            <h1 className="text-lg font-semibold" style={{ color: 'var(--text)' }}>
+            <h1 className="text-base font-semibold" style={{ color: 'var(--text)' }}>
               Sherpa AI
             </h1>
           </div>
-          <div
-            className="flex flex-wrap items-center justify-end gap-3 text-xs"
-            style={{ color: 'var(--text-muted)' }}
-          >
-            <span
-              className="inline-block h-2 w-2 rounded-full"
-              style={{ backgroundColor: health === 'healthy' ? 'var(--success)' : 'var(--warning)' }}
-            />
-            <span style={{ color: 'var(--text)', fontSize: 'var(--fs-sm)', textTransform: 'capitalize' }}>
-              {health}
-            </span>
-            <code
-              style={{
-                background: 'var(--surface-2)',
-                border: '1px solid var(--line)',
-                borderRadius: 'var(--r-md)',
-                color: 'var(--text-muted)',
-                fontSize: 'var(--fs-xs)',
-                padding: '4px 8px',
-              }}
-            >
-              {import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000'}
-            </code>
-            <div className="h-5 w-px" style={{ background: 'var(--line)' }} />
+          <div className="flex items-center gap-2">
+            {/* Settings & Theme consolidated */}
             <SettingsMenu
               selectedModel={llmModel}
               onSelectModel={setLlmModel}
               providers={llmProviders}
               loading={llmProvidersLoading}
             />
-            <Button
-              size="sm"
-              variant="secondary"
-              className="rounded-full"
+            <button
               onClick={() => setTheme((t) => (t === 'snow' ? 'default' : 'snow'))}
-              title="Toggle theme"
+              className="flex h-8 w-8 items-center justify-center rounded-md transition-colors"
+              style={{ background: 'var(--surface-2)', border: '1px solid var(--line)' }}
+              title={theme === 'snow' ? 'Switch to dark mode' : 'Switch to light mode'}
             >
-              {theme === 'snow' ? 'Theme: Snow' : 'Theme: Default'}
-            </Button>
+              {theme === 'snow' ? (
+                <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" style={{ color: 'var(--text-muted)' }}>
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" />
+                </svg>
+              ) : (
+                <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" style={{ color: 'var(--text-muted)' }}>
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" />
+                </svg>
+              )}
+            </button>
+
+            {/* Wallet section */}
             {walletAddress ? (
-              <div className="flex items-center gap-2 text-xs">
-                <Badge
+              <div
+                className="flex items-center gap-3 rounded-md py-1.5 pl-3 pr-1.5"
+                style={{ background: 'var(--surface-2)', border: '1px solid var(--line)' }}
+              >
+                <div className="flex items-center gap-2">
+                  <div
+                    className="h-2 w-2 rounded-full"
+                    style={{ background: health === 'healthy' ? 'var(--success)' : 'var(--warning)' }}
+                  />
+                  <span className="text-sm font-medium" style={{ color: 'var(--text)' }}>
+                    {truncateAddress(walletAddress)}
+                  </span>
+                  {totalUsd && (
+                    <span className="text-sm" style={{ color: 'var(--text-muted)' }}>
+                      {totalUsd}
+                    </span>
+                  )}
+                </div>
+                <Button
+                  size="sm"
                   variant="secondary"
-                  className="rounded-full px-3 py-1 text-xs"
-                  style={{ color: 'var(--text)' }}
+                  className="rounded-md px-3 py-1 text-xs"
+                  onClick={handleDisconnect}
                 >
-                  {truncateAddress(walletAddress)}
-                </Badge>
-                <Badge
-                  variant="secondary"
-                  className="rounded-full px-3 py-1 text-xs uppercase tracking-wide"
-                  style={{ color: 'var(--text)' }}
-                >
-                  {walletChain === 'solana' ? 'Solana' : 'Ethereum'}
-                </Badge>
-                {totalUsd && (
-                  <Badge
-                    variant="secondary"
-                    className="rounded-full px-3 py-1 text-xs"
-                    style={{ color: 'var(--text)' }}
-                  >
-                    {totalUsd}
-                  </Badge>
-                )}
-                <Button size="sm" variant="secondary" className="rounded-full" onClick={handleDisconnect}>
                   Disconnect
                 </Button>
               </div>
@@ -379,7 +362,7 @@ function MainApp() {
             ) : (
               <Button
                 size="sm"
-                className="rounded-full"
+                className="rounded-md"
                 onClick={async () => {
                   const input = window.prompt('Paste a wallet address (0x… or Solana base58)')
                   if (!input) return
@@ -394,7 +377,7 @@ function MainApp() {
                   window.alert('Address must be a 0x-prefixed EVM wallet or a Solana base58 string (32–44 characters).')
                 }}
               >
-                Use Address
+                Connect Wallet
               </Button>
             )}
           </div>
@@ -430,5 +413,9 @@ export function App() {
   if (isPlaygroundRoute) {
     return <WidgetPlayground />
   }
-  return <MainApp />
+  return (
+    <ToastProvider>
+      <MainApp />
+    </ToastProvider>
+  )
 }
