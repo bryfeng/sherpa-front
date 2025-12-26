@@ -195,7 +195,7 @@ function PanelItemComponent({
         break
       }
       case 'chart':
-        content = <ChartPanel widget={widget} />
+        content = <ChartPanel widget={widget} onExpand={handleExpand} />
         break
       default:
         content = <div className="text-sm text-slate-400">{JSON.stringify(payload)}</div>

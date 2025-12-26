@@ -29,3 +29,8 @@ body {
 *::-webkit-scrollbar { width: 8px; height: 8px; }
 *::-webkit-scrollbar-thumb { background-color: rgba(148,163,184,.35); border-radius: 8px; }
 *::-webkit-scrollbar-track { background: transparent; }
+
+/* Hide drag handle for chart widgets - they're full-width and don't need reordering chrome */
+:has(.chart-panel-container) > .drag-handle {
+  display: none !important;
+}

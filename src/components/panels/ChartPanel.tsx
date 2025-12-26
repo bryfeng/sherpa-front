@@ -29,7 +29,12 @@ function isTokenChartTemplate(payload: any): boolean {
   return Boolean(payload && typeof payload === 'object' && payload.template === TOKEN_PRICE_WIDGET_ID)
 }
 
-export default function ChartPanelComponent({ widget }: { widget: Widget }) {
+interface ChartPanelProps {
+  widget: Widget
+  onExpand?: () => void
+}
+
+export default function ChartPanelComponent({ widget, onExpand }: ChartPanelProps) {
   const payload = widget.payload
 
   if (isTokenChartTemplate(payload)) {
@@ -63,6 +68,7 @@ export default function ChartPanelComponent({ widget }: { widget: Widget }) {
           initialRange={(payload.range ?? '7d') as TokenChartParams['range']}
           initialData={initialData}
           showSelector
+          onExpand={onExpand}
         />
       </Suspense>
     )

@@ -63,21 +63,19 @@ export function SortablePanelItem({ id, children }: SortablePanelItemProps) {
       animate="animate"
       exit="exit"
       transition={panelSpring}
-      className={isDragging ? 'opacity-90 shadow-2xl' : ''}
+      className={`group ${isDragging ? 'opacity-90 shadow-2xl' : ''}`}
     >
       <div className="relative">
         <button
           type="button"
-          className="absolute left-0 top-1/2 -translate-y-1/2 -translate-x-3 z-10 flex h-8 w-6 items-center justify-center rounded-md bg-[var(--surface-2)] border border-[var(--line)] text-[var(--text-muted)] opacity-0 group-hover:opacity-100 hover:bg-[var(--hover)] hover:text-[var(--text)] transition-opacity cursor-grab active:cursor-grabbing focus:opacity-100 focus:outline-none focus:ring-2 focus:ring-[var(--accent)]"
+          className="drag-handle absolute left-0 top-4 -translate-x-3 z-10 flex h-8 w-6 items-center justify-center rounded-md bg-[var(--surface-2)] border border-[var(--line)] text-[var(--text-muted)] opacity-0 group-hover:opacity-100 hover:bg-[var(--hover)] hover:text-[var(--text)] transition-opacity cursor-grab active:cursor-grabbing focus:opacity-100 focus:outline-none focus:ring-2 focus:ring-[var(--accent)]"
           aria-label="Drag to reorder"
           {...attributes}
           {...listeners}
         >
           <GripVertical className="h-4 w-4" />
         </button>
-        <div className="group">
-          {children}
-        </div>
+        {children}
       </div>
     </motion.div>
   )

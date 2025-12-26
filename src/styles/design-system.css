@@ -1,0 +1,786 @@
+/*
+ * SHERPA DESIGN SYSTEM
+ * A distinctive, premium DeFi interface aesthetic
+ *
+ * Design Philosophy: "Alpine Precision"
+ * - Clean lines with subtle depth
+ * - Warm neutrals with electric accents
+ * - Professional trading feel with approachable AI assistant
+ */
+
+/* ============================================
+   TYPOGRAPHY - Distinctive Font Stack
+   ============================================ */
+@import url('https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300..700;1,9..40,300..700&family=JetBrains+Mono:wght@400;500;600&family=Outfit:wght@300;400;500;600;700&display=swap');
+
+:root {
+  /* Primary fonts */
+  --font-display: 'Outfit', system-ui, sans-serif;
+  --font-body: 'DM Sans', system-ui, sans-serif;
+  --font-mono: 'JetBrains Mono', 'SF Mono', monospace;
+
+  /* Font sizes - refined scale */
+  --text-2xs: 0.625rem;   /* 10px */
+  --text-xs: 0.6875rem;   /* 11px */
+  --text-sm: 0.8125rem;   /* 13px */
+  --text-base: 0.9375rem; /* 15px */
+  --text-lg: 1.0625rem;   /* 17px */
+  --text-xl: 1.25rem;     /* 20px */
+  --text-2xl: 1.5rem;     /* 24px */
+  --text-3xl: 1.875rem;   /* 30px */
+  --text-4xl: 2.25rem;    /* 36px */
+
+  /* Line heights */
+  --leading-tight: 1.2;
+  --leading-snug: 1.35;
+  --leading-normal: 1.5;
+  --leading-relaxed: 1.65;
+
+  /* Letter spacing */
+  --tracking-tight: -0.02em;
+  --tracking-normal: 0;
+  --tracking-wide: 0.02em;
+  --tracking-wider: 0.04em;
+}
+
+/* ============================================
+   DARK THEME - "Midnight Alpine"
+   Deep blues with warm amber accents
+   ============================================ */
+:root {
+  /* Base palette */
+  --color-ink-1: #0a0c10;
+  --color-ink-2: #0e1117;
+  --color-ink-3: #141820;
+  --color-ink-4: #1a1f2a;
+  --color-ink-5: #232936;
+  --color-ink-6: #2d3444;
+
+  /* Text colors */
+  --color-text-primary: #f0f2f5;
+  --color-text-secondary: #a0a8b8;
+  --color-text-tertiary: #6b7280;
+  --color-text-inverse: #0a0c10;
+
+  /* Accent - Electric Amber */
+  --color-accent: #f5a623;
+  --color-accent-hover: #ffb740;
+  --color-accent-muted: rgba(245, 166, 35, 0.12);
+  --color-accent-strong: #e69500;
+
+  /* Secondary accent - Arctic Blue */
+  --color-secondary: #4da6ff;
+  --color-secondary-hover: #66b3ff;
+  --color-secondary-muted: rgba(77, 166, 255, 0.12);
+
+  /* Semantic colors */
+  --color-success: #34d399;
+  --color-success-muted: rgba(52, 211, 153, 0.12);
+  --color-warning: #fbbf24;
+  --color-warning-muted: rgba(251, 191, 36, 0.12);
+  --color-danger: #f87171;
+  --color-danger-muted: rgba(248, 113, 113, 0.12);
+
+  /* Borders and lines */
+  --color-line: rgba(255, 255, 255, 0.08);
+  --color-line-strong: rgba(255, 255, 255, 0.14);
+  --color-line-subtle: rgba(255, 255, 255, 0.04);
+
+  /* Interactive states */
+  --color-hover: rgba(255, 255, 255, 0.04);
+  --color-active: rgba(255, 255, 255, 0.08);
+  --color-focus: var(--color-accent);
+
+  /* Semantic mappings */
+  --bg: var(--color-ink-1);
+  --bg-elevated: var(--color-ink-2);
+  --surface: var(--color-ink-3);
+  --surface-2: var(--color-ink-4);
+  --surface-3: var(--color-ink-5);
+  --text: var(--color-text-primary);
+  --text-muted: var(--color-text-secondary);
+  --text-subtle: var(--color-text-tertiary);
+  --text-inverse: var(--color-text-inverse);
+  --accent: var(--color-accent);
+  --accent-hover: var(--color-accent-hover);
+  --accent-muted: var(--color-accent-muted);
+  --line: var(--color-line);
+  --success: var(--color-success);
+  --warning: var(--color-warning);
+  --danger: var(--color-danger);
+
+  /* Shadows - layered depth */
+  --shadow-xs: 0 1px 2px rgba(0, 0, 0, 0.3);
+  --shadow-sm: 0 2px 4px rgba(0, 0, 0, 0.25), 0 1px 2px rgba(0, 0, 0, 0.2);
+  --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.3), 0 2px 4px rgba(0, 0, 0, 0.2);
+  --shadow-lg: 0 8px 24px rgba(0, 0, 0, 0.35), 0 4px 8px rgba(0, 0, 0, 0.25);
+  --shadow-xl: 0 16px 48px rgba(0, 0, 0, 0.4), 0 8px 16px rgba(0, 0, 0, 0.3);
+  --shadow-glow: 0 0 20px rgba(245, 166, 35, 0.15);
+  --shadow-glow-blue: 0 0 20px rgba(77, 166, 255, 0.15);
+
+  /* Radii */
+  --radius-xs: 4px;
+  --radius-sm: 6px;
+  --radius-md: 8px;
+  --radius-lg: 12px;
+  --radius-xl: 16px;
+  --radius-2xl: 24px;
+  --radius-full: 9999px;
+
+  /* Spacing scale */
+  --space-0: 0;
+  --space-1: 0.25rem;  /* 4px */
+  --space-2: 0.5rem;   /* 8px */
+  --space-3: 0.75rem;  /* 12px */
+  --space-4: 1rem;     /* 16px */
+  --space-5: 1.25rem;  /* 20px */
+  --space-6: 1.5rem;   /* 24px */
+  --space-8: 2rem;     /* 32px */
+  --space-10: 2.5rem;  /* 40px */
+  --space-12: 3rem;    /* 48px */
+  --space-16: 4rem;    /* 64px */
+
+  /* Z-index scale */
+  --z-base: 0;
+  --z-elevated: 10;
+  --z-dropdown: 100;
+  --z-sticky: 200;
+  --z-modal: 300;
+  --z-toast: 400;
+  --z-tooltip: 500;
+
+  /* Transitions */
+  --duration-fast: 100ms;
+  --duration-normal: 200ms;
+  --duration-slow: 300ms;
+  --duration-slower: 500ms;
+  --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-in-out: cubic-bezier(0.4, 0, 0.2, 1);
+  --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+/* ============================================
+   LIGHT THEME - "Alpine Summit"
+   Crisp whites with warm accents
+   ============================================ */
+.theme-light,
+[data-theme="light"] {
+  --color-ink-1: #ffffff;
+  --color-ink-2: #fafbfc;
+  --color-ink-3: #f4f5f7;
+  --color-ink-4: #ebeef2;
+  --color-ink-5: #dfe3e8;
+  --color-ink-6: #c4cdd5;
+
+  --color-text-primary: #1a1f2a;
+  --color-text-secondary: #5a6370;
+  --color-text-tertiary: #8892a2;
+  --color-text-inverse: #ffffff;
+
+  --color-accent: #d4880f;
+  --color-accent-hover: #c27a0a;
+  --color-accent-muted: rgba(212, 136, 15, 0.1);
+
+  --color-secondary: #2563eb;
+  --color-secondary-hover: #1d4ed8;
+  --color-secondary-muted: rgba(37, 99, 235, 0.1);
+
+  --color-success: #059669;
+  --color-success-muted: rgba(5, 150, 105, 0.1);
+  --color-warning: #d97706;
+  --color-warning-muted: rgba(217, 119, 6, 0.1);
+  --color-danger: #dc2626;
+  --color-danger-muted: rgba(220, 38, 38, 0.1);
+
+  --color-line: rgba(0, 0, 0, 0.08);
+  --color-line-strong: rgba(0, 0, 0, 0.12);
+  --color-line-subtle: rgba(0, 0, 0, 0.04);
+
+  --color-hover: rgba(0, 0, 0, 0.04);
+  --color-active: rgba(0, 0, 0, 0.06);
+
+  --shadow-xs: 0 1px 2px rgba(0, 0, 0, 0.05);
+  --shadow-sm: 0 2px 4px rgba(0, 0, 0, 0.06), 0 1px 2px rgba(0, 0, 0, 0.04);
+  --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.08), 0 2px 4px rgba(0, 0, 0, 0.04);
+  --shadow-lg: 0 8px 24px rgba(0, 0, 0, 0.1), 0 4px 8px rgba(0, 0, 0, 0.06);
+  --shadow-xl: 0 16px 48px rgba(0, 0, 0, 0.12), 0 8px 16px rgba(0, 0, 0, 0.08);
+  --shadow-glow: 0 0 20px rgba(212, 136, 15, 0.2);
+  --shadow-glow-blue: 0 0 20px rgba(37, 99, 235, 0.2);
+}
+
+/* Backwards compatibility with existing theme-snow class */
+.theme-snow {
+  --bg: #ffffff;
+  --bg-elev: #fafbfc;
+  --surface: #f4f5f7;
+  --surface-2: #ebeef2;
+  --line: rgba(0, 0, 0, 0.08);
+  --text: #1a1f2a;
+  --text-muted: #5a6370;
+  --text-inverse: #ffffff;
+  --accent: #d4880f;
+  --accent-hover: #c27a0a;
+  --accent-muted: rgba(212, 136, 15, 0.1);
+  --success: #059669;
+  --warning: #d97706;
+  --danger: #dc2626;
+  --hover: rgba(0, 0, 0, 0.04);
+  --active: rgba(0, 0, 0, 0.06);
+  --shadow-1: 0 1px 2px rgba(0, 0, 0, 0.05);
+  --shadow-2: 0 2px 4px rgba(0, 0, 0, 0.06);
+  --shadow-3: 0 4px 8px rgba(0, 0, 0, 0.08);
+}
+
+/* ============================================
+   PERSONA THEMES
+   Each AI persona has its own accent color
+   ============================================ */
+[data-persona="friendly"] {
+  --persona-accent: #34d399;
+  --persona-accent-muted: rgba(52, 211, 153, 0.12);
+  --persona-glow: 0 0 20px rgba(52, 211, 153, 0.2);
+}
+
+[data-persona="technical"] {
+  --persona-accent: #a78bfa;
+  --persona-accent-muted: rgba(167, 139, 250, 0.12);
+  --persona-glow: 0 0 20px rgba(167, 139, 250, 0.2);
+}
+
+[data-persona="professional"] {
+  --persona-accent: #60a5fa;
+  --persona-accent-muted: rgba(96, 165, 250, 0.12);
+  --persona-glow: 0 0 20px rgba(96, 165, 250, 0.2);
+}
+
+[data-persona="educational"] {
+  --persona-accent: #fbbf24;
+  --persona-accent-muted: rgba(251, 191, 36, 0.12);
+  --persona-glow: 0 0 20px rgba(251, 191, 36, 0.2);
+}
+
+/* ============================================
+   BASE STYLES
+   ============================================ */
+*, *::before, *::after {
+  box-sizing: border-box;
+}
+
+html {
+  font-family: var(--font-body);
+  font-size: 16px;
+  line-height: var(--leading-normal);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+}
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+}
+
+/* Focus styles */
+:focus-visible {
+  outline: 2px solid var(--color-focus);
+  outline-offset: 2px;
+}
+
+/* Selection */
+::selection {
+  background: var(--accent-muted);
+  color: var(--text);
+}
+
+/* Scrollbar styling */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--color-line-strong);
+  border-radius: var(--radius-full);
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--color-text-tertiary);
+}
+
+/* ============================================
+   TYPOGRAPHY UTILITIES
+   ============================================ */
+.font-display {
+  font-family: var(--font-display);
+}
+
+.font-body {
+  font-family: var(--font-body);
+}
+
+.font-mono {
+  font-family: var(--font-mono);
+}
+
+.heading-1 {
+  font-family: var(--font-display);
+  font-size: var(--text-4xl);
+  font-weight: 600;
+  line-height: var(--leading-tight);
+  letter-spacing: var(--tracking-tight);
+}
+
+.heading-2 {
+  font-family: var(--font-display);
+  font-size: var(--text-3xl);
+  font-weight: 600;
+  line-height: var(--leading-tight);
+  letter-spacing: var(--tracking-tight);
+}
+
+.heading-3 {
+  font-family: var(--font-display);
+  font-size: var(--text-2xl);
+  font-weight: 600;
+  line-height: var(--leading-snug);
+}
+
+.heading-4 {
+  font-family: var(--font-display);
+  font-size: var(--text-xl);
+  font-weight: 600;
+  line-height: var(--leading-snug);
+}
+
+.body-lg {
+  font-size: var(--text-lg);
+  line-height: var(--leading-relaxed);
+}
+
+.body-base {
+  font-size: var(--text-base);
+  line-height: var(--leading-normal);
+}
+
+.body-sm {
+  font-size: var(--text-sm);
+  line-height: var(--leading-normal);
+}
+
+.caption {
+  font-size: var(--text-xs);
+  line-height: var(--leading-normal);
+  letter-spacing: var(--tracking-wide);
+}
+
+.label {
+  font-size: var(--text-xs);
+  font-weight: 500;
+  letter-spacing: var(--tracking-wider);
+  text-transform: uppercase;
+}
+
+/* ============================================
+   COMPONENT STYLES
+   ============================================ */
+
+/* Card */
+.sherpa-card {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+}
+
+.sherpa-card--elevated {
+  background: var(--surface-2);
+  box-shadow: var(--shadow-md);
+}
+
+.sherpa-card--glass {
+  background: rgba(20, 24, 32, 0.8);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+}
+
+/* Button base */
+.sherpa-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  font-family: var(--font-body);
+  font-size: var(--text-sm);
+  font-weight: 500;
+  line-height: 1;
+  padding: var(--space-2) var(--space-4);
+  border-radius: var(--radius-md);
+  border: none;
+  cursor: pointer;
+  transition: all var(--duration-fast) var(--ease-out);
+  white-space: nowrap;
+}
+
+.sherpa-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* Button variants */
+.sherpa-btn--primary {
+  background: var(--accent);
+  color: var(--text-inverse);
+}
+
+.sherpa-btn--primary:hover:not(:disabled) {
+  background: var(--accent-hover);
+  box-shadow: var(--shadow-glow);
+}
+
+.sherpa-btn--secondary {
+  background: var(--surface-2);
+  color: var(--text);
+  border: 1px solid var(--line);
+}
+
+.sherpa-btn--secondary:hover:not(:disabled) {
+  background: var(--surface-3);
+  border-color: var(--color-line-strong);
+}
+
+.sherpa-btn--ghost {
+  background: transparent;
+  color: var(--text-muted);
+}
+
+.sherpa-btn--ghost:hover:not(:disabled) {
+  background: var(--color-hover);
+  color: var(--text);
+}
+
+.sherpa-btn--accent {
+  background: var(--accent-muted);
+  color: var(--accent);
+  border: 1px solid transparent;
+}
+
+.sherpa-btn--accent:hover:not(:disabled) {
+  background: var(--accent);
+  color: var(--text-inverse);
+}
+
+/* Button sizes */
+.sherpa-btn--sm {
+  font-size: var(--text-xs);
+  padding: var(--space-1) var(--space-3);
+  border-radius: var(--radius-sm);
+}
+
+.sherpa-btn--lg {
+  font-size: var(--text-base);
+  padding: var(--space-3) var(--space-6);
+  border-radius: var(--radius-lg);
+}
+
+/* Input */
+.sherpa-input {
+  width: 100%;
+  padding: var(--space-3) var(--space-4);
+  font-family: var(--font-body);
+  font-size: var(--text-base);
+  color: var(--text);
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  transition: all var(--duration-fast) var(--ease-out);
+}
+
+.sherpa-input:focus {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-muted);
+}
+
+.sherpa-input::placeholder {
+  color: var(--text-subtle);
+}
+
+/* Badge */
+.sherpa-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  padding: var(--space-1) var(--space-2);
+  font-size: var(--text-2xs);
+  font-weight: 500;
+  letter-spacing: var(--tracking-wide);
+  border-radius: var(--radius-full);
+  text-transform: uppercase;
+}
+
+.sherpa-badge--default {
+  background: var(--surface-2);
+  color: var(--text-muted);
+}
+
+.sherpa-badge--accent {
+  background: var(--accent-muted);
+  color: var(--accent);
+}
+
+.sherpa-badge--success {
+  background: var(--color-success-muted);
+  color: var(--success);
+}
+
+.sherpa-badge--warning {
+  background: var(--color-warning-muted);
+  color: var(--warning);
+}
+
+.sherpa-badge--danger {
+  background: var(--color-danger-muted);
+  color: var(--danger);
+}
+
+/* Chip (interactive badge) */
+.sherpa-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  padding: var(--space-1) var(--space-3);
+  font-size: var(--text-xs);
+  font-weight: 500;
+  color: var(--text-muted);
+  background: var(--surface-2);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-full);
+  cursor: pointer;
+  transition: all var(--duration-fast) var(--ease-out);
+}
+
+.sherpa-chip:hover {
+  background: var(--surface-3);
+  color: var(--text);
+  border-color: var(--color-line-strong);
+}
+
+.sherpa-chip--active {
+  background: var(--accent-muted);
+  color: var(--accent);
+  border-color: var(--accent);
+}
+
+/* Avatar */
+.sherpa-avatar {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border-radius: var(--radius-md);
+  font-weight: 600;
+  font-size: var(--text-sm);
+}
+
+.sherpa-avatar--user {
+  background: linear-gradient(135deg, var(--accent), var(--color-accent-strong));
+  color: var(--text-inverse);
+}
+
+.sherpa-avatar--assistant {
+  background: var(--surface-2);
+  border: 1px solid var(--line);
+  color: var(--accent);
+}
+
+.sherpa-avatar--persona {
+  background: var(--persona-accent-muted, var(--accent-muted));
+  border: 1px solid var(--line);
+  color: var(--persona-accent, var(--accent));
+}
+
+/* Divider */
+.sherpa-divider {
+  height: 1px;
+  background: var(--line);
+  border: none;
+  margin: var(--space-4) 0;
+}
+
+.sherpa-divider--vertical {
+  width: 1px;
+  height: auto;
+  margin: 0 var(--space-4);
+}
+
+/* ============================================
+   ANIMATION KEYFRAMES
+   ============================================ */
+@keyframes shimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+
+@keyframes pulse-soft {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.6; }
+}
+
+@keyframes slide-up {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes slide-down {
+  from {
+    opacity: 0;
+    transform: translateY(-8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes scale-in {
+  from {
+    opacity: 0;
+    transform: scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes bounce-subtle {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-3px); }
+}
+
+@keyframes typing-dot {
+  0%, 60%, 100% {
+    opacity: 0.3;
+    transform: scale(0.8);
+  }
+  30% {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+.animate-shimmer {
+  background: linear-gradient(90deg,
+    var(--surface) 0%,
+    var(--surface-2) 50%,
+    var(--surface) 100%
+  );
+  background-size: 200% 100%;
+  animation: shimmer 1.5s infinite;
+}
+
+.animate-pulse-soft {
+  animation: pulse-soft 2s infinite;
+}
+
+.animate-slide-up {
+  animation: slide-up var(--duration-normal) var(--ease-out);
+}
+
+.animate-slide-down {
+  animation: slide-down var(--duration-normal) var(--ease-out);
+}
+
+.animate-fade-in {
+  animation: fade-in var(--duration-normal) var(--ease-out);
+}
+
+.animate-scale-in {
+  animation: scale-in var(--duration-normal) var(--ease-spring);
+}
+
+/* Staggered animation delays */
+.stagger-1 { animation-delay: 50ms; }
+.stagger-2 { animation-delay: 100ms; }
+.stagger-3 { animation-delay: 150ms; }
+.stagger-4 { animation-delay: 200ms; }
+.stagger-5 { animation-delay: 250ms; }
+
+/* ============================================
+   UTILITY CLASSES
+   ============================================ */
+.glass {
+  background: rgba(20, 24, 32, 0.7);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+}
+
+.glow {
+  box-shadow: var(--shadow-glow);
+}
+
+.glow-blue {
+  box-shadow: var(--shadow-glow-blue);
+}
+
+.gradient-border {
+  position: relative;
+}
+
+.gradient-border::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  padding: 1px;
+  border-radius: inherit;
+  background: linear-gradient(135deg, var(--accent), var(--color-secondary));
+  -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+  mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+  pointer-events: none;
+}
+
+.text-gradient {
+  background: linear-gradient(135deg, var(--accent), var(--color-secondary));
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+/* Noise texture overlay */
+.noise::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)'/%3E%3C/svg%3E");
+  opacity: 0.02;
+  pointer-events: none;
+  mix-blend-mode: overlay;
+}
+
+/* Reduced motion */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}

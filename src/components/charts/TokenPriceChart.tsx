@@ -26,6 +26,7 @@ type TokenPriceChartProps = {
   initialRange?: TokenChartParams['range']
   initialData?: TokenChartResponse | null
   onRangeChange?: (range: TokenChartParams['range']) => void
+  onExpand?: () => void
   showSelector?: boolean
 }
 
@@ -119,6 +120,7 @@ export function TokenPriceChart({
   initialRange = '7d',
   initialData = null,
   onRangeChange,
+  onExpand,
   showSelector = false,
 }: TokenPriceChartProps) {
   const [selectedToken, setSelectedToken] = useState<TokenOption | null>(() => {
@@ -261,7 +263,7 @@ export function TokenPriceChart({
     }
 
     const chart = createChart(containerRef.current, {
-      height: 400,
+      height: 320,
       layout: {
         background: { type: ColorType.Solid, color: 'transparent' },
         textColor: chartMutedColor,
@@ -285,8 +287,8 @@ export function TokenPriceChart({
         horzLine: { color: chartMutedColor, labelBackgroundColor: surfaceElevated },
         vertLine: { color: chartMutedColor, labelBackgroundColor: surfaceElevated },
       },
-      handleScale: { axisPressedMouseMove: true },
-      handleScroll: { vertTouchDrag: false },
+      handleScale: { axisPressedMouseMove: true, mouseWheel: false },
+      handleScroll: { mouseWheel: false, vertTouchDrag: false },
     })
 
     chartRef.current = chart
@@ -440,24 +442,35 @@ export function TokenPriceChart({
           </div>
         </div>
 
-        {/* Actions */}
-        <div className="flex items-center gap-1">
+        {/* Actions - more visible with backgrounds */}
+        <div className="flex items-center gap-1.5">
           <button
             type="button"
-            className="p-2 rounded-lg transition hover:bg-[var(--hover)]"
-            style={{ color: chartMutedColor }}
+            className="p-2 rounded-lg border transition hover:border-[var(--accent)] hover:text-[var(--accent)]"
+            style={{
+              color: chartTextColor,
+              borderColor: borderColor,
+              background: 'var(--surface-2)',
+            }}
             aria-label="Chart settings"
           >
             <Settings2 className="h-4 w-4" />
           </button>
-          <button
-            type="button"
-            className="p-2 rounded-lg transition hover:bg-[var(--hover)]"
-            style={{ color: chartMutedColor }}
-            aria-label="Expand chart"
-          >
-            <Maximize2 className="h-4 w-4" />
-          </button>
+          {onExpand && (
+            <button
+              type="button"
+              onClick={onExpand}
+              className="p-2 rounded-lg border transition hover:border-[var(--accent)] hover:text-[var(--accent)]"
+              style={{
+                color: chartTextColor,
+                borderColor: borderColor,
+                background: 'var(--surface-2)',
+              }}
+              aria-label="Expand chart"
+            >
+              <Maximize2 className="h-4 w-4" />
+            </button>
+          )}
         </div>
       </div>
 
@@ -471,7 +484,7 @@ export function TokenPriceChart({
             <div className="h-6 w-6 animate-spin rounded-full border-2 border-t-transparent" style={{ borderColor: accentColor }} />
           </div>
         )}
-        <div ref={containerRef} className="w-full" style={{ height: 400 }} />
+        <div ref={containerRef} className="w-full" style={{ height: 320 }} />
 
         {/* Range selector - overlaid at bottom of chart */}
         <div className="absolute bottom-4 left-4 z-10">

@@ -14,7 +14,9 @@
     "test": "vitest",
     "test:ci": "vitest run --pool=forks",
     "typecheck": "tsc -b --noEmit",
-    "workspace:status": "node scripts/workspace-status.js"
+    "workspace:status": "node scripts/workspace-status.js",
+    "convex:dev": "convex dev",
+    "convex:deploy": "convex deploy"
   },
   "dependencies": {
     "@dnd-kit/core": "^6.3.1",
@@ -26,6 +28,7 @@
     "@tanstack/react-query": "^5.55.0",
     "@web3modal/wagmi": "^5.1.5",
     "axios": "^1.7.7",
+    "convex": "^1.31.2",
     "framer-motion": "^11.3.24",
     "lightweight-charts": "^4.2.3",
     "lucide-react": "^0.454.0",
