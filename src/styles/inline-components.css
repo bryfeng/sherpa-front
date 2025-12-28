@@ -1,0 +1,386 @@
+/**
+ * INLINE COMPONENTS STYLES
+ *
+ * Clean, minimal styling for inline components in chat.
+ * Inspired by Perplexity's card-based approach.
+ */
+
+/* Base inline component */
+.inline-component {
+  margin: 16px 0;
+  border-radius: 12px;
+  border: 1px solid var(--line);
+  background: var(--surface);
+  overflow: hidden;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.inline-component:hover {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 1px var(--accent-muted);
+}
+
+/* Header (optional) */
+.inline-component__header {
+  padding: 10px 16px;
+  border-bottom: 1px solid var(--line);
+  background: var(--surface-2);
+}
+
+.inline-component__title {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+/* Content area */
+.inline-component__content {
+  padding: 16px;
+}
+
+/* Variant sizing - more generous widths for better content display */
+.inline-component--compact {
+  max-width: 400px;
+}
+
+.inline-component--standard {
+  max-width: 100%;  /* Full width within the message area */
+}
+
+.inline-component--expanded {
+  max-width: 100%;
+}
+
+/* Container for multiple inline components */
+.inline-components-container {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-top: 12px;
+}
+
+/* Loading state */
+.inline-component--loading {
+  min-height: 120px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.inline-component--loading .inline-component__content {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-muted);
+}
+
+/* Error state */
+.inline-component--error {
+  border-color: var(--danger);
+}
+
+.inline-component--error .inline-component__content {
+  color: var(--danger);
+  text-align: center;
+}
+
+/* Interactive hint */
+.inline-component--interactive {
+  cursor: default;
+}
+
+.inline-component--interactive:hover {
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+/* Swap form specific adjustments */
+.inline-component .swap-widget {
+  padding: 0;
+}
+
+/* Portfolio card adjustments */
+.inline-component .portfolio-widget {
+  padding: 0;
+}
+
+/* Price ticker adjustments */
+.inline-component .price-ticker-widget {
+  padding: 0;
+}
+
+/* =========================================================
+   ENHANCED PORTFOLIO CARD
+   ========================================================= */
+
+.enhanced-portfolio-card {
+  background: var(--surface);
+  border-radius: 12px;
+  overflow: hidden;
+}
+
+/* Portfolio Header */
+.portfolio-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px;
+  border-radius: 12px;
+  transition: background-color 0.15s ease;
+}
+
+.portfolio-header__main {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  flex: 1;
+}
+
+.portfolio-header__value {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.portfolio-header__meta {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-top: 4px;
+}
+
+.portfolio-header__expand {
+  padding: 4px;
+  opacity: 0.6;
+  transition: opacity 0.15s ease;
+}
+
+.portfolio-header:hover .portfolio-header__expand {
+  opacity: 1;
+}
+
+.portfolio-view-full-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 8px;
+  font-size: 12px;
+  color: var(--accent);
+  background: transparent;
+  border: 1px solid var(--accent);
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.portfolio-view-full-btn:hover {
+  background: var(--accent);
+  color: var(--bg);
+}
+
+/* Portfolio Token List */
+.portfolio-tokens {
+  border-top: 1px solid var(--line);
+}
+
+.portfolio-show-more {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 12px;
+  cursor: pointer;
+  transition: background-color 0.15s ease;
+  border-radius: 0 0 12px 12px;
+}
+
+/* =========================================================
+   PORTFOLIO TOKEN ROW
+   ========================================================= */
+
+.portfolio-token-row {
+  border-bottom: 1px solid var(--line);
+}
+
+.portfolio-token-row:last-child {
+  border-bottom: none;
+}
+
+.portfolio-token-row__main {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 16px;
+  cursor: pointer;
+  transition: background-color 0.15s ease;
+}
+
+.portfolio-token-row__main:hover {
+  background: var(--surface-2);
+}
+
+.portfolio-token-row__expand-icon {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.portfolio-token-row__avatar {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 11px;
+  font-weight: 600;
+  flex-shrink: 0;
+}
+
+.portfolio-token-row__info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  flex: 1;
+  min-width: 0;
+}
+
+.portfolio-token-row__symbol {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.portfolio-token-row__allocation {
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+.portfolio-token-row__values {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 2px;
+  min-width: 80px;
+}
+
+.portfolio-token-row__usd {
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--text);
+  font-variant-numeric: tabular-nums;
+}
+
+.portfolio-token-row__change {
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+}
+
+.portfolio-token-row__sparkline {
+  width: 60px;
+  height: 24px;
+  flex-shrink: 0;
+  /* Placeholder for Phase 2 sparklines */
+}
+
+.portfolio-token-row__actions {
+  position: relative;
+  flex-shrink: 0;
+}
+
+.portfolio-token-row__action-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  background: transparent;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  color: var(--text-muted);
+  transition: all 0.15s ease;
+}
+
+.portfolio-token-row__action-btn:hover {
+  background: var(--surface-2);
+  color: var(--text);
+}
+
+/* Expanded Details */
+.portfolio-token-row__details {
+  overflow: hidden;
+}
+
+.portfolio-token-row__details-inner {
+  padding: 8px 16px 16px 56px;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 12px;
+}
+
+.portfolio-token-row__detail {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.portfolio-token-row__detail-label {
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--text-muted);
+}
+
+.portfolio-token-row__detail-value {
+  font-size: 13px;
+  color: var(--text);
+}
+
+.portfolio-token-row__contract {
+  font-family: 'SF Mono', 'Monaco', 'Inconsolata', monospace;
+  font-size: 12px;
+}
+
+/* =========================================================
+   PORTFOLIO TOKEN ACTIONS MENU
+   ========================================================= */
+
+.portfolio-actions-menu {
+  position: absolute;
+  top: 100%;
+  right: 0;
+  margin-top: 4px;
+  min-width: 120px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  z-index: 100;
+  overflow: hidden;
+}
+
+.portfolio-actions-menu__item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 10px 12px;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  color: var(--text);
+  font-size: 13px;
+  text-align: left;
+  transition: background-color 0.15s ease;
+}
+
+.portfolio-actions-menu__item:hover {
+  background: var(--surface-2);
+}
+
+.portfolio-actions-menu__item:not(:last-child) {
+  border-bottom: 1px solid var(--line);
+}
