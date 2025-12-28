@@ -11,7 +11,7 @@
   border-radius: 12px;
   border: 1px solid var(--line);
   background: var(--surface);
-  overflow: hidden;
+  overflow: visible; /* Allow action menus to overflow */
   transition: border-color 0.2s ease, box-shadow 0.2s ease;
 }
 
@@ -182,6 +182,7 @@
 /* Portfolio Token List */
 .portfolio-tokens {
   border-top: 1px solid var(--line);
+  /* Removed padding-bottom - using overflow: visible instead */
 }
 
 .portfolio-show-more {
@@ -288,6 +289,8 @@
 .portfolio-token-row__actions {
   position: relative;
   flex-shrink: 0;
+  /* Ensure menu can overflow */
+  z-index: 10;
 }
 
 .portfolio-token-row__action-btn {

@@ -18,25 +18,23 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { useSherpaStore } from './store'
 import type { PersonaId } from './store'
 
-// Widget Store
-import { useWidgetStore, useWidgetPicker } from './store/widget-store'
-
 // Services
 import { api } from './services/api'
 
 // Types
 import type { EntitlementSnapshot } from './types/entitlement'
 import type { LLMProviderInfo } from './types/llm'
-import type { Widget } from './types/widget-system'
 
 // Components
 import { PersonaSelector } from './components/header/PersonaSelector'
 import { SettingsMenu } from './components/header/SettingsMenu'
+import { WalletMenu } from './components/header/WalletMenu'
+import { PortfolioPanel } from './components/portfolio'
 import { ToastProvider } from './providers/ToastProvider'
 import WidgetPlayground from './pages/WidgetPlayground'
 
-// Widget Components
-import { WidgetBase, WidgetGrid, WidgetPicker, WidgetContent } from './components/widgets'
+// Chat Component
+import { ChatInterface } from './components/chat/ChatInterface'
 
 // Hooks
 import { usePortfolioSummary } from './workspace/hooks'
@@ -285,18 +283,18 @@ function useHealthCheck() {
 }
 
 // ============================================
-// CHAT PANEL COMPONENT
+// CHAT PANEL COMPONENT (with Inline Components)
 // ============================================
 
 interface ChatPanelProps {
   walletAddress?: string
   llmModel?: string
+  isPro?: boolean
+  persona: PersonaId
   onPortfolioRequested: () => void
 }
 
-function ChatPanel({ walletAddress, llmModel, onPortfolioRequested }: ChatPanelProps) {
-  const addWidget = useWidgetStore((s) => s.addWidget)
-
+function ChatPanel({ walletAddress, llmModel, isPro = false, persona, onPortfolioRequested }: ChatPanelProps) {
   const {
     messages,
     inputValue,
@@ -305,122 +303,43 @@ function ChatPanel({ walletAddress, llmModel, onPortfolioRequested }: ChatPanelP
     inputRef,
     setInputValue,
     send,
-    canSend,
+    insertPrompt,
+    prefersReducedMotion,
   } = useChatEngine({
     walletAddress,
     llmModel,
-    onNewWidgets: (widgets) => {
-      // Add widgets from chat to workspace
-      widgets.forEach((w) => {
-        addWidget({
-          kind: w.kind as any,
-          title: w.title,
-          payload: w.payload,
-        })
-      })
-    },
     onPortfolioRequested,
   })
 
-  const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === 'Enter' && !e.shiftKey) {
-      e.preventDefault()
-      send()
+  // Handle action buttons in messages
+  const handleAction = useCallback((action: any) => {
+    if (action.type === 'show_panel') {
+      // Panel actions could trigger a follow-up message
+      insertPrompt(`Show me more about ${action.label}`)
+    } else if (action.type === 'swap') {
+      insertPrompt('I want to swap tokens')
+    } else if (action.type === 'simulate') {
+      insertPrompt(`Simulate ${action.params?.symbol || 'this position'}`)
     }
-  }
+  }, [insertPrompt])
 
   return (
-    <div className="flex flex-col h-full">
-      {/* Messages */}
-      <div
-        ref={scrollRef}
-        className="flex-1 overflow-y-auto p-4 space-y-4"
-        style={{ minHeight: '300px', maxHeight: 'calc(100vh - 400px)' }}
-      >
-        {messages.length === 0 ? (
-          <div className="text-center py-8">
-            <div
-              className="w-16 h-16 rounded-2xl mx-auto mb-4 flex items-center justify-center"
-              style={{ background: 'var(--accent-muted)' }}
-            >
-              <svg
-                className="w-8 h-8"
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke="currentColor"
-                style={{ color: 'var(--accent)' }}
-              >
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
-              </svg>
-            </div>
-            <h3 className="font-semibold mb-2" style={{ color: 'var(--text)' }}>
-              Start a conversation
-            </h3>
-            <p className="text-sm" style={{ color: 'var(--text-muted)' }}>
-              Ask me about your portfolio, market trends, or DeFi strategies.
-            </p>
-          </div>
-        ) : (
-          messages.map((msg) => (
-            <div
-              key={msg.id}
-              className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}
-            >
-              <div
-                className={`max-w-[80%] px-4 py-3 rounded-2xl ${
-                  msg.role === 'user' ? 'rounded-br-md' : 'rounded-bl-md'
-                }`}
-                style={{
-                  background: msg.role === 'user' ? 'var(--accent)' : 'var(--surface-2)',
-                  color: msg.role === 'user' ? 'var(--text-inverse)' : 'var(--text)',
-                }}
-              >
-                {msg.typing ? (
-                  <div className="flex gap-1">
-                    <span className="w-2 h-2 rounded-full bg-current animate-bounce" style={{ animationDelay: '0ms' }} />
-                    <span className="w-2 h-2 rounded-full bg-current animate-bounce" style={{ animationDelay: '150ms' }} />
-                    <span className="w-2 h-2 rounded-full bg-current animate-bounce" style={{ animationDelay: '300ms' }} />
-                  </div>
-                ) : (
-                  <p className="text-sm whitespace-pre-wrap">{msg.text}</p>
-                )}
-              </div>
-            </div>
-          ))
-        )}
-      </div>
-
-      {/* Input */}
-      <div className="p-4 border-t" style={{ borderColor: 'var(--line)' }}>
-        <div
-          className="flex items-end gap-2 p-3 rounded-xl"
-          style={{ background: 'var(--surface-2)', border: '1px solid var(--line)' }}
-        >
-          <textarea
-            ref={inputRef}
-            value={inputValue}
-            onChange={(e) => setInputValue(e.target.value)}
-            onKeyDown={handleKeyDown}
-            placeholder="Ask Sherpa anything..."
-            rows={1}
-            className="flex-1 resize-none outline-none text-sm bg-transparent"
-            style={{ color: 'var(--text)', minHeight: '24px', maxHeight: '120px' }}
-          />
-          <button
-            onClick={send}
-            disabled={!canSend || isTyping}
-            className="p-2 rounded-lg transition-colors disabled:opacity-50"
-            style={{
-              background: canSend ? 'var(--accent)' : 'var(--surface)',
-              color: canSend ? 'var(--text-inverse)' : 'var(--text-muted)',
-            }}
-          >
-            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
-            </svg>
-          </button>
-        </div>
-      </div>
+    <div className="h-full" style={{ minHeight: 'calc(100vh - 200px)' }}>
+      <ChatInterface
+        messages={messages}
+        persona={persona}
+        inputValue={inputValue}
+        isTyping={isTyping}
+        onInputChange={setInputValue}
+        onSend={send}
+        onAction={handleAction}
+        onQuickAction={insertPrompt}
+        scrollRef={scrollRef}
+        inputRef={inputRef}
+        prefersReducedMotion={prefersReducedMotion}
+        walletAddress={walletAddress}
+        isPro={isPro}
+      />
     </div>
   )
 }
@@ -443,18 +362,14 @@ function MainApp() {
   const wallet = useSherpaStore((s) => s.wallet)
   const setProOverride = useSherpaStore((s) => s.setProOverride)
 
-  // Widget store
-  const widgets = useWidgetStore((s) => s.widgets)
-  const { isOpen: isPickerOpen } = useWidgetPicker()
-
   // Manual wallet state (for when WalletConnect isn't available)
   const [manualWallet, setManualWallet] = useState<{
     address: string
     chain: 'ethereum' | 'solana'
   } | null>(null)
 
-  // Workspace visibility
-  const [workspaceVisible, setWorkspaceVisible] = useState(true)
+  // Portfolio panel state
+  const [showPortfolioPanel, setShowPortfolioPanel] = useState(false)
 
   // Web3 hooks
   const { disconnect: disconnectEvm } = useWagmiDisconnect()
@@ -592,20 +507,6 @@ function MainApp() {
     />
   )
 
-  // Widget renderer
-  const renderWidget = useCallback(
-    (widget: Widget) => (
-      <WidgetBase widget={widget}>
-        <WidgetContent
-          widget={widget}
-          walletAddress={wallet.address ?? undefined}
-          isPro={isPro}
-        />
-      </WidgetBase>
-    ),
-    [wallet.address, isPro]
-  )
-
   return (
     <div
       className="min-h-screen flex flex-col"
@@ -723,21 +624,11 @@ function MainApp() {
 
             {/* Wallet */}
             {wallet.address ? (
-              <motion.button
-                onClick={handleDisconnect}
-                className="flex items-center gap-2 px-3 py-2 rounded-lg"
-                style={{ background: 'var(--surface-2)', border: '1px solid var(--line)' }}
-                whileHover={{ scale: 1.02 }}
-                whileTap={{ scale: 0.98 }}
-              >
-                <div className="w-2 h-2 rounded-full" style={{ background: 'var(--success)' }} />
-                <span className="text-sm font-mono font-medium" style={{ color: 'var(--text)' }}>
-                  {wallet.address.slice(0, 6)}...{wallet.address.slice(-4)}
-                </span>
-                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" style={{ color: 'var(--text-muted)' }}>
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                </svg>
-              </motion.button>
+              <WalletMenu
+                address={wallet.address}
+                onDisconnect={handleDisconnect}
+                onViewPortfolio={() => setShowPortfolioPanel(true)}
+              />
             ) : (
               <motion.button
                 onClick={handleConnect}
@@ -756,103 +647,42 @@ function MainApp() {
         </div>
       </header>
 
-      {/* Main Content */}
-      <main className="flex-1 px-6 py-6">
+      {/* Main Content - Full Width Chat */}
+      <main className="flex-1 flex justify-center px-4 py-6">
         <div
-          className="rounded-xl overflow-hidden"
+          className="w-full"
           style={{
-            background: 'var(--surface)',
-            border: '1px solid var(--line)',
-            maxWidth: '1800px',
-            margin: '0 auto',
+            maxWidth: '900px',
           }}
         >
-          {/* Workspace Toggle */}
-          <div
-            className="flex items-center justify-between px-4 py-3 border-b"
-            style={{ borderColor: 'var(--line)', background: 'var(--surface-2)' }}
-          >
-            <div className="flex items-center gap-3">
-              <motion.button
-                onClick={() => setWorkspaceVisible(!workspaceVisible)}
-                className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm font-medium"
-                style={{ background: 'var(--surface)', border: '1px solid var(--line)', color: 'var(--text)' }}
-                whileHover={{ borderColor: 'var(--accent)' }}
-                whileTap={{ scale: 0.98 }}
-              >
-                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  {workspaceVisible ? (
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                  ) : (
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-                  )}
-                </svg>
-                <span>Workspace</span>
-                {widgets.length > 0 && (
-                  <span
-                    className="px-1.5 py-0.5 text-xs rounded-full"
-                    style={{ background: 'var(--accent-muted)', color: 'var(--accent)' }}
-                  >
-                    {widgets.length}
-                  </span>
-                )}
-              </motion.button>
-            </div>
-          </div>
-
-          {/* Split Layout */}
-          <div className="flex flex-col lg:flex-row">
-            {/* Chat Panel */}
-            <div
-              className={`${workspaceVisible ? 'lg:w-[400px] lg:border-r' : 'flex-1'} flex-shrink-0`}
-              style={{ borderColor: 'var(--line)' }}
-            >
-              <div
-                className="px-4 py-3 border-b"
-                style={{ borderColor: 'var(--line)' }}
-              >
-                <div className="flex items-center justify-between">
-                  <span
-                    className="text-xs font-medium uppercase tracking-wider"
-                    style={{ color: 'var(--text-muted)' }}
-                  >
-                    Chat
-                  </span>
-                  <span
-                    className="px-2 py-0.5 text-xs rounded-full"
-                    style={{ background: 'var(--accent-muted)', color: 'var(--accent)' }}
-                  >
-                    Active
-                  </span>
-                </div>
-              </div>
-              <ChatPanel
-                walletAddress={wallet.address ?? undefined}
-                llmModel={llmModel}
-                onPortfolioRequested={refreshPortfolio}
-              />
-            </div>
-
-            {/* Workspace Panel */}
-            <AnimatePresence>
-              {workspaceVisible && (
-                <motion.div
-                  initial={{ opacity: 0, width: 0 }}
-                  animate={{ opacity: 1, width: 'auto' }}
-                  exit={{ opacity: 0, width: 0 }}
-                  transition={{ duration: 0.2 }}
-                  className="flex-1 overflow-hidden"
-                >
-                  <WidgetGrid renderWidget={renderWidget} />
-                </motion.div>
-              )}
-            </AnimatePresence>
-          </div>
+          <ChatPanel
+            walletAddress={wallet.address ?? undefined}
+            llmModel={llmModel}
+            isPro={isPro}
+            persona={persona}
+            onPortfolioRequested={refreshPortfolio}
+          />
         </div>
       </main>
 
-      {/* Widget Picker Modal */}
-      <WidgetPicker hasPro={isPro} walletAddress={wallet.address} />
+      {/* Portfolio Panel */}
+      <PortfolioPanel
+        isOpen={showPortfolioPanel}
+        onClose={() => setShowPortfolioPanel(false)}
+        walletAddress={wallet.address ?? undefined}
+        chain={wallet.chain}
+        onTokenAction={(action, token) => {
+          setShowPortfolioPanel(false)
+          // Insert prompt for the action
+          if (action === 'swap') {
+            useSherpaStore.getState().setInputValue(`Swap ${token.symbol}`)
+          } else if (action === 'send') {
+            useSherpaStore.getState().setInputValue(`Send ${token.symbol}`)
+          } else if (action === 'chart') {
+            useSherpaStore.getState().setInputValue(`Show ${token.symbol} chart`)
+          }
+        }}
+      />
     </div>
   )
 }

@@ -8,3 +8,4 @@
 export { EnhancedPortfolioCard } from './EnhancedPortfolioCard'
 export { PortfolioTokenRow } from './PortfolioTokenRow'
 export { PortfolioTokenActions } from './PortfolioTokenActions'
+export { PortfolioPanel } from './PortfolioPanel'

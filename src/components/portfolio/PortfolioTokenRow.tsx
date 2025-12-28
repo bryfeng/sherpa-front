@@ -146,6 +146,7 @@ export function PortfolioTokenRow({
                 token={position}
                 onAction={handleAction}
                 onClose={() => setShowActions(false)}
+                triggerRef={actionButtonRef}
               />
             )}
           </AnimatePresence>

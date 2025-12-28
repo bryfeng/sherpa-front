@@ -18,10 +18,10 @@ import {
   PanelRightClose,
   Wallet,
   Plus,
-  ChevronDown,
 } from 'lucide-react'
 import { useSherpaStore, useTheme, usePersona } from '../../store'
 import { PersonaSelector } from '../header/PersonaSelector'
+import { WalletMenu } from '../header/WalletMenu'
 import { ResizablePanel } from '../ui/ResizablePanel'
 import '../../styles/design-system.css'
 
@@ -85,6 +85,7 @@ interface HeaderProps {
   onDisconnect?: () => void
   onNewChat?: () => void
   onOpenSettings?: () => void
+  onViewPortfolio?: () => void
 }
 
 function Header({
@@ -93,14 +94,10 @@ function Header({
   onDisconnect,
   onNewChat,
   onOpenSettings,
+  onViewPortfolio,
 }: HeaderProps) {
   const { theme, toggleTheme } = useTheme()
   const { persona, setPersona } = usePersona()
-
-  // Truncate wallet address
-  const displayAddress = walletAddress
-    ? `${walletAddress.slice(0, 6)}...${walletAddress.slice(-4)}`
-    : null
 
   return (
     <header
@@ -189,31 +186,11 @@ function Header({
 
           {/* Wallet */}
           {walletAddress ? (
-            <motion.button
-              onClick={onDisconnect}
-              className="flex items-center gap-2 px-3 py-2 rounded-lg"
-              style={{
-                background: 'var(--surface-2)',
-                border: '1px solid var(--line)',
-              }}
-              whileHover={{ scale: 1.02 }}
-              whileTap={{ scale: 0.98 }}
-            >
-              <div
-                className="w-2 h-2 rounded-full"
-                style={{ background: 'var(--success)' }}
-              />
-              <span
-                className="text-sm font-mono font-medium"
-                style={{ color: 'var(--text)' }}
-              >
-                {displayAddress}
-              </span>
-              <ChevronDown
-                className="w-4 h-4"
-                style={{ color: 'var(--text-muted)' }}
-              />
-            </motion.button>
+            <WalletMenu
+              address={walletAddress}
+              onDisconnect={onDisconnect || (() => {})}
+              onViewPortfolio={onViewPortfolio}
+            />
           ) : (
             <motion.button
               onClick={onConnect}
@@ -329,6 +306,7 @@ export interface AppShellProps {
   onDisconnect?: () => void
   onNewChat?: () => void
   onOpenSettings?: () => void
+  onViewPortfolio?: () => void
 
   // Workspace props
   workspaceVisible?: boolean
@@ -347,6 +325,7 @@ export function AppShell({
   onDisconnect,
   onNewChat,
   onOpenSettings,
+  onViewPortfolio,
   workspaceVisible = false,
   onToggleWorkspace,
   widgetCount = 0,
@@ -383,6 +362,7 @@ export function AppShell({
         onDisconnect={onDisconnect}
         onNewChat={onNewChat}
         onOpenSettings={onOpenSettings}
+        onViewPortfolio={onViewPortfolio}
       />
 
       <main className="flex-1 px-6 py-8">
