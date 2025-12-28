@@ -59,7 +59,7 @@ function SortableWidget({ widget, children, isLocked }: SortableWidgetProps) {
     transition,
     opacity: isDragging ? 0.5 : 1,
     gridColumn: `span ${widget.size.cols}`,
-    gridRow: `span ${widget.size.rows}`,
+    // Let content determine height instead of spanning fixed rows
     zIndex: isDragging ? 10 : 1,
   }
 
@@ -445,7 +445,7 @@ export function WidgetGrid({ renderWidget, className = '' }: WidgetGridProps) {
                 className="grid gap-4"
                 style={{
                   gridTemplateColumns: `repeat(${layout.columns}, minmax(0, 1fr))`,
-                  gridAutoRows: `${layout.rowHeight}px`,
+                  gridAutoRows: 'auto',
                 }}
               >
                 {sortedWidgets.map((widget) => (
@@ -460,7 +460,7 @@ export function WidgetGrid({ renderWidget, className = '' }: WidgetGridProps) {
 
                 {/* Add widget placeholder */}
                 {!isLocked && (
-                  <div style={{ gridColumn: 'span 4', gridRow: 'span 2' }}>
+                  <div style={{ gridColumn: 'span 4' }}>
                     <WidgetPlaceholder onAddWidget={(cat) => openPicker(cat)} />
                   </div>
                 )}

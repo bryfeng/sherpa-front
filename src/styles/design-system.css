@@ -776,6 +776,37 @@ body {
   mix-blend-mode: overlay;
 }
 
+/* ============================================
+   PERSONA UTILITY CLASSES
+   Apply persona-specific accents to any element
+   ============================================ */
+.persona-accent {
+  color: var(--persona-accent, var(--accent));
+}
+
+.persona-accent-bg {
+  background: var(--persona-accent-muted, var(--accent-muted));
+}
+
+.persona-accent-border {
+  border-color: var(--persona-accent, var(--accent));
+}
+
+.persona-glow {
+  box-shadow: var(--persona-glow, var(--shadow-glow));
+}
+
+/* Direct persona color classes */
+.text-persona-friendly { color: #34d399; }
+.text-persona-technical { color: #a78bfa; }
+.text-persona-professional { color: #60a5fa; }
+.text-persona-educational { color: #fbbf24; }
+
+.bg-persona-friendly { background: rgba(52, 211, 153, 0.12); }
+.bg-persona-technical { background: rgba(167, 139, 250, 0.12); }
+.bg-persona-professional { background: rgba(96, 165, 250, 0.12); }
+.bg-persona-educational { background: rgba(251, 191, 36, 0.12); }
+
 /* Reduced motion */
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after {

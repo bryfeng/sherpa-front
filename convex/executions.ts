@@ -1,6 +1,67 @@
 import { mutation, query, internalMutation } from "./_generated/server";
 import { v } from "convex/values";
 
+// ============================================
+// State Machine Types
+// ============================================
+
+const stateValidator = v.union(
+  v.literal("idle"),
+  v.literal("analyzing"),
+  v.literal("planning"),
+  v.literal("awaiting_approval"),
+  v.literal("executing"),
+  v.literal("monitoring"),
+  v.literal("completed"),
+  v.literal("failed"),
+  v.literal("paused"),
+  v.literal("cancelled")
+);
+
+const stepValidator = v.object({
+  id: v.string(),
+  stepNumber: v.number(),
+  description: v.string(),
+  actionType: v.string(),
+  status: v.string(),
+  startedAt: v.optional(v.number()),
+  completedAt: v.optional(v.number()),
+  inputData: v.optional(v.any()),
+  outputData: v.optional(v.any()),
+  txHash: v.optional(v.string()),
+  chainId: v.optional(v.number()),
+  gasUsed: v.optional(v.number()),
+  gasPriceGwei: v.optional(v.number()),
+  errorMessage: v.optional(v.string()),
+  retryCount: v.number(),
+});
+
+const transitionValidator = v.object({
+  id: v.string(),
+  fromState: v.string(),
+  toState: v.string(),
+  trigger: v.string(),
+  timestamp: v.number(),
+  reason: v.optional(v.string()),
+  context: v.optional(v.any()),
+  errorMessage: v.optional(v.string()),
+  errorCode: v.optional(v.string()),
+});
+
+// ============================================
+// Queries
+// ============================================
+
+/**
+ * Get an execution by ID
+ */
+export const get = query({
+  args: { executionId: v.id("strategyExecutions") },
+  handler: async (ctx, args) => {
+    return await ctx.db.get(args.executionId);
+  },
+});
+
 /**
  * List executions for a strategy
  */
@@ -38,60 +99,196 @@ export const getWithDecisions = query({
 });
 
 /**
- * Create a new execution (internal - called by scheduler or actions)
+ * Get active executions for a wallet
  */
-export const create = internalMutation({
-  args: { strategyId: v.id("strategies") },
+export const listActiveByWallet = query({
+  args: { walletAddress: v.string() },
   handler: async (ctx, args) => {
-    return await ctx.db.insert("strategyExecutions", {
-      strategyId: args.strategyId,
-      status: "pending",
-      createdAt: Date.now(),
-    });
+    const activeStates = [
+      "analyzing",
+      "planning",
+      "awaiting_approval",
+      "executing",
+      "monitoring",
+    ];
+
+    const executions = await ctx.db
+      .query("strategyExecutions")
+      .withIndex("by_wallet", (q) => q.eq("walletAddress", args.walletAddress))
+      .collect();
+
+    return executions.filter((e) => activeStates.includes(e.currentState));
   },
 });
 
 /**
- * Start an execution
+ * Get executions by state
  */
-export const start = mutation({
-  args: { executionId: v.id("strategyExecutions") },
-  handler: async (ctx, args) => {
-    await ctx.db.patch(args.executionId, {
-      status: "running",
-      startedAt: Date.now(),
-    });
-  },
-});
-
-/**
- * Complete an execution successfully
- */
-export const complete = mutation({
+export const listByState = query({
   args: {
-    executionId: v.id("strategyExecutions"),
-    result: v.optional(v.any()),
+    state: stateValidator,
+    limit: v.optional(v.number()),
+  },
+  handler: async (ctx, args) => {
+    const limit = args.limit ?? 100;
+    return await ctx.db
+      .query("strategyExecutions")
+      .withIndex("by_state", (q) => q.eq("currentState", args.state))
+      .order("desc")
+      .take(limit);
+  },
+});
+
+/**
+ * Get running executions (for monitoring)
+ */
+export const getRunning = query({
+  args: {},
+  handler: async (ctx) => {
+    const activeStates = ["analyzing", "planning", "executing", "monitoring"];
+    const executions = await ctx.db.query("strategyExecutions").collect();
+    return executions.filter((e) => activeStates.includes(e.currentState));
+  },
+});
+
+/**
+ * Get recent failed executions (for monitoring)
+ */
+export const getRecentFailed = query({
+  args: { limit: v.optional(v.number()) },
+  handler: async (ctx, args) => {
+    return await ctx.db
+      .query("strategyExecutions")
+      .withIndex("by_state", (q) => q.eq("currentState", "failed"))
+      .order("desc")
+      .take(args.limit || 10);
+  },
+});
+
+/**
+ * Get executions awaiting approval
+ */
+export const getAwaitingApproval = query({
+  args: { walletAddress: v.optional(v.string()) },
+  handler: async (ctx, args) => {
+    const executions = await ctx.db
+      .query("strategyExecutions")
+      .withIndex("by_state", (q) => q.eq("currentState", "awaiting_approval"))
+      .collect();
+
+    if (args.walletAddress) {
+      return executions.filter((e) => e.walletAddress === args.walletAddress);
+    }
+    return executions;
+  },
+});
+
+// ============================================
+// Mutations - Creation
+// ============================================
+
+/**
+ * Create a new execution
+ */
+export const create = mutation({
+  args: {
+    strategyId: v.id("strategies"),
+    walletAddress: v.string(),
+    metadata: v.optional(v.any()),
   },
   handler: async (ctx, args) => {
     const now = Date.now();
-
-    await ctx.db.patch(args.executionId, {
-      status: "completed",
-      completedAt: now,
-      result: args.result,
+    return await ctx.db.insert("strategyExecutions", {
+      strategyId: args.strategyId,
+      walletAddress: args.walletAddress,
+      currentState: "idle",
+      stateEnteredAt: now,
+      steps: [],
+      currentStepIndex: 0,
+      stateHistory: [],
+      requiresApproval: false,
+      recoverable: true,
+      metadata: args.metadata,
+      createdAt: now,
     });
+  },
+});
 
-    // Update the strategy's lastExecutedAt
+/**
+ * Create a new execution (internal - called by scheduler or actions)
+ */
+export const createInternal = internalMutation({
+  args: {
+    strategyId: v.id("strategies"),
+    walletAddress: v.string(),
+  },
+  handler: async (ctx, args) => {
+    const now = Date.now();
+    return await ctx.db.insert("strategyExecutions", {
+      strategyId: args.strategyId,
+      walletAddress: args.walletAddress,
+      currentState: "idle",
+      stateEnteredAt: now,
+      steps: [],
+      currentStepIndex: 0,
+      stateHistory: [],
+      requiresApproval: false,
+      recoverable: true,
+      createdAt: now,
+    });
+  },
+});
+
+// ============================================
+// Mutations - State Machine
+// ============================================
+
+/**
+ * Update execution state (called by state machine)
+ */
+export const updateState = mutation({
+  args: {
+    executionId: v.id("strategyExecutions"),
+    currentState: stateValidator,
+    stateEnteredAt: v.number(),
+    transition: transitionValidator,
+    startedAt: v.optional(v.number()),
+    completedAt: v.optional(v.number()),
+    errorMessage: v.optional(v.string()),
+    errorCode: v.optional(v.string()),
+    recoverable: v.optional(v.boolean()),
+  },
+  handler: async (ctx, args) => {
     const execution = await ctx.db.get(args.executionId);
-    if (execution) {
+    if (!execution) {
+      throw new Error(`Execution ${args.executionId} not found`);
+    }
+
+    // Add transition to history
+    const stateHistory = [...execution.stateHistory, args.transition];
+
+    const updates: Record<string, unknown> = {
+      currentState: args.currentState,
+      stateEnteredAt: args.stateEnteredAt,
+      stateHistory,
+    };
+
+    if (args.startedAt !== undefined) updates.startedAt = args.startedAt;
+    if (args.completedAt !== undefined) updates.completedAt = args.completedAt;
+    if (args.errorMessage !== undefined) updates.errorMessage = args.errorMessage;
+    if (args.errorCode !== undefined) updates.errorCode = args.errorCode;
+    if (args.recoverable !== undefined) updates.recoverable = args.recoverable;
+
+    await ctx.db.patch(args.executionId, updates);
+
+    // Update strategy lastExecutedAt on completion
+    if (args.currentState === "completed") {
       const strategy = await ctx.db.get(execution.strategyId);
       if (strategy) {
+        const now = Date.now();
         await ctx.db.patch(execution.strategyId, {
           lastExecutedAt: now,
-          // Calculate next execution time based on cron (placeholder: 1 hour)
-          nextExecutionAt: strategy.cronExpression
-            ? now + 3600000
-            : undefined,
+          nextExecutionAt: strategy.cronExpression ? now + 3600000 : undefined,
           updatedAt: now,
         });
       }
@@ -100,21 +297,74 @@ export const complete = mutation({
 });
 
 /**
- * Fail an execution
+ * Update execution steps
  */
-export const fail = mutation({
+export const updateSteps = mutation({
   args: {
     executionId: v.id("strategyExecutions"),
-    error: v.string(),
+    steps: v.array(stepValidator),
+    currentStepIndex: v.number(),
   },
   handler: async (ctx, args) => {
     await ctx.db.patch(args.executionId, {
-      status: "failed",
-      completedAt: Date.now(),
-      error: args.error,
+      steps: args.steps,
+      currentStepIndex: args.currentStepIndex,
     });
   },
 });
+
+/**
+ * Set approval info
+ */
+export const setApproval = mutation({
+  args: {
+    executionId: v.id("strategyExecutions"),
+    requiresApproval: v.boolean(),
+    approvalReason: v.optional(v.string()),
+    approvedBy: v.optional(v.string()),
+    approvedAt: v.optional(v.number()),
+  },
+  handler: async (ctx, args) => {
+    await ctx.db.patch(args.executionId, {
+      requiresApproval: args.requiresApproval,
+      approvalReason: args.approvalReason,
+      approvedBy: args.approvedBy,
+      approvedAt: args.approvedAt,
+    });
+  },
+});
+
+/**
+ * Full state sync (for recovery/debugging)
+ */
+export const syncState = mutation({
+  args: {
+    executionId: v.id("strategyExecutions"),
+    currentState: stateValidator,
+    stateEnteredAt: v.number(),
+    steps: v.array(stepValidator),
+    currentStepIndex: v.number(),
+    stateHistory: v.array(transitionValidator),
+    startedAt: v.optional(v.number()),
+    completedAt: v.optional(v.number()),
+    requiresApproval: v.boolean(),
+    approvalReason: v.optional(v.string()),
+    approvedBy: v.optional(v.string()),
+    approvedAt: v.optional(v.number()),
+    errorMessage: v.optional(v.string()),
+    errorCode: v.optional(v.string()),
+    recoverable: v.boolean(),
+    metadata: v.optional(v.any()),
+  },
+  handler: async (ctx, args) => {
+    const { executionId, ...data } = args;
+    await ctx.db.patch(executionId, data);
+  },
+});
+
+// ============================================
+// Mutations - Agent Decisions
+// ============================================
 
 /**
  * Add an agent decision to an execution
@@ -138,32 +388,5 @@ export const addDecision = mutation({
       riskAssessment: args.riskAssessment,
       createdAt: Date.now(),
     });
-  },
-});
-
-/**
- * Get running executions (for monitoring)
- */
-export const getRunning = query({
-  args: {},
-  handler: async (ctx) => {
-    return await ctx.db
-      .query("strategyExecutions")
-      .withIndex("by_status", (q) => q.eq("status", "running"))
-      .collect();
-  },
-});
-
-/**
- * Get recent failed executions (for monitoring)
- */
-export const getRecentFailed = query({
-  args: { limit: v.optional(v.number()) },
-  handler: async (ctx, args) => {
-    return await ctx.db
-      .query("strategyExecutions")
-      .withIndex("by_status", (q) => q.eq("status", "failed"))
-      .order("desc")
-      .take(args.limit || 10);
   },
 });

@@ -26,7 +26,9 @@ import {
 } from 'lucide-react'
 import type { AgentAction, AgentMessage } from '../../types/defi-ui'
 import type { PersonaId } from '../../store'
+import { InlineComponentRenderer } from '../inline'
 import '../../styles/design-system.css'
+import '../../styles/inline-components.css'
 
 // ============================================
 // PERSONA CONFIGURATION
@@ -335,6 +337,8 @@ interface MessageBubbleProps {
   message: AgentMessage
   persona: PersonaId
   onAction: (action: AgentAction) => void
+  walletAddress?: string
+  isPro?: boolean
   prefersReducedMotion?: boolean
 }
 
@@ -342,6 +346,8 @@ const MessageBubble = memo(function MessageBubble({
   message,
   persona,
   onAction,
+  walletAddress,
+  isPro = false,
   prefersReducedMotion,
 }: MessageBubbleProps) {
   const isUser = message.role === 'user'
@@ -373,57 +379,76 @@ const MessageBubble = memo(function MessageBubble({
         )}
       </div>
 
-      {/* Message content */}
-      <div
-        className="max-w-[75%] rounded-xl px-4 py-3"
-        style={{
-          background: isUser ? 'var(--accent)' : 'var(--surface)',
-          color: isUser ? 'var(--text-inverse)' : 'var(--text)',
-          border: isUser ? 'none' : '1px solid var(--line)',
-          boxShadow: 'var(--shadow-sm)',
-        }}
-      >
-        {/* Typing indicator or content */}
-        {message.typing ? (
-          <TypingIndicator persona={persona} />
-        ) : (
-          <>
-            {isUser ? (
-              <p className="text-sm whitespace-pre-wrap">{message.text}</p>
-            ) : (
-              <MarkdownContent text={message.text} />
-            )}
-          </>
-        )}
+      {/* Message content + Inline components (vertical stack) */}
+      <div className="flex-1 flex flex-col gap-3 min-w-0">
+        {/* Message bubble */}
+        <div
+          className="rounded-xl px-4 py-3"
+          style={{
+            background: isUser ? 'var(--accent)' : 'var(--surface)',
+            color: isUser ? 'var(--text-inverse)' : 'var(--text)',
+            border: isUser ? 'none' : '1px solid var(--line)',
+            boxShadow: 'var(--shadow-sm)',
+            maxWidth: isUser ? '85%' : '100%',
+            marginLeft: isUser ? 'auto' : undefined,
+          }}
+        >
+          {/* Typing indicator or content */}
+          {message.typing ? (
+            <TypingIndicator persona={persona} />
+          ) : (
+            <>
+              {isUser ? (
+                <p className="text-sm whitespace-pre-wrap">{message.text}</p>
+              ) : (
+                <MarkdownContent text={message.text} />
+              )}
+            </>
+          )}
 
-        {/* Action buttons */}
-        {actions.length > 0 && (
-          <div className="mt-3 flex flex-wrap gap-2">
-            {actions.map((action) => (
-              <ActionButton
-                key={action.id}
-                action={action}
-                onClick={() => onAction(action)}
-                isUserMessage={isUser}
+          {/* Action buttons */}
+          {actions.length > 0 && (
+            <div className="mt-3 flex flex-wrap gap-2">
+              {actions.map((action) => (
+                <ActionButton
+                  key={action.id}
+                  action={action}
+                  onClick={() => onAction(action)}
+                  isUserMessage={isUser}
+                />
+              ))}
+            </div>
+          )}
+
+          {/* Sources */}
+          {sources.length > 0 && (
+            <div
+              className="mt-3 pt-2 flex flex-wrap items-center gap-2 text-xs border-t"
+              style={{
+                borderColor: isUser
+                  ? 'rgba(255, 255, 255, 0.15)'
+                  : 'var(--line)',
+                color: isUser ? 'rgba(255, 255, 255, 0.7)' : 'var(--text-muted)',
+              }}
+            >
+              <span>Sources:</span>
+              {sources.map((source, i) => (
+                <SourceBadge key={i} source={source} />
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* Inline components (BELOW the bubble, stacked vertically) */}
+        {!isUser && message.components && message.components.length > 0 && (
+          <div className="inline-components-container">
+            {message.components.map((component) => (
+              <InlineComponentRenderer
+                key={component.id}
+                component={component}
+                walletAddress={walletAddress}
+                isPro={isPro}
               />
-            ))}
-          </div>
-        )}
-
-        {/* Sources */}
-        {sources.length > 0 && (
-          <div
-            className="mt-3 pt-2 flex flex-wrap items-center gap-2 text-xs border-t"
-            style={{
-              borderColor: isUser
-                ? 'rgba(255, 255, 255, 0.15)'
-                : 'var(--line)',
-              color: isUser ? 'rgba(255, 255, 255, 0.7)' : 'var(--text-muted)',
-            }}
-          >
-            <span>Sources:</span>
-            {sources.map((source, i) => (
-              <SourceBadge key={i} source={source} />
             ))}
           </div>
         )}
@@ -603,6 +628,8 @@ export interface ChatInterfaceProps {
   inputRef?: React.RefObject<HTMLTextAreaElement>
   prefersReducedMotion?: boolean
   ariaAnnouncement?: string
+  walletAddress?: string
+  isPro?: boolean
 }
 
 export function ChatInterface({
@@ -618,6 +645,8 @@ export function ChatInterface({
   inputRef,
   prefersReducedMotion,
   ariaAnnouncement,
+  walletAddress,
+  isPro = false,
 }: ChatInterfaceProps) {
   return (
     <div
@@ -639,6 +668,8 @@ export function ChatInterface({
               message={message}
               persona={persona}
               onAction={onAction}
+              walletAddress={walletAddress}
+              isPro={isPro}
               prefersReducedMotion={prefersReducedMotion}
             />
           ))}

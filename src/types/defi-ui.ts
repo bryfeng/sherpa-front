@@ -1,5 +1,31 @@
 import type { PersonaId as Persona } from './persona'
 
+// ============================================
+// INLINE COMPONENTS (Perplexity-style)
+// ============================================
+
+export type InlineComponentKind =
+  | 'portfolio-card'
+  | 'swap-form'
+  | 'price-chart'
+  | 'token-list'
+  | 'action-card'
+
+export type InlineComponentVariant = 'compact' | 'standard' | 'expanded'
+
+export interface InlineComponent {
+  id: string
+  kind: InlineComponentKind
+  payload: Record<string, any>
+  variant?: InlineComponentVariant
+  title?: string
+  createdAt: number
+}
+
+// ============================================
+// ACTIONS
+// ============================================
+
 export type ActionType = 'show_panel' | 'swap' | 'bridge' | 'explain' | 'subscribe' | 'simulate'
 
 export type AgentAction = {
@@ -34,6 +60,7 @@ export type AgentMessage = {
   text: string
   actions?: AgentAction[]
   panels?: string[]
+  components?: InlineComponent[]  // Inline rich components
   sources?: any[]
   typing?: boolean
   persona?: Persona

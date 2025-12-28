@@ -1,18 +1,27 @@
-import { internalAction, internalMutation } from "./_generated/server";
+import { internalAction, internalMutation, internalQuery } from "./_generated/server";
 import { internal } from "./_generated/api";
+import { v } from "convex/values";
+import { Doc } from "./_generated/dataModel";
 
 /**
  * Check for strategies that need execution and trigger them
  */
 export const checkTriggers = internalAction({
   args: {},
-  handler: async (ctx) => {
+  handler: async (ctx): Promise<void> => {
     const now = Date.now();
 
-    // Get active strategies where nextExecutionAt <= now
-    const strategies = await ctx.runQuery(internal.scheduler.getReadyStrategies);
+    // Get all active strategies
+    const strategies: Doc<"strategies">[] = await ctx.runQuery(
+      internal.scheduler.getAllActiveStrategies
+    );
 
-    for (const strategy of strategies) {
+    // Filter to ones ready for execution
+    const readyStrategies = strategies.filter(
+      (s) => s.nextExecutionAt && s.nextExecutionAt <= now
+    );
+
+    for (const strategy of readyStrategies) {
       try {
         // Create execution record
         const executionId = await ctx.runMutation(internal.executions.create, {
@@ -38,7 +47,9 @@ export const checkTriggers = internalAction({
           });
 
           if (!response.ok) {
-            console.error(`Failed to trigger execution for strategy ${strategy._id}`);
+            console.error(
+              `Failed to trigger execution for strategy ${strategy._id}`
+            );
           }
         }
 
@@ -55,31 +66,11 @@ export const checkTriggers = internalAction({
 });
 
 /**
- * Get strategies ready for execution (internal query)
- */
-export const getReadyStrategies = internalAction({
-  args: {},
-  handler: async (ctx) => {
-    const now = Date.now();
-
-    // This would normally be a query, but we need to filter by nextExecutionAt
-    // For now, we fetch all active strategies and filter in memory
-    const strategies = await ctx.runQuery(internal.scheduler.getAllActiveStrategies);
-
-    return strategies.filter(
-      (s: any) => s.nextExecutionAt && s.nextExecutionAt <= now
-    );
-  },
-});
-
-/**
  * Get all active strategies (internal query for scheduler)
  */
-import { internalQuery } from "./_generated/server";
-
 export const getAllActiveStrategies = internalQuery({
   args: {},
-  handler: async (ctx) => {
+  handler: async (ctx): Promise<Doc<"strategies">[]> => {
     return await ctx.db
       .query("strategies")
       .withIndex("by_status", (q) => q.eq("status", "active"))
@@ -95,7 +86,7 @@ export const updateNextExecution = internalMutation({
     strategyId: v.id("strategies"),
     lastExecutedAt: v.number(),
   },
-  handler: async (ctx, args) => {
+  handler: async (ctx, args): Promise<void> => {
     const strategy = await ctx.db.get(args.strategyId);
     if (!strategy) return;
 
@@ -116,7 +107,7 @@ export const updateNextExecution = internalMutation({
  */
 export const cleanupSessions = internalMutation({
   args: {},
-  handler: async (ctx) => {
+  handler: async (ctx): Promise<{ deletedCount: number }> => {
     const now = Date.now();
 
     const expiredSessions = await ctx.db
@@ -132,5 +123,92 @@ export const cleanupSessions = internalMutation({
   },
 });
 
-// Import v for the mutation args
-import { v } from "convex/values";
+/**
+ * Clean up expired nonces
+ */
+export const cleanupNonces = internalMutation({
+  args: {},
+  handler: async (ctx): Promise<{ deletedCount: number }> => {
+    const now = Date.now();
+
+    const expiredNonces = await ctx.db
+      .query("nonces")
+      .withIndex("by_expiry", (q) => q.lt("expiresAt", now))
+      .collect();
+
+    for (const nonce of expiredNonces) {
+      await ctx.db.delete(nonce._id);
+    }
+
+    return { deletedCount: expiredNonces.length };
+  },
+});
+
+/**
+ * Clean up old rate limit records
+ */
+export const cleanupRateLimits = internalMutation({
+  args: {},
+  handler: async (ctx): Promise<{ deletedCount: number }> => {
+    const now = Date.now();
+    // Delete records older than 1 hour (they're no longer needed)
+    const cutoff = now - 60 * 60 * 1000;
+
+    const allRecords = await ctx.db.query("rateLimits").collect();
+
+    let deletedCount = 0;
+    for (const record of allRecords) {
+      const windowEnd = record.windowStart + record.windowSeconds * 1000;
+      if (windowEnd < cutoff) {
+        await ctx.db.delete(record._id);
+        deletedCount++;
+      }
+    }
+
+    return { deletedCount };
+  },
+});
+
+/**
+ * Clean up expired session keys
+ */
+export const cleanupSessionKeys = internalMutation({
+  args: {},
+  handler: async (ctx): Promise<{ expiredCount: number; deletedCount: number }> => {
+    const now = Date.now();
+
+    // Mark expired sessions
+    const activeSessions = await ctx.db
+      .query("sessionKeys")
+      .filter((q) => q.eq(q.field("status"), "active"))
+      .collect();
+
+    let expiredCount = 0;
+    for (const session of activeSessions) {
+      if (session.expiresAt < now) {
+        await ctx.db.patch(session._id, {
+          status: "expired",
+        });
+        expiredCount++;
+      }
+    }
+
+    // Delete old sessions (expired or revoked more than 30 days ago)
+    const cutoff = now - 30 * 24 * 60 * 60 * 1000;
+    const allSessions = await ctx.db.query("sessionKeys").collect();
+
+    let deletedCount = 0;
+    for (const session of allSessions) {
+      const shouldDelete =
+        (session.status === "expired" && session.expiresAt < cutoff) ||
+        (session.status === "revoked" && session.revokedAt && session.revokedAt < cutoff);
+
+      if (shouldDelete) {
+        await ctx.db.delete(session._id);
+        deletedCount++;
+      }
+    }
+
+    return { expiredCount, deletedCount };
+  },
+});

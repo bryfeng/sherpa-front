@@ -34,7 +34,7 @@ export function InlineComponentRenderer({
   const { kind, payload, variant = 'standard', title } = component
 
   switch (kind) {
-    case 'portfolio-card':
+    case 'portfolio-card': {
       // Use address from payload if available, otherwise fall back to connected wallet
       const portfolioAddress = payload?.address || payload?.wallet_address || walletAddress
       return (
@@ -49,6 +49,7 @@ export function InlineComponentRenderer({
           />
         </InlineCard>
       )
+    }
 
     case 'swap-form':
       return (

@@ -10,8 +10,42 @@ import { useReducedMotion } from 'framer-motion'
 import { useSherpaStore } from '../store'
 import { api } from '../services/api'
 import { transformBackendPanels } from '../services/panels'
-import type { AgentMessage } from '../types/defi-ui'
+import type { AgentMessage, InlineComponent, InlineComponentKind, InlineComponentVariant } from '../types/defi-ui'
 import type { Widget } from '../types/widgets'
+
+// Map backend panel kinds to inline component kinds
+function panelKindToComponentKind(panelKind: string): InlineComponentKind {
+  const mapping: Record<string, InlineComponentKind> = {
+    'portfolio': 'portfolio-card',
+    'chart': 'price-chart',
+    'prices': 'token-list',
+    'trending': 'token-list',
+    'swap': 'swap-form',
+    'table': 'token-list',
+    'card': 'action-card',
+    'prediction': 'action-card',
+  }
+  return mapping[panelKind] || 'action-card'
+}
+
+// Get appropriate variant for component kind
+function getVariantForKind(kind: string): InlineComponentVariant {
+  if (kind === 'swap' || kind === 'chart') return 'expanded'
+  if (kind === 'prices' || kind === 'trending' || kind === 'table') return 'standard'
+  return 'standard'
+}
+
+// Convert backend panels to inline components
+function panelsToInlineComponents(panels: any[]): InlineComponent[] {
+  return panels.map((panel) => ({
+    id: `comp_${panel.id || Math.random().toString(36).slice(2, 9)}`,
+    kind: panelKindToComponentKind(panel.kind),
+    payload: panel.payload ?? {},
+    variant: getVariantForKind(panel.kind),
+    title: panel.title,
+    createdAt: Date.now(),
+  }))
+}
 
 // Generate unique IDs
 function uid(prefix = 'id') {
@@ -170,7 +204,7 @@ export function useChatEngine(options: UseChatEngineOptions) {
         }
       }
 
-      // Process panels into widgets
+      // Process panels into inline components
       const newPanels = transformBackendPanels(response.panels)
       const portfolioRequested = newPanels.some((p) => p.kind === 'portfolio')
 
@@ -178,28 +212,33 @@ export function useChatEngine(options: UseChatEngineOptions) {
         onPortfolioRequested?.()
       }
 
-      // Convert non-portfolio panels to widgets
-      const nonPortfolioWidgets = newPanels
-        .filter((p) => p.kind !== 'portfolio')
-        .map((panel): Widget => ({
-          id: panel.id,
-          kind: panel.kind,
-          title: panel.title,
-          payload: panel.payload ?? {},
-          sources: [],
-          density: panel.kind === 'chart' ? 'full' : 'rail',
-        }))
+      // Convert panels to inline components (embedded in message)
+      const inlineComponents = panelsToInlineComponents(newPanels)
 
-      if (nonPortfolioWidgets.length > 0) {
-        onNewWidgets?.(nonPortfolioWidgets)
+      // Also send to widgets callback for backwards compatibility (optional)
+      if (onNewWidgets && newPanels.length > 0) {
+        const nonPortfolioWidgets = newPanels
+          .filter((p) => p.kind !== 'portfolio')
+          .map((panel): Widget => ({
+            id: panel.id,
+            kind: panel.kind,
+            title: panel.title,
+            payload: panel.payload ?? {},
+            sources: [],
+            density: panel.kind === 'chart' ? 'full' : 'rail',
+          }))
+        if (nonPortfolioWidgets.length > 0) {
+          onNewWidgets(nonPortfolioWidgets)
+        }
       }
 
-      // Remove typing indicator and add response
+      // Remove typing indicator and add response with embedded components
       removeMessage(typingId)
       addMessage({
         id: uid('msg'),
         role: 'assistant',
         text: response.reply || 'Done.',
+        components: inlineComponents.length > 0 ? inlineComponents : undefined,
         sources: response.sources,
       })
 

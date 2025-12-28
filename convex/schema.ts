@@ -76,20 +76,76 @@ export default defineSchema({
 
   strategyExecutions: defineTable({
     strategyId: v.id("strategies"),
-    status: v.union(
-      v.literal("pending"),
-      v.literal("running"),
+    walletAddress: v.string(),
+    // State machine state
+    currentState: v.union(
+      v.literal("idle"),
+      v.literal("analyzing"),
+      v.literal("planning"),
+      v.literal("awaiting_approval"),
+      v.literal("executing"),
+      v.literal("monitoring"),
       v.literal("completed"),
-      v.literal("failed")
+      v.literal("failed"),
+      v.literal("paused"),
+      v.literal("cancelled")
     ),
+    stateEnteredAt: v.number(),
+    // Execution steps
+    steps: v.array(
+      v.object({
+        id: v.string(),
+        stepNumber: v.number(),
+        description: v.string(),
+        actionType: v.string(),
+        status: v.string(),
+        startedAt: v.optional(v.number()),
+        completedAt: v.optional(v.number()),
+        inputData: v.optional(v.any()),
+        outputData: v.optional(v.any()),
+        txHash: v.optional(v.string()),
+        chainId: v.optional(v.number()),
+        gasUsed: v.optional(v.number()),
+        gasPriceGwei: v.optional(v.number()),
+        errorMessage: v.optional(v.string()),
+        retryCount: v.number(),
+      })
+    ),
+    currentStepIndex: v.number(),
+    // State history
+    stateHistory: v.array(
+      v.object({
+        id: v.string(),
+        fromState: v.string(),
+        toState: v.string(),
+        trigger: v.string(),
+        timestamp: v.number(),
+        reason: v.optional(v.string()),
+        context: v.optional(v.any()),
+        errorMessage: v.optional(v.string()),
+        errorCode: v.optional(v.string()),
+      })
+    ),
+    // Timing
     startedAt: v.optional(v.number()),
     completedAt: v.optional(v.number()),
-    result: v.optional(v.any()),
-    error: v.optional(v.string()),
+    // Approval
+    requiresApproval: v.boolean(),
+    approvalReason: v.optional(v.string()),
+    approvedBy: v.optional(v.string()),
+    approvedAt: v.optional(v.number()),
+    // Error info
+    errorMessage: v.optional(v.string()),
+    errorCode: v.optional(v.string()),
+    recoverable: v.boolean(),
+    // Metadata
+    metadata: v.optional(v.any()),
     createdAt: v.number(),
   })
     .index("by_strategy", ["strategyId"])
-    .index("by_status", ["status"]),
+    .index("by_state", ["currentState"])
+    .index("by_wallet", ["walletAddress"])
+    .index("by_wallet_state", ["walletAddress", "currentState"]),
 
   // ============================================
   // Transactions
@@ -140,15 +196,32 @@ export default defineSchema({
   }).index("by_execution", ["executionId"]),
 
   // ============================================
-  // Sessions & Auth
+  // Auth: Nonces (for SIWE)
   // ============================================
-  sessions: defineTable({
+  nonces: defineTable({
     walletAddress: v.string(),
-    chainId: v.number(),
     nonce: v.string(),
     expiresAt: v.number(),
     createdAt: v.number(),
   })
+    .index("by_wallet", ["walletAddress"])
+    .index("by_wallet_nonce", ["walletAddress", "nonce"])
+    .index("by_expiry", ["expiresAt"]),
+
+  // ============================================
+  // Auth: Sessions
+  // ============================================
+  sessions: defineTable({
+    sessionId: v.string(),
+    walletAddress: v.string(),
+    chainId: v.number(),
+    userId: v.optional(v.string()),
+    walletId: v.optional(v.string()),
+    scopes: v.array(v.string()),
+    expiresAt: v.number(),
+    createdAt: v.number(),
+  })
+    .index("by_session_id", ["sessionId"])
     .index("by_wallet", ["walletAddress"])
     .index("by_expiry", ["expiresAt"]),
 
@@ -161,4 +234,147 @@ export default defineSchema({
     windowStart: v.number(),
     windowSeconds: v.number(),
   }).index("by_key", ["key"]),
+
+  // ============================================
+  // Session Keys (for autonomous agent access)
+  // ============================================
+  sessionKeys: defineTable({
+    sessionId: v.string(),
+    walletAddress: v.string(),
+    agentId: v.optional(v.string()),
+    // Permissions
+    permissions: v.array(v.string()), // ["swap", "bridge", "transfer"]
+    // Value limits
+    valueLimits: v.object({
+      maxValuePerTxUsd: v.string(), // Decimal as string
+      maxTotalValueUsd: v.string(),
+      maxTransactions: v.optional(v.number()),
+      totalValueUsedUsd: v.string(),
+      transactionCount: v.number(),
+    }),
+    // Allowlists
+    chainAllowlist: v.array(v.number()),
+    contractAllowlist: v.array(v.string()),
+    tokenAllowlist: v.array(v.string()),
+    // Timing
+    createdAt: v.number(),
+    expiresAt: v.number(),
+    // Status
+    status: v.union(
+      v.literal("active"),
+      v.literal("expired"),
+      v.literal("revoked"),
+      v.literal("exhausted")
+    ),
+    revokedAt: v.optional(v.number()),
+    revokeReason: v.optional(v.string()),
+    lastUsedAt: v.optional(v.number()),
+    // Usage log (recent entries only)
+    usageLog: v.optional(v.array(v.any())),
+  })
+    .index("by_session_id", ["sessionId"])
+    .index("by_wallet", ["walletAddress"])
+    .index("by_wallet_status", ["walletAddress", "status"])
+    .index("by_expiry", ["expiresAt"])
+    .index("by_agent", ["agentId"]),
+
+  // ============================================
+  // Admin: Users (separate from regular users)
+  // ============================================
+  admin_users: defineTable({
+    email: v.string(),
+    passwordHash: v.string(),
+    name: v.string(),
+    role: v.union(
+      v.literal("viewer"),
+      v.literal("support"),
+      v.literal("operator"),
+      v.literal("admin"),
+      v.literal("super_admin")
+    ),
+    avatar: v.optional(v.string()),
+    isActive: v.boolean(),
+    failedLoginAttempts: v.number(),
+    lockedUntil: v.optional(v.number()),
+    lastLoginAt: v.optional(v.number()),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+    createdBy: v.optional(v.id("admin_users")),
+  })
+    .index("by_email", ["email"])
+    .index("by_role", ["role"])
+    .index("by_active", ["isActive"]),
+
+  // ============================================
+  // Admin: Sessions
+  // ============================================
+  admin_sessions: defineTable({
+    sessionId: v.string(),
+    adminUserId: v.id("admin_users"),
+    expiresAt: v.number(),
+    createdAt: v.number(),
+    ipAddress: v.optional(v.string()),
+    userAgent: v.optional(v.string()),
+  })
+    .index("by_session_id", ["sessionId"])
+    .index("by_admin_user", ["adminUserId"])
+    .index("by_expiry", ["expiresAt"]),
+
+  // ============================================
+  // Admin: Audit Log
+  // ============================================
+  audit_log: defineTable({
+    adminUserId: v.id("admin_users"),
+    action: v.string(),
+    targetType: v.string(),
+    targetId: v.optional(v.string()),
+    details: v.optional(v.any()),
+    ipAddress: v.optional(v.string()),
+    createdAt: v.number(),
+  })
+    .index("by_admin", ["adminUserId"])
+    .index("by_action", ["action"])
+    .index("by_target", ["targetType", "targetId"])
+    .index("by_created", ["createdAt"]),
+
+  // ============================================
+  // Admin: User Flags (moderation)
+  // ============================================
+  user_flags: defineTable({
+    userId: v.id("users"),
+    flagType: v.union(
+      v.literal("verified"),
+      v.literal("banned"),
+      v.literal("suspended"),
+      v.literal("pro_override"),
+      v.literal("rate_limit_override")
+    ),
+    reason: v.optional(v.string()),
+    expiresAt: v.optional(v.number()),
+    createdBy: v.id("admin_users"),
+    createdAt: v.number(),
+  })
+    .index("by_user", ["userId"])
+    .index("by_user_type", ["userId", "flagType"])
+    .index("by_type", ["flagType"]),
+
+  // ============================================
+  // Admin: System Metrics
+  // ============================================
+  system_metrics: defineTable({
+    metricType: v.string(),
+    date: v.string(),
+    data: v.object({
+      totalUsers: v.optional(v.number()),
+      activeUsers: v.optional(v.number()),
+      newUsers: v.optional(v.number()),
+      totalStrategies: v.optional(v.number()),
+      activeStrategies: v.optional(v.number()),
+      totalTransactions: v.optional(v.number()),
+      transactionVolume: v.optional(v.number()),
+      chatMessages: v.optional(v.number()),
+      errors: v.optional(v.number()),
+    }),
+    createdAt: v.number(),
+  }).index("by_type_date", ["metricType", "date"]),
 });
