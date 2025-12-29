@@ -38,7 +38,7 @@ export const getDashboardStats = query({
     // Get failed strategy executions in last 24h
     const executions = await ctx.db.query("strategyExecutions").collect();
     const recentErrors = executions.filter(
-      (e) => e.status === "failed" && e.createdAt > oneDayAgo
+      (e) => e.currentState === "failed" && e.createdAt > oneDayAgo
     );
 
     // Estimate active users (users with activity in last 24h)
@@ -75,7 +75,7 @@ export const getSystemHealth = query({
     const oneDayAgo = Date.now() - 24 * 60 * 60 * 1000;
     const executions = await ctx.db.query("strategyExecutions").collect();
     const recentExecutions = executions.filter((e) => e.createdAt > oneDayAgo);
-    const recentErrors = recentExecutions.filter((e) => e.status === "failed");
+    const recentErrors = recentExecutions.filter((e) => e.currentState === "failed");
 
     const errorRate =
       recentExecutions.length > 0
@@ -150,10 +150,10 @@ export const getActivityFeed = query({
       events.push({
         id: `exec_${execution._id}`,
         type:
-          execution.status === "failed" ? "error" : "strategy_execution",
+          execution.currentState === "failed" ? "error" : "strategy_execution",
         message:
-          execution.status === "failed"
-            ? `Strategy execution failed: ${execution.error || "Unknown error"}`
+          execution.currentState === "failed"
+            ? `Strategy execution failed: ${execution.errorMessage || "Unknown error"}`
             : `Strategy "${strategy?.name || "Unknown"}" executed successfully`,
         timestamp: execution.createdAt,
       });

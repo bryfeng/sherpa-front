@@ -390,3 +390,89 @@ export const addDecision = mutation({
     });
   },
 });
+
+// ============================================
+// Mutations - Status Updates (for HTTP handlers)
+// ============================================
+
+/**
+ * Mark an execution as completed
+ */
+export const complete = mutation({
+  args: {
+    executionId: v.id("strategyExecutions"),
+    result: v.optional(v.any()),
+  },
+  handler: async (ctx, args) => {
+    const execution = await ctx.db.get(args.executionId);
+    if (!execution) {
+      throw new Error(`Execution ${args.executionId} not found`);
+    }
+
+    const now = Date.now();
+    const transition = {
+      id: `tr_${now}`,
+      fromState: execution.currentState,
+      toState: "completed",
+      trigger: "complete_called",
+      timestamp: now,
+    };
+
+    await ctx.db.patch(args.executionId, {
+      currentState: "completed",
+      stateEnteredAt: now,
+      completedAt: now,
+      stateHistory: [...execution.stateHistory, transition],
+      metadata: args.result ? { ...execution.metadata, result: args.result } : execution.metadata,
+    });
+
+    // Update strategy lastExecutedAt
+    const strategy = await ctx.db.get(execution.strategyId);
+    if (strategy) {
+      await ctx.db.patch(execution.strategyId, {
+        lastExecutedAt: now,
+        nextExecutionAt: strategy.cronExpression ? now + 3600000 : undefined,
+        updatedAt: now,
+      });
+    }
+  },
+});
+
+/**
+ * Mark an execution as failed
+ */
+export const fail = mutation({
+  args: {
+    executionId: v.id("strategyExecutions"),
+    error: v.string(),
+    errorCode: v.optional(v.string()),
+    recoverable: v.optional(v.boolean()),
+  },
+  handler: async (ctx, args) => {
+    const execution = await ctx.db.get(args.executionId);
+    if (!execution) {
+      throw new Error(`Execution ${args.executionId} not found`);
+    }
+
+    const now = Date.now();
+    const transition = {
+      id: `tr_${now}`,
+      fromState: execution.currentState,
+      toState: "failed",
+      trigger: "fail_called",
+      timestamp: now,
+      errorMessage: args.error,
+      errorCode: args.errorCode,
+    };
+
+    await ctx.db.patch(args.executionId, {
+      currentState: "failed",
+      stateEnteredAt: now,
+      completedAt: now,
+      errorMessage: args.error,
+      errorCode: args.errorCode,
+      recoverable: args.recoverable ?? false,
+      stateHistory: [...execution.stateHistory, transition],
+    });
+  },
+});

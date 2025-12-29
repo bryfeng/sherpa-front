@@ -40,7 +40,7 @@ http.route({
 
     try {
       const body = await request.json();
-      const { strategyId } = body as { strategyId: string };
+      const { strategyId, walletAddress } = body as { strategyId: string; walletAddress?: string };
 
       if (!strategyId) {
         return new Response(
@@ -49,9 +49,13 @@ http.route({
         );
       }
 
+      // Use provided wallet address or placeholder (strategy execution should provide this)
+      const resolvedWalletAddress = walletAddress || "0x0000000000000000000000000000000000000000";
+
       // Create execution record
-      const executionId = await ctx.runMutation(internal.executions.create, {
+      const executionId = await ctx.runMutation(api.executions.create, {
         strategyId: strategyId as any,
+        walletAddress: resolvedWalletAddress,
       });
 
       return new Response(

@@ -23,9 +23,16 @@ export const checkTriggers = internalAction({
 
     for (const strategy of readyStrategies) {
       try {
+        // Get wallet address for the strategy's user
+        const wallet = await ctx.runQuery(internal.scheduler.getWalletForUser, {
+          userId: strategy.userId,
+        });
+        const walletAddress = wallet?.address || "0x0000000000000000000000000000000000000000";
+
         // Create execution record
-        const executionId = await ctx.runMutation(internal.executions.create, {
+        const executionId = await ctx.runMutation(internal.executions.createInternal, {
           strategyId: strategy._id,
+          walletAddress,
         });
 
         // Call FastAPI to run the actual strategy
@@ -75,6 +82,29 @@ export const getAllActiveStrategies = internalQuery({
       .query("strategies")
       .withIndex("by_status", (q) => q.eq("status", "active"))
       .collect();
+  },
+});
+
+/**
+ * Get primary wallet for a user (internal query for scheduler)
+ */
+export const getWalletForUser = internalQuery({
+  args: { userId: v.id("users") },
+  handler: async (ctx, args): Promise<Doc<"wallets"> | null> => {
+    // Try to get primary wallet first
+    const primaryWallet = await ctx.db
+      .query("wallets")
+      .withIndex("by_user", (q) => q.eq("userId", args.userId))
+      .filter((q) => q.eq(q.field("isPrimary"), true))
+      .first();
+
+    if (primaryWallet) return primaryWallet;
+
+    // Fall back to any wallet
+    return await ctx.db
+      .query("wallets")
+      .withIndex("by_user", (q) => q.eq("userId", args.userId))
+      .first();
   },
 });
 
