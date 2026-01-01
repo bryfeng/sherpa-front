@@ -359,6 +359,96 @@ export default defineSchema({
     .index("by_type", ["flagType"]),
 
   // ============================================
+  // Token Catalog (Enriched Token Metadata)
+  // ============================================
+  tokenCatalog: defineTable({
+    // Identity
+    address: v.string(),
+    chainId: v.number(),
+    symbol: v.string(),
+    name: v.string(),
+    decimals: v.number(),
+    logoUrl: v.optional(v.string()),
+
+    // Taxonomy
+    categories: v.array(v.string()), // ["defi", "lending", "governance"]
+    sector: v.optional(v.string()), // "DeFi", "Gaming", "Infrastructure"
+    subsector: v.optional(v.string()), // "DEX", "Lending", "L2"
+
+    // Protocol/Project info
+    projectName: v.optional(v.string()), // "Aave", "Uniswap"
+    projectSlug: v.optional(v.string()), // For API lookups (defillama, coingecko)
+    coingeckoId: v.optional(v.string()),
+    defillamaId: v.optional(v.string()),
+    website: v.optional(v.string()),
+    twitter: v.optional(v.string()),
+    discord: v.optional(v.string()),
+    github: v.optional(v.string()),
+
+    // Market context
+    marketCapTier: v.optional(v.string()), // "mega", "large", "mid", "small", "micro"
+    isStablecoin: v.boolean(),
+    isWrapped: v.boolean(),
+    isLpToken: v.boolean(),
+    isGovernanceToken: v.boolean(),
+    isNative: v.boolean(),
+
+    // Related tokens (for correlation)
+    relatedTokens: v.array(
+      v.object({
+        address: v.string(),
+        chainId: v.number(),
+        relationship: v.string(), // "same_project", "competitor", "derivative", "wrapped"
+      })
+    ),
+
+    // Data freshness
+    lastUpdated: v.number(),
+    dataSource: v.string(), // "coingecko", "defillama", "manual"
+    enrichmentVersion: v.number(), // Schema version for re-enrichment
+
+    // Additional metadata
+    description: v.optional(v.string()),
+    tags: v.array(v.string()),
+  })
+    .index("by_chain_address", ["chainId", "address"])
+    .index("by_symbol", ["symbol"])
+    .index("by_project", ["projectSlug"])
+    .index("by_sector", ["sector"])
+    .index("by_coingecko", ["coingeckoId"])
+    .index("by_last_updated", ["lastUpdated"]),
+
+  // Portfolio Profiles (cached portfolio analysis)
+  portfolioProfiles: defineTable({
+    walletId: v.id("wallets"),
+    walletAddress: v.string(),
+
+    // Sector allocation (percentage)
+    sectorAllocation: v.any(), // { "DeFi": 45.5, "Infrastructure": 30.2, ... }
+
+    // Category exposure
+    categoryExposure: v.any(), // { "lending": 20, "dex": 15, ... }
+
+    // Risk profile
+    riskProfile: v.object({
+      diversificationScore: v.number(), // 0-100
+      stablecoinPercent: v.number(),
+      memePercent: v.number(),
+      concentrationRisk: v.number(), // Top holding %
+    }),
+
+    // Token count by tier
+    tokensByTier: v.any(), // { "mega": 2, "large": 3, "mid": 5, ... }
+
+    // Timestamps
+    calculatedAt: v.number(),
+    portfolioValueUsd: v.optional(v.number()),
+  })
+    .index("by_wallet", ["walletId"])
+    .index("by_wallet_address", ["walletAddress"])
+    .index("by_calculated", ["calculatedAt"]),
+
+  // ============================================
   // Admin: System Metrics
   // ============================================
   system_metrics: defineTable({

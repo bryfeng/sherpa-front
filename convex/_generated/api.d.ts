@@ -22,6 +22,7 @@ import type * as rateLimit from "../rateLimit.js";
 import type * as scheduler from "../scheduler.js";
 import type * as sessionKeys from "../sessionKeys.js";
 import type * as strategies from "../strategies.js";
+import type * as tokenCatalog from "../tokenCatalog.js";
 import type * as transactions from "../transactions.js";
 import type * as users from "../users.js";
 import type * as wallets from "../wallets.js";
@@ -47,6 +48,7 @@ declare const fullApi: ApiFromModules<{
   scheduler: typeof scheduler;
   sessionKeys: typeof sessionKeys;
   strategies: typeof strategies;
+  tokenCatalog: typeof tokenCatalog;
   transactions: typeof transactions;
   users: typeof users;
   wallets: typeof wallets;
