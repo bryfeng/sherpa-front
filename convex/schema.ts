@@ -449,6 +449,108 @@ export default defineSchema({
     .index("by_calculated", ["calculatedAt"]),
 
   // ============================================
+  // News Items (Aggregated & Processed News)
+  // ============================================
+  newsItems: defineTable({
+    // Identity
+    sourceId: v.string(), // Unique ID from source (URL hash or external ID)
+    source: v.string(), // "rss:coindesk", "coingecko", "defillama"
+
+    // Content
+    title: v.string(),
+    summary: v.optional(v.string()), // LLM-generated summary
+    url: v.string(),
+    imageUrl: v.optional(v.string()),
+    publishedAt: v.number(),
+
+    // Classification (LLM-derived)
+    category: v.optional(
+      v.union(
+        v.literal("regulatory"),
+        v.literal("technical"),
+        v.literal("partnership"),
+        v.literal("tokenomics"),
+        v.literal("market"),
+        v.literal("hack"),
+        v.literal("upgrade"),
+        v.literal("general")
+      )
+    ),
+
+    // Sentiment (LLM-derived)
+    sentiment: v.optional(
+      v.object({
+        score: v.number(), // -1 to 1
+        label: v.union(
+          v.literal("very_negative"),
+          v.literal("negative"),
+          v.literal("neutral"),
+          v.literal("positive"),
+          v.literal("very_positive")
+        ),
+        confidence: v.number(), // 0 to 1
+      })
+    ),
+
+    // Token associations
+    relatedTokens: v.array(
+      v.object({
+        symbol: v.string(),
+        address: v.optional(v.string()),
+        chainId: v.optional(v.number()),
+        relevanceScore: v.number(), // 0 to 1
+      })
+    ),
+
+    // Related sectors/categories (for portfolio matching)
+    relatedSectors: v.array(v.string()), // ["DeFi", "Infrastructure"]
+    relatedCategories: v.array(v.string()), // ["lending", "dex"]
+
+    // Importance scoring
+    importance: v.optional(
+      v.object({
+        score: v.number(), // 0 to 1
+        factors: v.array(v.string()), // ["major_protocol", "security_issue"]
+      })
+    ),
+
+    // Processing metadata
+    processedAt: v.optional(v.number()),
+    processingVersion: v.number(), // Schema version for re-processing
+    rawContent: v.optional(v.string()), // Original content for re-processing
+
+    // Data freshness
+    fetchedAt: v.number(),
+    expiresAt: v.optional(v.number()), // For cleanup
+  })
+    .index("by_source_id", ["source", "sourceId"])
+    .index("by_published", ["publishedAt"])
+    .index("by_category", ["category"])
+    .index("by_fetched", ["fetchedAt"])
+    .index("by_processed", ["processedAt"])
+    .index("by_expires", ["expiresAt"]),
+
+  // News Sources Configuration (for cron management)
+  newsSources: defineTable({
+    name: v.string(), // "coindesk", "theblock", "coingecko"
+    type: v.union(
+      v.literal("rss"),
+      v.literal("api"),
+      v.literal("scraper")
+    ),
+    url: v.string(), // RSS URL or API endpoint
+    enabled: v.boolean(),
+    lastFetchedAt: v.optional(v.number()),
+    lastSuccessAt: v.optional(v.number()),
+    errorCount: v.number(),
+    lastError: v.optional(v.string()),
+    config: v.optional(v.any()), // Source-specific config
+  })
+    .index("by_name", ["name"])
+    .index("by_type", ["type"])
+    .index("by_enabled", ["enabled"]),
+
+  // ============================================
   // Admin: System Metrics
   // ============================================
   system_metrics: defineTable({
