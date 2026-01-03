@@ -13,7 +13,6 @@ import type {
   WidgetSizePreset,
   WidgetDisplayState,
   WidgetRefreshConfig,
-  WidgetPayloads,
   WidgetPayload,
 } from '../types/widget-system'
 
@@ -488,6 +487,56 @@ export const WIDGET_REGISTRY: Record<WidgetKind, WidgetMetadata> = {
     requiresPro: false,
     tags: ['links', 'bookmarks', 'shortcuts'],
   },
+
+  // ===== POLICY WIDGETS =====
+  'risk-policy': {
+    kind: 'risk-policy',
+    category: 'utility',
+    name: 'Risk Policy',
+    description: 'Configure your trading risk preferences and limits',
+    icon: 'shield',
+    defaultSize: 'tall',
+    minSize: { cols: 4, rows: 3 },
+    maxSize: { cols: 6, rows: 4 },
+    resizable: true,
+    refreshable: true,
+    defaultRefreshInterval: 0,
+    requiresWallet: true,
+    requiresPro: false,
+    tags: ['policy', 'risk', 'settings', 'limits'],
+  },
+  'session-keys': {
+    kind: 'session-keys',
+    category: 'utility',
+    name: 'Session Keys',
+    description: 'Manage agent permissions and session keys',
+    icon: 'key',
+    defaultSize: 'tall',
+    minSize: { cols: 4, rows: 3 },
+    maxSize: { cols: 6, rows: 4 },
+    resizable: true,
+    refreshable: true,
+    defaultRefreshInterval: 30,
+    requiresWallet: true,
+    requiresPro: false,
+    tags: ['policy', 'session', 'agent', 'permissions', 'keys'],
+  },
+  'policy-status': {
+    kind: 'policy-status',
+    category: 'utility',
+    name: 'Policy Status',
+    description: 'System status and policy overview',
+    icon: 'activity',
+    defaultSize: 'compact',
+    minSize: { cols: 3, rows: 1 },
+    maxSize: { cols: 4, rows: 2 },
+    resizable: false,
+    refreshable: true,
+    defaultRefreshInterval: 60,
+    requiresWallet: false,
+    requiresPro: false,
+    tags: ['policy', 'status', 'system', 'health'],
+  },
 }
 
 // ============================================
@@ -566,6 +615,16 @@ function getDefaultPayload(kind: WidgetKind): WidgetPayload {
     'calculator': { mode: 'token' },
     'notes': { content: '' },
     'quick-links': { links: [] },
+    // Policy widgets
+    'risk-policy': { config: null, status: 'idle' },
+    'session-keys': { sessions: [], status: 'idle' },
+    'policy-status': {
+      operational: true,
+      emergencyStop: false,
+      inMaintenance: false,
+      allowedChains: [1, 137, 42161, 8453, 10],
+      maxSingleTxUsd: 100000,
+    },
   }
   return defaults[kind]
 }

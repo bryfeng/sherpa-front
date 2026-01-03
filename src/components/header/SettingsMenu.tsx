@@ -1,15 +1,16 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react'
-import { Check, ChevronRight, Loader2, Settings2 } from 'lucide-react'
+import { Check, ChevronRight, Loader2, Settings2, Shield } from 'lucide-react'
 import type { LLMProviderInfo } from '../../types/llm'
 
 interface SettingsMenuProps {
   selectedModel: string
   providers: LLMProviderInfo[]
   onSelectModel: (model: string) => void
+  onOpenPolicies?: () => void
   loading?: boolean
 }
 
-export function SettingsMenu({ selectedModel, providers, onSelectModel, loading = false }: SettingsMenuProps) {
+export function SettingsMenu({ selectedModel, providers, onSelectModel, onOpenPolicies, loading = false }: SettingsMenuProps) {
   const [open, setOpen] = useState(false)
   const menuRef = useRef<HTMLDivElement | null>(null)
 
@@ -65,14 +66,20 @@ export function SettingsMenu({ selectedModel, providers, onSelectModel, loading 
             <div>
               <button
                 type="button"
-                className="flex w-full items-center justify-between rounded-xl border border-dashed border-slate-200 px-3 py-2 text-left text-slate-500"
-                disabled
+                onClick={() => {
+                  onOpenPolicies?.()
+                  setOpen(false)
+                }}
+                className="flex w-full items-center justify-between rounded-xl border border-slate-200 px-3 py-2 text-left transition hover:border-slate-300 hover:bg-slate-50"
               >
-                <span>
-                  <div className="text-sm font-medium text-slate-600">Policies</div>
-                  <div className="text-xs text-slate-400">Custom policy packs coming soon.</div>
+                <span className="flex items-center gap-2">
+                  <Shield className="h-4 w-4 text-primary-500" />
+                  <span>
+                    <div className="text-sm font-medium text-slate-700">Policies</div>
+                    <div className="text-xs text-slate-500">Risk limits, session keys & controls</div>
+                  </span>
                 </span>
-                <ChevronRight className="h-4 w-4" />
+                <ChevronRight className="h-4 w-4 text-slate-400" />
               </button>
             </div>
 

@@ -58,6 +58,10 @@ export type WidgetKind =
   | 'calculator'
   | 'notes'
   | 'quick-links'
+  // Policy widgets
+  | 'risk-policy'
+  | 'session-keys'
+  | 'policy-status'
 
 // ============================================
 // WIDGET SIZING
@@ -347,6 +351,52 @@ export interface WidgetPayloads {
   }
   'quick-links': {
     links: Array<{ name: string; url: string; icon?: string }>
+  }
+
+  // Policy widgets
+  'risk-policy': {
+    config: {
+      maxPositionPercent: number
+      maxPositionValueUsd: number
+      maxDailyVolumeUsd: number
+      maxDailyLossUsd: number
+      maxSingleTxUsd: number
+      requireApprovalAboveUsd: number
+      maxSlippagePercent: number
+      warnSlippagePercent: number
+      maxGasPercent: number
+      warnGasPercent: number
+      minLiquidityUsd: number
+      enabled: boolean
+    } | null
+    status: 'idle' | 'loading' | 'ready' | 'saving' | 'error'
+    error?: string
+  }
+  'session-keys': {
+    sessions: Array<{
+      sessionId: string
+      permissions: string[]
+      maxValuePerTxUsd: number
+      maxTotalValueUsd: number
+      totalValueUsedUsd: number
+      transactionCount: number
+      maxTransactions?: number
+      chainAllowlist: number[]
+      status: 'active' | 'expired' | 'revoked' | 'exhausted'
+      expiresAt: number
+      createdAt: number
+      lastUsedAt?: number
+    }>
+    status: 'idle' | 'loading' | 'ready' | 'error'
+    error?: string
+  }
+  'policy-status': {
+    operational: boolean
+    emergencyStop: boolean
+    inMaintenance: boolean
+    message?: string
+    allowedChains: number[]
+    maxSingleTxUsd: number
   }
 }
 

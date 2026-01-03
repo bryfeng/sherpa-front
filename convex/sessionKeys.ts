@@ -214,6 +214,71 @@ export const cleanupExpired = mutation({
 });
 
 /**
+ * Extend a session key's expiration.
+ */
+export const extend = mutation({
+  args: {
+    sessionId: v.string(),
+    additionalDays: v.number(),
+  },
+  handler: async (ctx, args): Promise<{ newExpiresAt: number }> => {
+    if (args.additionalDays < 1 || args.additionalDays > 365) {
+      throw new Error("Additional days must be between 1 and 365");
+    }
+
+    const session = await ctx.db
+      .query("sessionKeys")
+      .withIndex("by_session_id", (q) => q.eq("sessionId", args.sessionId))
+      .first();
+
+    if (!session) {
+      throw new Error(`Session ${args.sessionId} not found`);
+    }
+
+    if (session.status === "revoked") {
+      throw new Error("Cannot extend a revoked session");
+    }
+
+    if (session.status === "exhausted") {
+      throw new Error("Cannot extend an exhausted session");
+    }
+
+    // Extend from now if expired, or from current expiration if still active
+    const baseTime = session.expiresAt < Date.now() ? Date.now() : session.expiresAt;
+    const newExpiresAt = baseTime + args.additionalDays * 24 * 60 * 60 * 1000;
+
+    await ctx.db.patch(session._id, {
+      expiresAt: newExpiresAt,
+      status: "active", // Re-activate if was expired
+    });
+
+    return { newExpiresAt };
+  },
+});
+
+/**
+ * Get active sessions count for a wallet.
+ */
+export const getActiveCount = query({
+  args: {
+    walletAddress: v.string(),
+  },
+  handler: async (ctx, args): Promise<number> => {
+    const now = Date.now();
+    const sessions = await ctx.db
+      .query("sessionKeys")
+      .withIndex("by_wallet", (q) =>
+        q.eq("walletAddress", args.walletAddress.toLowerCase())
+      )
+      .collect();
+
+    return sessions.filter(
+      (s) => s.status === "active" && s.expiresAt > now
+    ).length;
+  },
+});
+
+/**
  * Delete old session keys (cleanup)
  */
 export const deleteOld = mutation({

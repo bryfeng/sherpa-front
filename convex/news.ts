@@ -375,6 +375,31 @@ export const insertBatch = mutation({
         url: v.string(),
         imageUrl: v.optional(v.string()),
         publishedAt: v.number(),
+        category: v.optional(
+          v.union(
+            v.literal("regulatory"),
+            v.literal("technical"),
+            v.literal("partnership"),
+            v.literal("tokenomics"),
+            v.literal("market"),
+            v.literal("hack"),
+            v.literal("upgrade"),
+            v.literal("general")
+          )
+        ),
+        sentiment: v.optional(
+          v.object({
+            score: v.number(),
+            label: v.union(
+              v.literal("very_negative"),
+              v.literal("negative"),
+              v.literal("neutral"),
+              v.literal("positive"),
+              v.literal("very_positive")
+            ),
+            confidence: v.number(),
+          })
+        ),
         relatedTokens: v.array(
           v.object({
             symbol: v.string(),
@@ -385,7 +410,14 @@ export const insertBatch = mutation({
         ),
         relatedSectors: v.array(v.string()),
         relatedCategories: v.array(v.string()),
+        importance: v.optional(
+          v.object({
+            score: v.number(),
+            factors: v.array(v.string()),
+          })
+        ),
         processingVersion: v.number(),
+        processedAt: v.optional(v.number()),
         rawContent: v.optional(v.string()),
         expiresAt: v.optional(v.number()),
       })

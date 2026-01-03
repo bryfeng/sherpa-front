@@ -19,6 +19,17 @@ const HistorySummaryPanel = React.lazy(() =>
   import('../panels/history/HistorySummaryPanel').then((m) => ({ default: m.HistorySummaryPanel }))
 )
 
+// Policy widgets
+const RiskPolicyWidget = React.lazy(() =>
+  import('../policy/RiskPolicyWidget').then((m) => ({ default: m.RiskPolicyWidget }))
+)
+const SessionKeysWidget = React.lazy(() =>
+  import('../policy/SessionKeysWidget').then((m) => ({ default: m.SessionKeysWidget }))
+)
+const PolicyStatusWidget = React.lazy(() =>
+  import('../policy/PolicyStatusWidget').then((m) => ({ default: m.PolicyStatusWidget }))
+)
+
 export interface ArtifactContentProps {
   artifact: Widget | null
   walletAddress?: string
@@ -90,6 +101,16 @@ function ArtifactRenderer({
           )}
         </div>
       )
+
+    // Policy widgets
+    case 'risk-policy':
+      return <RiskPolicyWidget artifact={artifact} walletAddress={walletAddress} />
+
+    case 'session-keys':
+      return <SessionKeysWidget artifact={artifact} walletAddress={walletAddress} />
+
+    case 'policy-status':
+      return <PolicyStatusWidget />
 
     default:
       return (

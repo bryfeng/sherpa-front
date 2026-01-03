@@ -337,6 +337,18 @@ export function useDeFiChatController({ props, shellState, dispatch }: UseDeFiCh
     setShowProInfo(true)
   }, [setCopiedToken, setShowProInfo])
 
+  const openPolicies = useCallback(() => {
+    const policyWidget: Widget = {
+      id: 'risk-policy',
+      kind: 'risk-policy',
+      title: 'Policy Settings',
+      payload: { config: null, status: 'loading' },
+      sources: [],
+      density: 'full',
+    }
+    useSherpaStore.getState().addWidget(policyWidget)
+  }, [])
+
   useEffect(() => () => {
     isMounted.current = false
   }, [])
@@ -1003,6 +1015,12 @@ export function useDeFiChatController({ props, shellState, dispatch }: UseDeFiCh
     onNewChat: handleStartNewChat,
     onConnectWallet: () => openAppKit(),
     menuActions: [
+      {
+        id: 'manage-policies',
+        label: 'Manage Policies',
+        description: 'Risk limits, session keys & controls',
+        onSelect: openPolicies,
+      },
       {
         id: 'export-session',
         label: 'Download session JSON',
