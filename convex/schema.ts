@@ -6,9 +6,13 @@ export default defineSchema({
   // Users & Wallets
   // ============================================
   users: defineTable({
+    evmWalletAddress: v.optional(v.string()),
+    solanaWalletAddress: v.optional(v.string()),
     createdAt: v.number(),
     updatedAt: v.number(),
-  }),
+  })
+    .index("by_evm_wallet", ["evmWalletAddress"])
+    .index("by_solana_wallet", ["solanaWalletAddress"]),
 
   wallets: defineTable({
     userId: v.id("users"),
@@ -446,6 +450,47 @@ export default defineSchema({
     .index("by_agent", ["agentId"]),
 
   // ============================================
+  // Risk Policies (per user/wallet)
+  // ============================================
+  riskPolicies: defineTable({
+    walletAddress: v.string(),
+    config: v.object({
+      maxPositionPercent: v.number(),
+      maxPositionValueUsd: v.number(),
+      maxDailyVolumeUsd: v.number(),
+      maxDailyLossUsd: v.number(),
+      maxSingleTxUsd: v.number(),
+      requireApprovalAboveUsd: v.number(),
+      maxSlippagePercent: v.number(),
+      warnSlippagePercent: v.number(),
+      maxGasPercent: v.number(),
+      warnGasPercent: v.number(),
+      minLiquidityUsd: v.number(),
+      enabled: v.boolean(),
+    }),
+    updatedAt: v.number(),
+  }).index("by_wallet", ["walletAddress"]),
+
+  // ============================================
+  // System Policy (singleton for platform controls)
+  // ============================================
+  systemPolicy: defineTable({
+    emergencyStop: v.boolean(),
+    emergencyStopReason: v.optional(v.string()),
+    inMaintenance: v.boolean(),
+    maintenanceMessage: v.optional(v.string()),
+    blockedContracts: v.array(v.string()),
+    blockedTokens: v.array(v.string()),
+    blockedChains: v.array(v.number()),
+    allowedChains: v.array(v.number()),
+    protocolWhitelistEnabled: v.boolean(),
+    allowedProtocols: v.array(v.string()),
+    maxSingleTxUsd: v.number(),
+    updatedAt: v.number(),
+    updatedBy: v.optional(v.string()),
+  }),
+
+  // ============================================
   // Admin: Users (separate from regular users)
   // ============================================
   admin_users: defineTable({
@@ -736,4 +781,128 @@ export default defineSchema({
     }),
     createdAt: v.number(),
   }).index("by_type_date", ["metricType", "date"]),
+
+  // ============================================
+  // Event Monitoring: Subscriptions
+  // ============================================
+  subscriptions: defineTable({
+    // Identity
+    id: v.string(), // UUID from backend
+    userId: v.optional(v.string()),
+
+    // What to watch
+    address: v.string(),
+    chain: v.string(), // "ethereum", "polygon", "solana", etc.
+    eventTypes: v.array(v.string()), // ["swap", "transfer_in", "transfer_out"]
+
+    // Webhook config
+    webhookId: v.optional(v.string()), // External webhook ID (Alchemy/Helius)
+    status: v.union(
+      v.literal("pending"),
+      v.literal("active"),
+      v.literal("paused"),
+      v.literal("failed"),
+      v.literal("expired")
+    ),
+
+    // Metadata
+    label: v.optional(v.string()),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+    lastActivityAt: v.optional(v.number()),
+    errorMessage: v.optional(v.string()),
+  })
+    .index("by_id", ["id"])
+    .index("by_user", ["userId"])
+    .index("by_address_chain", ["address", "chain"])
+    .index("by_status", ["status"])
+    .index("by_webhook", ["webhookId"]),
+
+  // ============================================
+  // Event Monitoring: Wallet Activity
+  // ============================================
+  walletActivity: defineTable({
+    // Identity
+    id: v.string(), // UUID from backend
+    walletAddress: v.string(),
+    chain: v.string(),
+    eventType: v.string(), // "swap", "transfer_in", "transfer_out", etc.
+
+    // Transaction info
+    txHash: v.string(),
+    blockNumber: v.number(),
+    timestamp: v.number(), // Unix timestamp ms
+
+    // Direction relative to watched wallet
+    direction: v.string(), // "in", "out", "internal"
+
+    // Value
+    valueUsd: v.optional(v.number()),
+
+    // Counterparty
+    counterpartyAddress: v.optional(v.string()),
+    counterpartyLabel: v.optional(v.string()), // "uniswap_v3", "aave_v3", etc.
+
+    // For copy trading
+    isCopyable: v.boolean(),
+    copyRelevanceScore: v.number(), // 0-1
+
+    // Parsed transaction details (optional, for rich data)
+    parsedTx: v.optional(v.any()),
+
+    // Timestamps
+    createdAt: v.number(),
+    processedAt: v.optional(v.number()),
+  })
+    .index("by_id", ["id"])
+    .index("by_wallet", ["walletAddress"])
+    .index("by_wallet_chain", ["walletAddress", "chain"])
+    .index("by_tx_hash", ["txHash"])
+    .index("by_timestamp", ["timestamp"])
+    .index("by_event_type", ["eventType"])
+    .index("by_copyable", ["isCopyable", "timestamp"]),
+
+  // ============================================
+  // Copy Trading: Watched Wallets (Leaders)
+  // ============================================
+  watchedWallets: defineTable({
+    // Identity
+    address: v.string(),
+    chain: v.string(),
+
+    // Labels
+    label: v.optional(v.string()),
+    notes: v.optional(v.string()),
+
+    // Performance metrics
+    totalTrades: v.number(),
+    winRate: v.optional(v.number()), // 0-1
+    avgTradePnlPercent: v.optional(v.number()),
+    totalPnlUsd: v.optional(v.number()),
+    sharpeRatio: v.optional(v.number()),
+    maxDrawdownPercent: v.optional(v.number()),
+
+    // Activity metrics
+    avgTradesPerDay: v.optional(v.number()),
+    mostTradedTokens: v.array(v.string()),
+    preferredSectors: v.array(v.string()),
+
+    // Follower info
+    followerCount: v.number(),
+    totalCopiedVolumeUsd: v.number(),
+
+    // Status
+    isActive: v.boolean(),
+    firstSeenAt: v.number(),
+    lastActiveAt: v.number(),
+
+    // Data quality
+    dataQualityScore: v.number(), // 0-1, how much history we have
+    lastAnalyzedAt: v.optional(v.number()),
+  })
+    .index("by_address_chain", ["address", "chain"])
+    .index("by_win_rate", ["winRate"])
+    .index("by_pnl", ["totalPnlUsd"])
+    .index("by_followers", ["followerCount"])
+    .index("by_active", ["isActive", "lastActiveAt"]),
 });
