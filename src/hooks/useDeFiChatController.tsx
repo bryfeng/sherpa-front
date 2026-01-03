@@ -184,17 +184,7 @@ export interface UseDeFiChatControllerParams {
 }
 
 export interface UseDeFiChatControllerResult {
-  headerProps: {
-    persona: Persona
-    walletLabel: string
-    walletConnected: boolean
-    proLabel: string
-    onPersonaChange: (persona: Persona) => void
-    onNewChat: () => void
-    onPlanWorkflow: () => void
-    onShowTrending: () => void
-    onOpenWorkspace: () => void
-  }
+  headerProps: HeaderBarProps
   chatSurfaceProps: ChatSurfaceProps
   workspaceSurfaceProps: WorkspaceSurfaceProps
   surface: {
@@ -1011,14 +1001,7 @@ export function useDeFiChatController({ props, shellState, dispatch }: UseDeFiCh
     proLabel: proBadgeLabel,
     onPersonaChange: setPersona,
     onNewChat: handleStartNewChat,
-    onPlanWorkflow: () => handleInsertQuickPrompt('Outline the next best DeFi workflow for my wallet.'),
-    onShowTrending: () => {
-      loadTrendingTokensPanel({ highlight: true }).catch(() => {})
-      showWorkspace()
-    },
-    onOpenWorkspace: showWorkspace,
     onConnectWallet: () => openAppKit(),
-    onRequestPro: handleProUpsell,
     menuActions: [
       {
         id: 'export-session',
@@ -1066,23 +1049,6 @@ export function useDeFiChatController({ props, shellState, dispatch }: UseDeFiCh
     inputValue: input,
     onInputChange: setInput,
     onSend: () => { void send() },
-    onOpenWorkspace: showWorkspace,
-    onPinLatest: handlePinLatestPanel,
-    canPinLatest: widgets.length > 0,
-    proBadgeLabel,
-    pro,
-    showProInfo,
-    onDismissProInfo: () => {
-      setShowProInfo(false)
-      setCopiedToken(false)
-    },
-    onProUpsell: handleProUpsell,
-    proRequirement,
-    proTokenAddress,
-    proContractDisplay,
-    proExplorerUrl,
-    copiedToken,
-    onCopyToken: handleCopyToken,
   }
 
   const workspaceSurfaceProps: WorkspaceSurfaceProps = {

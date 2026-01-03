@@ -10,9 +10,6 @@ function renderHeaderBar(overrides: Partial<HeaderBarProps> = {}) {
     proLabel: 'Pro Preview',
     onPersonaChange: vi.fn(),
     onNewChat: vi.fn(),
-    onPlanWorkflow: vi.fn(),
-    onShowTrending: vi.fn(),
-    onOpenWorkspace: vi.fn(),
     menuActions: [],
     ...overrides,
   }

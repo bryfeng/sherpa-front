@@ -2,11 +2,10 @@
 
 import React from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
-import { Bot, ExternalLink, Send, Star, User, X, BarChart3, Pin } from 'lucide-react'
+import { Bot, ExternalLink, Send, User } from 'lucide-react'
 
 import type { AgentAction, AgentMessage } from '../../types/defi-ui'
-import { Button, Textarea } from '../ui/primitives'
-import { useToastContext } from '../../providers/ToastProvider'
+import { Textarea } from '../ui/primitives'
 
 function SourceBadge({ src }: { src: any }) {
   let label = ''
@@ -258,20 +257,6 @@ export interface ChatSurfaceProps {
   inputValue: string
   onInputChange: (value: string) => void
   onSend: () => void
-  onOpenWorkspace: () => void
-  onPinLatest: () => void
-  canPinLatest: boolean
-  proBadgeLabel: string
-  pro: boolean
-  showProInfo: boolean
-  onDismissProInfo: () => void
-  onProUpsell: (source: 'cta' | 'action') => void
-  proRequirement: string
-  proTokenAddress?: string | null
-  proContractDisplay: string | null
-  proExplorerUrl?: string | null
-  copiedToken: boolean
-  onCopyToken: () => void
 }
 
 function ChatSurfaceComponent({
@@ -285,22 +270,7 @@ function ChatSurfaceComponent({
   inputValue,
   onInputChange,
   onSend,
-  onOpenWorkspace,
-  onPinLatest,
-  canPinLatest,
-  proBadgeLabel,
-  pro,
-  showProInfo,
-  onDismissProInfo,
-  onProUpsell,
-  proRequirement,
-  proTokenAddress,
-  proContractDisplay,
-  proExplorerUrl,
-  copiedToken,
-  onCopyToken,
 }: ChatSurfaceProps) {
-  const { showToast } = useToastContext()
   const canSend = inputValue.trim().length > 0
 
   const placeholderExamples = [
@@ -325,11 +295,6 @@ function ChatSurfaceComponent({
   const handleSend = () => {
     if (!canSend) return
     onSend()
-  }
-
-  const handleCopyWithToast = () => {
-    onCopyToken()
-    showToast('Contract address copied to clipboard', 'success')
   }
 
   return (
@@ -399,109 +364,7 @@ function ChatSurfaceComponent({
                 <span>Send</span>
               </button>
             </div>
-            {/* Quick actions row */}
-            <div className="mt-3 flex flex-wrap items-center gap-2 border-t pt-3" style={{ borderColor: 'var(--line)' }}>
-              <button
-                onClick={onOpenWorkspace}
-                className="flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-xs font-medium transition-colors"
-                style={{ color: 'var(--text-muted)', background: 'var(--surface-2)', border: '1px solid var(--line)' }}
-              >
-                <BarChart3 className="h-3.5 w-3.5" />
-                <span>Workspace</span>
-              </button>
-              <button
-                onClick={onPinLatest}
-                disabled={!canPinLatest}
-                className="flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-xs font-medium transition-colors disabled:opacity-40"
-                style={{ color: 'var(--text-muted)', background: 'var(--surface-2)', border: '1px solid var(--line)' }}
-                title="Pin latest content to artifacts panel"
-              >
-                <Pin className="h-3.5 w-3.5" />
-                <span>Pin to Artifacts</span>
-              </button>
-            </div>
           </div>
-
-          {/* Pro badge row - simplified */}
-          <div className="flex flex-wrap items-center justify-between gap-3 px-1">
-            <span className="text-xs" style={{ color: 'var(--text-muted)' }}>
-              {proBadgeLabel}
-            </span>
-            {!pro && (
-              <button
-                onClick={() => onProUpsell('cta')}
-                className="flex items-center gap-1.5 rounded-md px-3 py-1 text-xs font-medium transition-colors"
-                style={{
-                  color: 'var(--accent)',
-                  background: 'var(--accent-muted)',
-                }}
-              >
-                <Star className="h-3 w-3" />
-                <span>Upgrade to Pro</span>
-              </button>
-            )}
-          </div>
-          {showProInfo && !pro && (
-            <div
-              className="rounded-lg border p-4 text-xs"
-              style={{ borderColor: 'var(--line)', background: 'var(--accent-muted)', color: 'var(--text)' }}
-            >
-              <div className="flex items-start gap-3">
-                <div
-                  className="mt-[2px] rounded-full border p-1"
-                  style={{ borderColor: 'var(--accent)', background: 'rgba(90,164,255,.2)' }}
-                >
-                  <Star className="h-3.5 w-3.5" style={{ color: 'var(--accent)' }} />
-                </div>
-                <div className="flex-1 space-y-2">
-                  <div className="flex items-start justify-between gap-2">
-                    <div>
-                      <p className="text-sm font-semibold" style={{ color: 'var(--text)' }}>
-                        Unlock Sherpa Pro
-                      </p>
-                      <p className="mt-1 text-[11px] leading-relaxed" style={{ color: 'var(--text-muted)' }}>
-                        {proRequirement}
-                      </p>
-                    </div>
-                    <button
-                      onClick={onDismissProInfo}
-                      className="rounded-full p-1"
-                      style={{ color: 'var(--accent)' }}
-                      aria-label="Dismiss Pro info"
-                    >
-                      <X className="h-4 w-4" />
-                    </button>
-                  </div>
-                  {proTokenAddress && (
-                    <div className="flex flex-wrap items-center gap-2 text-[11px]" style={{ color: 'var(--text)' }}>
-                      <code className="rounded-lg border px-2 py-1 font-mono text-[11px] tracking-tight" style={{ borderColor: 'var(--accent)', background: 'rgba(90,164,255,.16)' }}>
-                        {proContractDisplay}
-                      </code>
-                      <Button size="sm" variant="secondary" onClick={handleCopyWithToast} className="rounded-full px-3 py-1 text-[11px]">
-                        {copiedToken ? 'Copied' : 'Copy contract'}
-                      </Button>
-                      {proExplorerUrl && (
-                        <a
-                          href={proExplorerUrl}
-                          target="_blank"
-                          rel="noreferrer"
-                          className="chip chip--accent"
-                        >
-                          View explorer
-                        </a>
-                      )}
-                    </div>
-                  )}
-                </div>
-              </div>
-              <div className="mt-3 text-[11px]" style={{ color: 'var(--text-muted)' }}>
-                <span className="font-medium" style={{ color: 'var(--text)' }}>
-                  Pro perks:
-                </span>{' '}
-                deeper simulations, fee benchmarking, and guided DeFi workflows tailored to your wallet state.
-              </div>
-            </div>
-          )}
         </div>
       </div>
     </div>

@@ -77,8 +77,6 @@ export default function DeFiChatAdaptiveUI(props: DeFiChatAdaptiveUIProps) {
         onToggleArtifactPanel={toggleVisibility}
         artifactButtonLabel="Artifacts"
         artifactCount={artifactTabs.length}
-        conversationDisplay={surface.conversationLabel}
-        railChip={surface.portfolioChip}
         chat={enhancedChatSurfaceProps}
         artifacts={{
           artifactWidgets,

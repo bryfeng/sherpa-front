@@ -2,10 +2,9 @@
 
 import React, { useEffect, useId, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
-import { BarChart3, Sparkles, TrendingUp, Wand2 } from 'lucide-react'
+import { Sparkles } from 'lucide-react'
 
 import type { PersonaId as Persona } from '../../types/persona'
-import { Entitled } from '../Entitled'
 import { Badge, Button } from '../ui/primitives'
 import { HeaderActionMenu, type HeaderActionItem } from './HeaderActionMenu'
 
@@ -245,11 +244,7 @@ export interface HeaderBarProps {
   proLabel: string
   onPersonaChange: (persona: Persona) => void
   onNewChat: () => void
-  onPlanWorkflow: () => void
-  onShowTrending: () => void
-  onOpenWorkspace: () => void
   onConnectWallet?: () => void
-  onRequestPro?: (source: 'cta' | 'action') => void
   menuActions?: HeaderActionItem[]
 }
 
@@ -260,14 +255,9 @@ function HeaderBarComponent({
   proLabel,
   onPersonaChange,
   onNewChat,
-  onPlanWorkflow,
-  onShowTrending,
-  onOpenWorkspace,
   onConnectWallet,
-  onRequestPro,
   menuActions = [],
 }: HeaderBarProps) {
-  const personaLabel = useMemo(() => personaStyles[persona].label, [persona])
 
   return (
     <div className="flex flex-col gap-4" style={{ color: 'var(--text)' }}>
@@ -319,46 +309,6 @@ function HeaderBarComponent({
           <HeaderActionMenu actions={menuActions} />
         </div>
       </header>
-
-      <div
-        className="flex flex-wrap items-center gap-2 rounded-lg p-3"
-        style={{
-          background: 'var(--bg-elev)',
-          border: '1px solid var(--line)',
-          boxShadow: 'var(--shadow-1)',
-        }}
-      >
-        <span
-          className="font-semibold uppercase tracking-[0.2em]"
-          style={{ fontSize: 'var(--fs-xs)', color: 'var(--text-muted)' }}
-        >
-          Focus
-        </span>
-        <Entitled
-          fallback={
-            <Button
-              size="sm"
-              variant="secondary"
-              onClick={() => onRequestPro?.('action')}
-              className="rounded-md"
-              aria-label="Plan workflow (requires Pro)"
-            >
-              <Wand2 className="mr-1 h-3 w-3" />Plan workflow
-            </Button>
-          }
-        >
-          <Button size="sm" variant="secondary" onClick={onPlanWorkflow} className="rounded-md">
-            <Wand2 className="mr-1 h-3 w-3" />Plan workflow
-          </Button>
-        </Entitled>
-        <Button size="sm" variant="secondary" onClick={onShowTrending} className="rounded-md">
-          <TrendingUp className="mr-1 h-3 w-3" />Trending tokens
-        </Button>
-        <Button size="sm" variant="outline" onClick={onOpenWorkspace} className="rounded-md">
-          <BarChart3 className="mr-1 h-3 w-3" />Open workspace
-        </Button>
-        <span className="sr-only">Active persona {personaLabel}</span>
-      </div>
     </div>
   )
 }

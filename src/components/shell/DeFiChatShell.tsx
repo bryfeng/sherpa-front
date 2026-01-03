@@ -17,8 +17,6 @@ export interface DeFiChatShellProps {
   artifactButtonLabel: string
   /** Number of open artifact tabs */
   artifactCount: number
-  conversationDisplay: string
-  railChip?: React.ReactNode
   chat: ChatSurfaceProps
   /** Artifact panel props */
   artifacts: Omit<ArtifactPanelProps, 'isVisible' | 'onCollapse'>
@@ -30,8 +28,6 @@ export function DeFiChatShell({
   onToggleArtifactPanel,
   artifactButtonLabel,
   artifactCount,
-  conversationDisplay,
-  railChip,
   chat,
   artifacts,
 }: DeFiChatShellProps) {
@@ -74,15 +70,6 @@ export function DeFiChatShell({
                   {artifactCount} artifact{artifactCount !== 1 ? 's' : ''} available
                 </span>
               )}
-            </div>
-            <div className="flex flex-wrap items-center gap-3">
-              {railChip}
-              <div className="flex items-center gap-2 text-xs" style={{ color: 'var(--text-muted)' }}>
-                <span className="hidden sm:inline">Session</span>
-                <span className="badge badge--outline">
-                  {conversationDisplay}
-                </span>
-              </div>
             </div>
           </div>
 
