@@ -248,6 +248,7 @@ export interface HeaderBarProps {
   onPlanWorkflow: () => void
   onShowTrending: () => void
   onOpenWorkspace: () => void
+  onConnectWallet?: () => void
   onRequestPro?: (source: 'cta' | 'action') => void
   menuActions?: HeaderActionItem[]
 }
@@ -262,6 +263,7 @@ function HeaderBarComponent({
   onPlanWorkflow,
   onShowTrending,
   onOpenWorkspace,
+  onConnectWallet,
   onRequestPro,
   menuActions = [],
 }: HeaderBarProps) {
@@ -292,9 +294,22 @@ function HeaderBarComponent({
               <PersonaDropdown persona={persona} onSelect={onPersonaChange} />
             </div>
           </div>
-          <Badge variant={walletConnected ? 'secondary' : 'outline'} className="rounded-md px-2.5 py-0.5 text-xs">
-            {walletLabel}
-          </Badge>
+          {walletConnected ? (
+            <Badge variant="secondary" className="rounded-md px-2.5 py-0.5 text-xs">
+              {walletLabel}
+            </Badge>
+          ) : (
+            <button
+              onClick={onConnectWallet}
+              className="rounded-md px-2.5 py-1 text-xs font-medium transition-colors"
+              style={{
+                background: 'var(--accent)',
+                color: 'var(--text-inverse)',
+              }}
+            >
+              Connect Wallet
+            </button>
+          )}
           <Badge variant="outline" className="rounded-md px-2.5 py-0.5 text-xs">
             {proLabel}
           </Badge>

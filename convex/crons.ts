@@ -38,4 +38,25 @@ crons.interval(
   internal.scheduler.cleanupSessionKeys
 );
 
+// Check for DCA strategies due for execution every minute
+crons.interval(
+  "check-dca-strategies",
+  { minutes: 1 },
+  internal.scheduler.checkDCAStrategies
+);
+
+// Fetch news from RSS and API sources every 15 minutes
+crons.interval(
+  "fetch-news",
+  { minutes: 15 },
+  internal.scheduler.fetchNews
+);
+
+// Process unprocessed news items with LLM every 5 minutes
+crons.interval(
+  "process-news",
+  { minutes: 5 },
+  internal.scheduler.processNews
+);
+
 export default crons;

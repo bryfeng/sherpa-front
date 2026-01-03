@@ -24,9 +24,11 @@ import type { HeaderBarProps } from '../components/header/HeaderBar'
 import type { ChatSurfaceProps } from '../components/surfaces/ChatSurface'
 import type { WorkspaceSurfaceProps } from '../components/surfaces/WorkspaceSurface'
 import { useWalletClient, usePublicClient, useSwitchChain } from 'wagmi'
+import { useAppKit } from '@reown/appkit/react'
 import { erc20Abi } from 'viem'
 
 import type { ShellUIState, ShellUIAction } from './useShellUIReducer'
+import { useSherpaStore } from '../store'
 
 const seedWidgets: Widget[] = [
   {
@@ -315,6 +317,7 @@ export function useDeFiChatController({ props, shellState, dispatch }: UseDeFiCh
   const { data: walletClient } = walletClientResult
   const publicClient = usePublicClient()
   const { switchChainAsync } = useSwitchChain()
+  const { open: openAppKit } = useAppKit()
   const walletReady = Boolean(walletClient)
 
   const exportSession = useCallback(() => {
@@ -404,10 +407,12 @@ export function useDeFiChatController({ props, shellState, dispatch }: UseDeFiCh
     }
     setWidgets((previous) => upsertWidgets(previous, [widget]))
     setHighlight(['top_coins'])
+    // Add to artifact panel
+    useSherpaStore.getState().addWidget(widget)
   }, [setHighlight])
 
-  const loadTrendingTokensPanel = useCallback(async (options: { highlight?: boolean } = {}) => {
-    const { highlight: forceHighlight = false } = options
+  const loadTrendingTokensPanel = useCallback(async (options: { highlight?: boolean; addToArtifacts?: boolean } = {}) => {
+    const { highlight: forceHighlight = false, addToArtifacts = false } = options
     let tokens: TrendingToken[] = []
     let errorMessage: string | undefined
 
@@ -439,6 +444,10 @@ export function useDeFiChatController({ props, shellState, dispatch }: UseDeFiCh
 
     if (forceHighlight || !existed) {
       setHighlight(['trending_tokens'])
+    }
+    // Add to artifact panel when explicitly requested
+    if (addToArtifacts) {
+      useSherpaStore.getState().addWidget(widget)
     }
   }, [setHighlight])
 
@@ -513,6 +522,8 @@ export function useDeFiChatController({ props, shellState, dispatch }: UseDeFiCh
       if ((needsUpdate || !existed || portfolioHighlightPending.current) && portfolioHighlightPending.current) {
         setHighlight(['portfolio_overview'])
         portfolioHighlightPending.current = false
+        // Also add to artifact panel when portfolio is requested
+        useSherpaStore.getState().addWidget(widget)
       }
       return upsertWidgets(prev, [widget])
     })
@@ -941,7 +952,7 @@ export function useDeFiChatController({ props, shellState, dispatch }: UseDeFiCh
         }
         if (panelId === 'trending_tokens') {
           addUserMessage('What are the trending tokens right now?')
-          loadTrendingTokensPanel({ highlight: true }).catch(() => {})
+          loadTrendingTokensPanel({ highlight: true, addToArtifacts: true }).catch(() => {})
           setMessages((previous) => [
             ...previous,
             { id: uid('msg'), role: 'assistant', text: 'Here are the trending tokens based on recent trading activity.' },
@@ -1006,6 +1017,7 @@ export function useDeFiChatController({ props, shellState, dispatch }: UseDeFiCh
       showWorkspace()
     },
     onOpenWorkspace: showWorkspace,
+    onConnectWallet: () => openAppKit(),
     onRequestPro: handleProUpsell,
     menuActions: [
       {

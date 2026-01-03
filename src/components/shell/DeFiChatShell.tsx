@@ -3,62 +3,75 @@ import { PanelRight, PanelRightClose } from 'lucide-react'
 
 import { HeaderBar, type HeaderBarProps } from '../header/HeaderBar'
 import { ChatSurface, type ChatSurfaceProps } from '../surfaces/ChatSurface'
-import { WorkspaceSurface, type WorkspaceSurfaceProps } from '../surfaces/WorkspaceSurface'
+import { ArtifactPanel, type ArtifactPanelProps } from '../surfaces/ArtifactPanel'
 import { Button, Card } from '../ui/primitives'
 import { ResizablePanel } from '../ui/ResizablePanel'
 
 export interface DeFiChatShellProps {
   header: HeaderBarProps
-  workspaceVisible: boolean
-  onToggleWorkspace: () => void
-  workspaceButtonLabel: string
+  /** Whether the artifact panel is visible */
+  artifactPanelVisible: boolean
+  /** Toggle artifact panel visibility */
+  onToggleArtifactPanel: () => void
+  /** Label for the artifact panel button */
+  artifactButtonLabel: string
+  /** Number of open artifact tabs */
+  artifactCount: number
   conversationDisplay: string
   railChip?: React.ReactNode
   chat: ChatSurfaceProps
-  workspace: WorkspaceSurfaceProps
+  /** Artifact panel props */
+  artifacts: Omit<ArtifactPanelProps, 'isVisible' | 'onCollapse'>
 }
 
 export function DeFiChatShell({
   header,
-  workspaceVisible,
-  onToggleWorkspace,
-  workspaceButtonLabel,
+  artifactPanelVisible,
+  onToggleArtifactPanel,
+  artifactButtonLabel,
+  artifactCount,
   conversationDisplay,
   railChip,
   chat,
-  workspace,
+  artifacts,
 }: DeFiChatShellProps) {
   return (
-    <div className="app-chrome min-h-[calc(100vh-64px)] w-full py-10">
-      <div className="flex w-full flex-col gap-8">
+    <div className="flex h-screen w-full flex-col px-4 py-4 lg:px-6 overflow-hidden">
+      <div className="shrink-0">
         <HeaderBar {...header} />
+      </div>
 
-        <Card className="overflow-hidden">
+      <Card className="mt-4 flex-1 flex flex-col overflow-hidden min-h-0">
           <div
-            className="flex flex-wrap items-center justify-between gap-4 border-b px-[var(--s4)] py-[var(--s3)]"
+            className="flex flex-wrap items-center justify-between gap-4 border-b px-[var(--s4)] py-[var(--s3)] shrink-0"
             style={{ borderColor: 'var(--line)', background: 'var(--surface-2)' }}
           >
             <div className="flex items-center gap-3">
               <Button
                 size="sm"
-                variant={workspaceVisible ? 'secondary' : 'outline'}
-                onClick={onToggleWorkspace}
-                aria-pressed={workspaceVisible}
+                variant={artifactPanelVisible ? 'secondary' : 'outline'}
+                onClick={onToggleArtifactPanel}
+                aria-pressed={artifactPanelVisible}
                 className="rounded-md"
               >
-                {workspaceVisible ? (
+                {artifactPanelVisible ? (
                   <PanelRightClose className="mr-1.5 h-4 w-4" />
                 ) : (
                   <PanelRight className="mr-1.5 h-4 w-4" />
                 )}
-                {workspaceButtonLabel}
+                {artifactButtonLabel}
+                {artifactCount > 0 && (
+                  <span className="ml-1.5 rounded-full bg-[var(--accent)] px-1.5 py-0.5 text-[10px] font-medium text-white">
+                    {artifactCount}
+                  </span>
+                )}
               </Button>
-              {!workspaceVisible && (
+              {!artifactPanelVisible && artifactCount > 0 && (
                 <span
                   className="text-xs"
                   style={{ color: 'var(--text-muted)' }}
                 >
-                  Click to show workspace
+                  {artifactCount} artifact{artifactCount !== 1 ? 's' : ''} available
                 </span>
               )}
             </div>
@@ -73,61 +86,78 @@ export function DeFiChatShell({
             </div>
           </div>
 
-          {workspaceVisible ? (
-            <div className="flex flex-col lg:flex-row">
+          <div className="flex flex-1 flex-col lg:flex-row min-h-0">
+            {/* Chat Panel - Desktop */}
+            {/* Chat expands when artifact panel is closed OR when no artifacts exist */}
+            {artifactPanelVisible && artifactCount > 0 ? (
+              // Resizable chat when artifact panel is open
               <ResizablePanel
-                defaultWidth={380}
-                minWidth={280}
+                defaultWidth={450}
+                minWidth={350}
                 maxWidth={600}
                 side="left"
-                className="hidden lg:block border-r"
+                className="hidden lg:flex lg:flex-col border-r"
               >
                 <section
-                  className="h-full bg-[var(--surface-2)]/30"
+                  className="flex flex-1 flex-col min-h-0 bg-[var(--surface-2)]/30"
                   style={{ borderColor: 'var(--line)' }}
                 >
-                  <div className="flex h-full min-h-[420px] flex-col lg:max-h-[calc(100vh-260px)]">
-                    <div
-                      className="flex items-center justify-between gap-2 border-b px-4 py-3 text-xs tracking-wide uppercase"
-                      style={{ borderColor: 'var(--line)', color: 'var(--text-muted)' }}
-                    >
-                      <span>Chat</span>
-                      <span className="badge badge--secondary">Active</span>
-                    </div>
-                    <ChatSurface {...chat} />
-                  </div>
-                </section>
-              </ResizablePanel>
-
-              <section
-                className="lg:hidden border-b bg-[var(--surface-2)]/40"
-                style={{ borderColor: 'var(--line)' }}
-              >
-                <div className="flex min-h-[420px] flex-col">
                   <div
-                    className="flex items-center justify-between gap-2 border-b px-4 py-3 text-xs tracking-wide uppercase"
+                    className="flex items-center justify-between gap-2 border-b px-4 py-3 text-xs tracking-wide uppercase shrink-0"
                     style={{ borderColor: 'var(--line)', color: 'var(--text-muted)' }}
                   >
                     <span>Chat</span>
                     <span className="badge badge--secondary">Active</span>
                   </div>
+                  <div className="flex-1 min-h-0">
+                    <ChatSurface {...chat} />
+                  </div>
+                </section>
+              </ResizablePanel>
+            ) : (
+              // Full-width chat when artifact panel is closed
+              <section
+                className="hidden lg:flex flex-1 flex-col min-h-0 bg-[var(--surface-2)]/30"
+                style={{ borderColor: 'var(--line)' }}
+              >
+                <div
+                  className="flex items-center justify-between gap-2 border-b px-4 py-3 text-xs tracking-wide uppercase shrink-0"
+                  style={{ borderColor: 'var(--line)', color: 'var(--text-muted)' }}
+                >
+                  <span>Chat</span>
+                  <span className="badge badge--secondary">Active</span>
+                </div>
+                <div className="flex-1 min-h-0">
                   <ChatSurface {...chat} />
                 </div>
               </section>
+            )}
 
-              <section
-                className="flex-1 flex h-full min-h-[520px] flex-col lg:max-h-[calc(100vh-260px)]"
+            {/* Chat Panel - Mobile (full width) */}
+            <section
+              className="lg:hidden flex-1 flex flex-col min-h-0 border-b bg-[var(--surface-2)]/40"
+              style={{ borderColor: 'var(--line)' }}
+            >
+              <div
+                className="flex items-center justify-between gap-2 border-b px-4 py-3 text-xs tracking-wide uppercase shrink-0"
+                style={{ borderColor: 'var(--line)', color: 'var(--text-muted)' }}
               >
-                <WorkspaceSurface {...workspace} />
-              </section>
-            </div>
-          ) : (
-            <section role="region">
-              <ChatSurface {...chat} />
+                <span>Chat</span>
+                <span className="badge badge--secondary">Active</span>
+              </div>
+              <div className="flex-1 min-h-0">
+                <ChatSurface {...chat} />
+              </div>
             </section>
-          )}
+
+            {/* Artifact Panel */}
+            <ArtifactPanel
+              {...artifacts}
+              isVisible={artifactPanelVisible}
+              onCollapse={onToggleArtifactPanel}
+            />
+          </div>
         </Card>
-      </div>
     </div>
   )
 }

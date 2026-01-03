@@ -9,10 +9,9 @@
  * - New widget system for workspace
  */
 
-import { useCallback, useEffect, useMemo, useState } from 'react'
-import { useAccount, useDisconnect as useWagmiDisconnect, useReconnect } from 'wagmi'
-import { useAppKitAccount, useDisconnect as useAppKitDisconnect, useAppKit } from '@reown/appkit/react'
-import { motion, AnimatePresence } from 'framer-motion'
+import { useEffect, useMemo, useState } from 'react'
+import { useAccount, useReconnect } from 'wagmi'
+import { useAppKitAccount } from '@reown/appkit/react'
 
 // Store
 import { useSherpaStore } from './store'
@@ -26,19 +25,12 @@ import type { EntitlementSnapshot } from './types/entitlement'
 import type { LLMProviderInfo } from './types/llm'
 
 // Components
-import { PersonaSelector } from './components/header/PersonaSelector'
-import { SettingsMenu } from './components/header/SettingsMenu'
-import { WalletMenu } from './components/header/WalletMenu'
-import { PortfolioPanel } from './components/portfolio'
 import { ToastProvider } from './providers/ToastProvider'
 import WidgetPlayground from './pages/WidgetPlayground'
-
-// Chat Component
-import { ChatInterface } from './components/chat/ChatInterface'
+import DeFiChatAdaptiveUI from './pages/DeFiChatAdaptiveUI'
 
 // Hooks
 import { usePortfolioSummary } from './workspace/hooks'
-import { useChatEngine } from './hooks/useChatEngine'
 
 // Styles - Import new design system
 import './styles/design-system.css'
@@ -283,131 +275,24 @@ function useHealthCheck() {
 }
 
 // ============================================
-// CHAT PANEL COMPONENT (with Inline Components)
-// ============================================
-
-interface ChatPanelProps {
-  walletAddress?: string
-  llmModel?: string
-  isPro?: boolean
-  persona: PersonaId
-  onPortfolioRequested: () => void
-}
-
-function ChatPanel({ walletAddress, llmModel, isPro = false, persona, onPortfolioRequested }: ChatPanelProps) {
-  const {
-    messages,
-    inputValue,
-    isTyping,
-    scrollRef,
-    inputRef,
-    setInputValue,
-    send,
-    insertPrompt,
-    prefersReducedMotion,
-  } = useChatEngine({
-    walletAddress,
-    llmModel,
-    onPortfolioRequested,
-  })
-
-  // Handle action buttons in messages
-  const handleAction = useCallback((action: any) => {
-    if (action.type === 'show_panel') {
-      // Panel actions could trigger a follow-up message
-      insertPrompt(`Show me more about ${action.label}`)
-    } else if (action.type === 'swap') {
-      insertPrompt('I want to swap tokens')
-    } else if (action.type === 'simulate') {
-      insertPrompt(`Simulate ${action.params?.symbol || 'this position'}`)
-    }
-  }, [insertPrompt])
-
-  return (
-    <div className="h-full" style={{ minHeight: 'calc(100vh - 200px)' }}>
-      <ChatInterface
-        messages={messages}
-        persona={persona}
-        inputValue={inputValue}
-        isTyping={isTyping}
-        onInputChange={setInputValue}
-        onSend={send}
-        onAction={handleAction}
-        onQuickAction={insertPrompt}
-        scrollRef={scrollRef}
-        inputRef={inputRef}
-        prefersReducedMotion={prefersReducedMotion}
-        walletAddress={walletAddress}
-        isPro={isPro}
-      />
-    </div>
-  )
-}
-
-// ============================================
 // MAIN APP COMPONENT
 // ============================================
 
 function MainApp() {
-  const isTestEnv = ((import.meta as any).env?.MODE || '').toLowerCase() === 'test'
-  const hasModal = Boolean(import.meta.env.VITE_WALLETCONNECT_PROJECT_ID)
-
   // Store state
   const theme = useSherpaStore((s) => s.theme)
-  const setTheme = useSherpaStore((s) => s.setTheme)
   const persona = useSherpaStore((s) => s.persona)
   const setPersona = useSherpaStore((s) => s.setPersona)
   const llmModel = useSherpaStore((s) => s.llmModel)
-  const setLlmModel = useSherpaStore((s) => s.setLlmModel)
   const wallet = useSherpaStore((s) => s.wallet)
-  const setProOverride = useSherpaStore((s) => s.setProOverride)
-
-  // Manual wallet state (for when WalletConnect isn't available)
-  const [manualWallet, setManualWallet] = useState<{
-    address: string
-    chain: 'ethereum' | 'solana'
-  } | null>(null)
-
-  // Portfolio panel state
-  const [showPortfolioPanel, setShowPortfolioPanel] = useState(false)
-
-  // Web3 hooks
-  const { disconnect: disconnectEvm } = useWagmiDisconnect()
-  const { disconnect: disconnectAppKit } = useAppKitDisconnect()
-  const { open: openAppKit } = useAppKit()
 
   // Sync wallet state
-  const activeWallet = useWalletSync()
-
-  // Determine resolved wallet (active or manual)
-  const resolvedWallet = activeWallet ?? manualWallet
-
-  // Update store with manual wallet if needed
-  useEffect(() => {
-    if (manualWallet && !activeWallet) {
-      useSherpaStore.getState().setWallet({
-        address: manualWallet.address,
-        chain: manualWallet.chain,
-        isConnected: true,
-        isManual: true,
-      })
-    }
-  }, [manualWallet, activeWallet])
-
-  // Clear manual wallet when real wallet connects
-  useEffect(() => {
-    if (activeWallet && manualWallet) {
-      setManualWallet(null)
-    }
-  }, [activeWallet, manualWallet])
+  useWalletSync()
 
   // Hooks
   useHealthCheck()
-  const { llmProviders, llmProvidersLoading } = useLLMProviders()
-  const { isPro, gatingActive } = useEntitlementSync(
-    wallet.address,
-    wallet.chain
-  )
+  useLLMProviders()
+  const { isPro } = useEntitlementSync(wallet.address, wallet.chain)
 
   // Portfolio data
   const {
@@ -441,248 +326,28 @@ function MainApp() {
     }
   }, [llmModel])
 
-  // Handle disconnect
-  const handleDisconnect = useCallback(async () => {
-    if (wallet.chain === 'solana') {
-      await disconnectAppKit({ namespace: 'solana' }).catch((error) => {
-        console.warn('Failed to disconnect Solana wallet', error)
-      })
-      setManualWallet(null)
-      return
-    }
-
-    await Promise.allSettled([
-      (async () => {
-        try {
-          await disconnectEvm()
-        } catch (e) {
-          console.warn('Failed to disconnect EVM', e)
-        }
-      })(),
-      (async () => {
-        try {
-          await disconnectAppKit({ namespace: 'eip155' })
-        } catch (e) {
-          console.warn('Failed to disconnect AppKit EVM', e)
-        }
-      })(),
-    ])
-    setManualWallet(null)
-  }, [wallet.chain, disconnectEvm, disconnectAppKit])
-
-  // Handle connect
-  const handleConnect = useCallback(() => {
-    if (hasModal && !isTestEnv) {
-      openAppKit()
-    } else {
-      // Manual wallet input fallback
-      const input = window.prompt('Paste a wallet address (0x… or Solana base58)')
-      if (!input) return
-      if (/^0x[a-fA-F0-9]{40}$/.test(input)) {
-        setManualWallet({ address: input, chain: 'ethereum' })
-        return
-      }
-      if (/^[1-9A-HJ-NP-Za-km-z]{32,44}$/.test(input)) {
-        setManualWallet({ address: input, chain: 'solana' })
-        return
-      }
-      window.alert(
-        'Address must be a 0x-prefixed EVM wallet or a Solana base58 string (32–44 characters).'
-      )
-    }
-  }, [hasModal, isTestEnv, openAppKit])
-
-  // Handle new chat
-  const handleNewChat = useCallback(() => {
-    useSherpaStore.getState().startNewChat()
-  }, [])
-
-  // Settings menu
-  const settingsMenu = (
-    <SettingsMenu
-      selectedModel={llmModel}
-      onSelectModel={setLlmModel}
-      providers={llmProviders}
-      loading={llmProvidersLoading}
-    />
-  )
-
   return (
     <div
       className="min-h-screen flex flex-col"
       style={{ background: 'var(--bg)', color: 'var(--text)' }}
       data-persona={persona}
     >
-      {/* Header */}
-      <header
-        className="sticky top-0 z-30 border-b"
-        style={{
-          background: 'var(--bg)',
-          borderColor: 'var(--line)',
-          backdropFilter: 'blur(12px)',
-        }}
-      >
-        <div className="flex items-center justify-between px-6 py-3">
-          {/* Left: Logo + Persona */}
-          <div className="flex items-center gap-6">
-            {/* Logo */}
-            <div className="flex items-center gap-3">
-              <div
-                className="w-9 h-9 rounded-xl flex items-center justify-center"
-                style={{
-                  background: 'linear-gradient(135deg, var(--accent), var(--color-secondary, #4da6ff))',
-                  boxShadow: '0 0 20px rgba(245, 166, 35, 0.15)',
-                }}
-              >
-                <svg
-                  viewBox="0 0 24 24"
-                  className="w-5 h-5"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  style={{ color: 'var(--text-inverse)' }}
-                >
-                  <path d="M8 21l4-10 4 10" />
-                  <path d="M12 11l-4-5 8 0 -4 5" />
-                </svg>
-              </div>
-              <div>
-                <h1
-                  className="font-semibold text-lg tracking-tight"
-                  style={{ color: 'var(--text)', fontFamily: 'var(--font-display, Outfit, system-ui)' }}
-                >
-                  Sherpa
-                </h1>
-                <p
-                  className="text-[10px] font-medium uppercase tracking-wider -mt-0.5"
-                  style={{ color: 'var(--text-muted)' }}
-                >
-                  AI Portfolio Guide
-                </p>
-              </div>
-            </div>
-
-            {/* Divider */}
-            <div className="w-px h-6 hidden sm:block" style={{ background: 'var(--line)' }} />
-
-            {/* Persona Selector */}
-            <div className="hidden sm:block">
-              <PersonaSelector value={persona} onChange={setPersona} />
-            </div>
-          </div>
-
-          {/* Right: Actions */}
-          <div className="flex items-center gap-2">
-            {/* Settings */}
-            {settingsMenu}
-
-            {/* Theme toggle */}
-            <motion.button
-              onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
-              className="p-2 rounded-lg transition-colors"
-              style={{ color: 'var(--text-muted)', background: 'transparent' }}
-              whileHover={{ backgroundColor: 'var(--color-hover)' }}
-              whileTap={{ scale: 0.95 }}
-              title={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
-            >
-              <AnimatePresence mode="wait" initial={false}>
-                <motion.div
-                  key={theme}
-                  initial={{ rotate: -90, opacity: 0 }}
-                  animate={{ rotate: 0, opacity: 1 }}
-                  exit={{ rotate: 90, opacity: 0 }}
-                  transition={{ duration: 0.15 }}
-                >
-                  {theme === 'dark' ? (
-                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" />
-                    </svg>
-                  ) : (
-                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" />
-                    </svg>
-                  )}
-                </motion.div>
-              </AnimatePresence>
-            </motion.button>
-
-            {/* New Chat */}
-            <motion.button
-              onClick={handleNewChat}
-              className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium"
-              style={{ color: 'var(--text-muted)', background: 'transparent' }}
-              whileHover={{ backgroundColor: 'var(--color-hover)' }}
-              whileTap={{ scale: 0.98 }}
-            >
-              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-              </svg>
-              <span className="hidden sm:inline">New Chat</span>
-            </motion.button>
-
-            {/* Wallet */}
-            {wallet.address ? (
-              <WalletMenu
-                address={wallet.address}
-                onDisconnect={handleDisconnect}
-                onViewPortfolio={() => setShowPortfolioPanel(true)}
-              />
-            ) : (
-              <motion.button
-                onClick={handleConnect}
-                className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium"
-                style={{ background: 'var(--accent)', color: 'var(--text-inverse)' }}
-                whileHover={{ scale: 1.02 }}
-                whileTap={{ scale: 0.98 }}
-              >
-                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" />
-                </svg>
-                <span>Connect</span>
-              </motion.button>
-            )}
-          </div>
-        </div>
-      </header>
-
-      {/* Main Content - Full Width Chat */}
-      <main className="flex-1 flex justify-center px-4 py-6">
-        <div
-          className="w-full"
-          style={{
-            maxWidth: '900px',
+      <main className="flex-1">
+        <DeFiChatAdaptiveUI
+          persona={persona}
+          setPersona={setPersona}
+          walletAddress={wallet.address ?? undefined}
+          pro={isPro}
+          entitlement={useSherpaStore.getState().entitlement}
+          onRequestPro={(source) => {
+            console.log('Pro requested from:', source)
           }}
-        >
-          <ChatPanel
-            walletAddress={wallet.address ?? undefined}
-            llmModel={llmModel}
-            isPro={isPro}
-            persona={persona}
-            onPortfolioRequested={refreshPortfolio}
-          />
-        </div>
+          portfolioSummary={portfolioSummary ?? undefined}
+          portfolioStatus={portfolioSummary ? 'success' : 'idle'}
+          onRefreshPortfolio={async () => { await refreshPortfolio() }}
+          llmModel={llmModel}
+        />
       </main>
-
-      {/* Portfolio Panel */}
-      <PortfolioPanel
-        isOpen={showPortfolioPanel}
-        onClose={() => setShowPortfolioPanel(false)}
-        walletAddress={wallet.address ?? undefined}
-        chain={wallet.chain}
-        onTokenAction={(action, token) => {
-          setShowPortfolioPanel(false)
-          // Insert prompt for the action
-          if (action === 'swap') {
-            useSherpaStore.getState().setInputValue(`Swap ${token.symbol}`)
-          } else if (action === 'send') {
-            useSherpaStore.getState().setInputValue(`Send ${token.symbol}`)
-          } else if (action === 'chart') {
-            useSherpaStore.getState().setInputValue(`Show ${token.symbol} chart`)
-          }
-        }}
-      />
     </div>
   )
 }

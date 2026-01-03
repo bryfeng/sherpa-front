@@ -200,6 +200,183 @@ export const cleanupRateLimits = internalMutation({
 });
 
 /**
+ * Check for DCA strategies due for execution
+ */
+export const checkDCAStrategies = internalAction({
+  args: {},
+  handler: async (ctx): Promise<void> => {
+    const now = Date.now();
+
+    // Get all active DCA strategies due for execution
+    const dueStrategies = await ctx.runQuery(
+      internal.scheduler.getDueDCAStrategies,
+      { beforeTimestamp: now }
+    );
+
+    if (dueStrategies.length === 0) {
+      return;
+    }
+
+    console.log(`Found ${dueStrategies.length} DCA strategies due for execution`);
+
+    for (const strategy of dueStrategies) {
+      try {
+        // Call FastAPI to execute the DCA
+        const fastapiUrl = process.env.FASTAPI_URL;
+        const internalKey = process.env.INTERNAL_API_KEY;
+
+        if (fastapiUrl && internalKey) {
+          const response = await fetch(`${fastapiUrl}/internal/dca/execute`, {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              "X-Internal-Key": internalKey,
+            },
+            body: JSON.stringify({
+              strategyId: strategy._id,
+            }),
+          });
+
+          if (!response.ok) {
+            const errorText = await response.text();
+            console.error(
+              `Failed to execute DCA strategy ${strategy._id}: ${response.status} ${errorText}`
+            );
+
+            // Mark strategy as having an error (don't stop it though)
+            await ctx.runMutation(internal.scheduler.recordDCAError, {
+              strategyId: strategy._id,
+              error: `HTTP ${response.status}: ${errorText}`,
+            });
+          } else {
+            console.log(`Successfully triggered DCA execution for ${strategy._id}`);
+          }
+        } else {
+          console.error("FASTAPI_URL or INTERNAL_API_KEY not configured");
+        }
+      } catch (error) {
+        console.error(`Error executing DCA strategy ${strategy._id}:`, error);
+
+        // Record error but continue with other strategies
+        await ctx.runMutation(internal.scheduler.recordDCAError, {
+          strategyId: strategy._id,
+          error: error instanceof Error ? error.message : String(error),
+        });
+      }
+    }
+  },
+});
+
+/**
+ * Get DCA strategies due for execution
+ */
+export const getDueDCAStrategies = internalQuery({
+  args: { beforeTimestamp: v.number() },
+  handler: async (ctx, args) => {
+    // Get active strategies with nextExecutionAt <= now
+    const strategies = await ctx.db
+      .query("dcaStrategies")
+      .filter((q) =>
+        q.and(
+          q.eq(q.field("status"), "active"),
+          q.lte(q.field("nextExecutionAt"), args.beforeTimestamp)
+        )
+      )
+      .take(50); // Process max 50 per minute
+
+    return strategies;
+  },
+});
+
+/**
+ * Record DCA execution error (without stopping the strategy)
+ */
+export const recordDCAError = internalMutation({
+  args: {
+    strategyId: v.id("dcaStrategies"),
+    error: v.string(),
+  },
+  handler: async (ctx, args): Promise<void> => {
+    await ctx.db.patch(args.strategyId, {
+      lastError: args.error,
+      updatedAt: Date.now(),
+    });
+  },
+});
+
+/**
+ * Trigger news fetch from RSS and API sources
+ */
+export const fetchNews = internalAction({
+  args: {},
+  handler: async (): Promise<void> => {
+    const fastapiUrl = process.env.FASTAPI_URL;
+    const internalKey = process.env.INTERNAL_API_KEY;
+
+    if (!fastapiUrl || !internalKey) {
+      console.error("FASTAPI_URL or INTERNAL_API_KEY not configured for news fetch");
+      return;
+    }
+
+    try {
+      const response = await fetch(`${fastapiUrl}/news/internal/fetch`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "X-Internal-Key": internalKey,
+        },
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error(`News fetch failed: ${response.status} ${errorText}`);
+      } else {
+        const result = await response.json();
+        console.log(`News fetch complete: ${result.new} new items, ${result.processed} processed`);
+      }
+    } catch (error) {
+      console.error("Error triggering news fetch:", error);
+    }
+  },
+});
+
+/**
+ * Trigger LLM processing of unprocessed news
+ */
+export const processNews = internalAction({
+  args: {},
+  handler: async (): Promise<void> => {
+    const fastapiUrl = process.env.FASTAPI_URL;
+    const internalKey = process.env.INTERNAL_API_KEY;
+
+    if (!fastapiUrl || !internalKey) {
+      console.error("FASTAPI_URL or INTERNAL_API_KEY not configured for news processing");
+      return;
+    }
+
+    try {
+      const response = await fetch(`${fastapiUrl}/news/internal/process`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "X-Internal-Key": internalKey,
+        },
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error(`News processing failed: ${response.status} ${errorText}`);
+      } else {
+        const result = await response.json();
+        console.log(`News processing complete: ${result.processed} items processed`);
+      }
+    } catch (error) {
+      console.error("Error triggering news processing:", error);
+    }
+  },
+});
+
+/**
  * Clean up expired session keys
  */
 export const cleanupSessionKeys = internalMutation({

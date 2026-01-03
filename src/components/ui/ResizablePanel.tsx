@@ -67,10 +67,12 @@ export function ResizablePanel({
   return (
     <div
       ref={panelRef}
-      className={`relative flex-shrink-0 ${className}`}
+      className={`relative flex-shrink-0 h-full ${className}`}
       style={{ width }}
     >
-      {children}
+      <div className="h-full flex flex-col">
+        {children}
+      </div>
       <div
         className={`absolute top-0 ${side === 'left' ? 'right-0' : 'left-0'} h-full w-1 cursor-col-resize group`}
         onMouseDown={handleMouseDown}

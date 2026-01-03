@@ -148,6 +148,173 @@ export default defineSchema({
     .index("by_wallet_state", ["walletAddress", "currentState"]),
 
   // ============================================
+  // DCA Strategies
+  // ============================================
+  dcaStrategies: defineTable({
+    userId: v.id("users"),
+    walletId: v.id("wallets"),
+    walletAddress: v.string(),
+
+    // Basic info
+    name: v.string(),
+    description: v.optional(v.string()),
+
+    // What to buy
+    fromToken: v.object({
+      symbol: v.string(),
+      address: v.string(),
+      chainId: v.number(),
+      decimals: v.number(),
+    }),
+    toToken: v.object({
+      symbol: v.string(),
+      address: v.string(),
+      chainId: v.number(),
+      decimals: v.number(),
+    }),
+
+    // How much per execution
+    amountPerExecutionUsd: v.number(), // e.g., 100 = $100 per buy
+
+    // Schedule
+    frequency: v.union(
+      v.literal("hourly"),
+      v.literal("daily"),
+      v.literal("weekly"),
+      v.literal("biweekly"),
+      v.literal("monthly"),
+      v.literal("custom")
+    ),
+    cronExpression: v.optional(v.string()), // For custom frequency
+    executionHourUtc: v.number(), // 0-23, hour of day to execute
+    executionDayOfWeek: v.optional(v.number()), // 0-6, for weekly (0 = Sunday)
+    executionDayOfMonth: v.optional(v.number()), // 1-31, for monthly
+
+    // Constraints
+    maxSlippageBps: v.number(), // e.g., 100 = 1%
+    maxGasUsd: v.number(), // Max gas to pay per execution
+    skipIfGasAboveUsd: v.optional(v.number()), // Skip if gas exceeds this
+    pauseIfPriceAboveUsd: v.optional(v.number()), // Pause if token price above
+    pauseIfPriceBelowUsd: v.optional(v.number()), // Pause if token price below
+    minAmountOut: v.optional(v.string()), // Minimum tokens to receive (Decimal)
+
+    // Session key reference
+    sessionKeyId: v.optional(v.id("sessionKeys")),
+
+    // Status
+    status: v.union(
+      v.literal("draft"), // Not yet activated
+      v.literal("pending_session"), // Waiting for session key
+      v.literal("active"), // Running
+      v.literal("paused"), // Temporarily paused
+      v.literal("completed"), // User ended it
+      v.literal("failed"), // Unrecoverable error
+      v.literal("expired") // Session key expired
+    ),
+    pauseReason: v.optional(v.string()),
+
+    // Scheduling state
+    nextExecutionAt: v.optional(v.number()), // Timestamp of next scheduled run
+    lastExecutionAt: v.optional(v.number()),
+
+    // Lifetime stats
+    totalExecutions: v.number(),
+    successfulExecutions: v.number(),
+    failedExecutions: v.number(),
+    skippedExecutions: v.number(), // Due to gas, price bounds, etc.
+    totalAmountSpentUsd: v.number(),
+    totalTokensAcquired: v.string(), // Decimal string for precision
+    averagePriceUsd: v.optional(v.number()),
+    lastError: v.optional(v.string()),
+
+    // Budget limits (optional)
+    maxTotalSpendUsd: v.optional(v.number()), // Stop after spending this much
+    maxExecutions: v.optional(v.number()), // Stop after N executions
+    endDate: v.optional(v.number()), // Stop after this date
+
+    // Timestamps
+    createdAt: v.number(),
+    updatedAt: v.number(),
+    activatedAt: v.optional(v.number()),
+  })
+    .index("by_user", ["userId"])
+    .index("by_wallet", ["walletId"])
+    .index("by_wallet_address", ["walletAddress"])
+    .index("by_status", ["status"])
+    .index("by_next_execution", ["status", "nextExecutionAt"]),
+
+  // Individual DCA execution records
+  dcaExecutions: defineTable({
+    strategyId: v.id("dcaStrategies"),
+    executionNumber: v.number(), // 1, 2, 3, etc.
+
+    // Execution result
+    status: v.union(
+      v.literal("pending"), // Scheduled
+      v.literal("running"), // In progress
+      v.literal("completed"), // Success
+      v.literal("failed"), // Error
+      v.literal("skipped") // Skipped due to constraints
+    ),
+
+    // Skip reason (if skipped)
+    skipReason: v.optional(
+      v.union(
+        v.literal("gas_too_high"),
+        v.literal("price_above_limit"),
+        v.literal("price_below_limit"),
+        v.literal("insufficient_balance"),
+        v.literal("session_expired"),
+        v.literal("slippage_exceeded"),
+        v.literal("manually_skipped")
+      )
+    ),
+
+    // Market conditions at execution
+    marketConditions: v.optional(
+      v.object({
+        tokenPriceUsd: v.number(),
+        gasGwei: v.number(),
+        estimatedGasUsd: v.number(),
+      })
+    ),
+
+    // Quote details
+    quote: v.optional(
+      v.object({
+        inputAmount: v.string(), // Amount of fromToken
+        expectedOutputAmount: v.string(), // Expected toToken amount
+        minimumOutputAmount: v.string(), // With slippage
+        priceImpactBps: v.number(),
+        route: v.optional(v.string()), // DEX route description
+      })
+    ),
+
+    // Transaction details (if executed)
+    txHash: v.optional(v.string()),
+    chainId: v.number(),
+    actualInputAmount: v.optional(v.string()),
+    actualOutputAmount: v.optional(v.string()),
+    actualPriceUsd: v.optional(v.number()), // Actual price paid
+    gasUsed: v.optional(v.number()),
+    gasPriceGwei: v.optional(v.number()),
+    gasUsd: v.optional(v.number()),
+
+    // Error info (if failed)
+    errorMessage: v.optional(v.string()),
+    errorCode: v.optional(v.string()),
+
+    // Timing
+    scheduledAt: v.number(),
+    startedAt: v.optional(v.number()),
+    completedAt: v.optional(v.number()),
+  })
+    .index("by_strategy", ["strategyId"])
+    .index("by_strategy_status", ["strategyId", "status"])
+    .index("by_status", ["status"])
+    .index("by_scheduled", ["scheduledAt"]),
+
+  // ============================================
   // Transactions
   // ============================================
   transactions: defineTable({

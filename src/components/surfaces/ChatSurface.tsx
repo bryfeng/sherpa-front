@@ -333,10 +333,10 @@ function ChatSurfaceComponent({
   }
 
   return (
-    <div className="flex h-full flex-col">
+    <div className="flex h-full flex-col min-h-0 overflow-hidden">
       <div
         ref={containerRef}
-        className="flex-1 space-y-4 overflow-y-auto px-4 pt-4 pb-6"
+        className="flex-1 space-y-4 overflow-y-auto px-4 pt-4 pb-6 min-h-0"
         role="log"
         aria-live="polite"
         aria-relevant="additions text"
@@ -361,7 +361,7 @@ function ChatSurfaceComponent({
         {ariaAnnouncement}
       </div>
       <div
-        className="border-t px-4 py-4"
+        className="border-t px-4 py-4 shrink-0"
         style={{ borderColor: 'var(--line)', background: 'var(--bg-elev)' }}
       >
         <div className="space-y-3">
@@ -414,9 +414,10 @@ function ChatSurfaceComponent({
                 disabled={!canPinLatest}
                 className="flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-xs font-medium transition-colors disabled:opacity-40"
                 style={{ color: 'var(--text-muted)', background: 'var(--surface-2)', border: '1px solid var(--line)' }}
+                title="Pin latest content to artifacts panel"
               >
                 <Pin className="h-3.5 w-3.5" />
-                <span>Pin panel</span>
+                <span>Pin to Artifacts</span>
               </button>
             </div>
           </div>
