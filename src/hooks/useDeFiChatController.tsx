@@ -248,6 +248,10 @@ export function useDeFiChatController({ props, shellState, dispatch }: UseDeFiCh
     }
   })
 
+  // Watch store's conversationId for sidebar selection
+  const storeConversationId = useSherpaStore((state) => state.conversationId)
+  const prevStoreConversationIdRef = useRef<string | null>(null)
+
   const scrollRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLTextAreaElement>(null)
   const copyInfoTimeout = useRef<number | null>(null)
@@ -470,6 +474,64 @@ export function useDeFiChatController({ props, shellState, dispatch }: UseDeFiCh
       setConversationId(undefined)
     }
   }, [storageKey, walletAddress])
+
+  // Sync with store's conversationId (from sidebar selection)
+  useEffect(() => {
+    // Skip if this is the initial render or no change
+    if (prevStoreConversationIdRef.current === storeConversationId) return
+
+    // Update the ref
+    const prevId = prevStoreConversationIdRef.current
+    prevStoreConversationIdRef.current = storeConversationId
+
+    // Handle new chat (null conversationId from store)
+    if (storeConversationId === null) {
+      // Only reset if we had a previous conversation (not initial load)
+      if (prevId !== null) {
+        setConversationId(undefined)
+        setMessages(seedIntro)
+        setWidgets(seedWidgets)
+        setHighlight(undefined)
+        resetPanelUI()
+        try {
+          localStorage.removeItem(storageKey(walletAddress ?? null))
+        } catch {}
+      }
+      return
+    }
+
+    // Skip if same as local conversationId (already loaded)
+    if (storeConversationId === conversationId) return
+
+    // Load the selected conversation
+    api.getConversation(storeConversationId)
+      .then((data) => {
+        if (!isMounted.current) return
+
+        // Update local conversation ID
+        setConversationId(storeConversationId)
+
+        // Convert messages to AgentMessage format
+        const loadedMessages: AgentMessage[] = data.messages.map((msg) => ({
+          id: msg.id,
+          role: msg.role as 'user' | 'assistant',
+          text: msg.content,
+        }))
+
+        setMessages(loadedMessages.length > 0 ? loadedMessages : seedIntro)
+        setWidgets(seedWidgets) // Reset widgets for loaded conversation
+        setHighlight(undefined)
+        resetPanelUI()
+
+        // Update localStorage
+        try {
+          localStorage.setItem(storageKey(walletAddress ?? null), storeConversationId)
+        } catch {}
+      })
+      .catch((err) => {
+        console.error('Failed to load conversation:', err)
+      })
+  }, [storeConversationId, conversationId, storageKey, walletAddress, setHighlight, resetPanelUI])
 
   useEffect(() => {
     if (hasLiveWidgets && !hasNudgedWorkspace) {

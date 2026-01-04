@@ -168,7 +168,7 @@ export const insert = mutation({
     // Check for duplicate by id
     const existing = await ctx.db
       .query("walletActivity")
-      .withIndex("by_id", (q) => q.eq("id", args.id))
+      .withIndex("by_external_id", (q) => q.eq("id", args.id))
       .first();
 
     if (existing) {
@@ -231,7 +231,7 @@ export const insertBatch = mutation({
       // Check for duplicate
       const existing = await ctx.db
         .query("walletActivity")
-        .withIndex("by_id", (q) => q.eq("id", activity.id))
+        .withIndex("by_external_id", (q) => q.eq("id", activity.id))
         .first();
 
       if (existing) {

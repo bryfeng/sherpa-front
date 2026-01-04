@@ -4,6 +4,9 @@ import './index.css'
 import { App } from './App'
 import { Web3Provider } from './providers/Web3Provider'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
+import { ConvexProvider, ConvexReactClient } from 'convex/react'
+
+const convex = new ConvexReactClient(import.meta.env.VITE_CONVEX_URL as string)
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -19,10 +22,12 @@ const queryClient = new QueryClient({
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
-    <QueryClientProvider client={queryClient}>
-      <Web3Provider>
-        <App />
-      </Web3Provider>
-    </QueryClientProvider>
+    <ConvexProvider client={convex}>
+      <QueryClientProvider client={queryClient}>
+        <Web3Provider>
+          <App />
+        </Web3Provider>
+      </QueryClientProvider>
+    </ConvexProvider>
   </React.StrictMode>,
 )

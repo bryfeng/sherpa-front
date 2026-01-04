@@ -17,7 +17,7 @@ export const getById = query({
   handler: async (ctx, { id }) => {
     return await ctx.db
       .query("subscriptions")
-      .withIndex("by_id", (q) => q.eq("id", id))
+      .withIndex("by_external_id", (q) => q.eq("id", id))
       .first();
   },
 });
@@ -109,7 +109,7 @@ export const upsert = mutation({
     // Check if exists
     const existing = await ctx.db
       .query("subscriptions")
-      .withIndex("by_id", (q) => q.eq("id", args.id))
+      .withIndex("by_external_id", (q) => q.eq("id", args.id))
       .first();
 
     if (existing) {
@@ -165,7 +165,7 @@ export const updateStatus = mutation({
   handler: async (ctx, { id, status, updatedAt, errorMessage }) => {
     const sub = await ctx.db
       .query("subscriptions")
-      .withIndex("by_id", (q) => q.eq("id", id))
+      .withIndex("by_external_id", (q) => q.eq("id", id))
       .first();
 
     if (!sub) {
@@ -193,7 +193,7 @@ export const updateLastActivity = mutation({
   handler: async (ctx, { id, lastActivityAt }) => {
     const sub = await ctx.db
       .query("subscriptions")
-      .withIndex("by_id", (q) => q.eq("id", id))
+      .withIndex("by_external_id", (q) => q.eq("id", id))
       .first();
 
     if (!sub) {
@@ -217,7 +217,7 @@ export const remove = mutation({
   handler: async (ctx, { id }) => {
     const sub = await ctx.db
       .query("subscriptions")
-      .withIndex("by_id", (q) => q.eq("id", id))
+      .withIndex("by_external_id", (q) => q.eq("id", id))
       .first();
 
     if (!sub) {

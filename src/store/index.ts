@@ -171,6 +171,26 @@ interface WorkspaceSlice {
 }
 
 // ============================================
+// CONVERSATION SIDEBAR SLICE - History sidebar state
+// ============================================
+
+interface ConversationSidebarSlice {
+  // Visibility
+  sidebarVisible: boolean
+  toggleSidebar: () => void
+  showSidebar: () => void
+  hideSidebar: () => void
+
+  // Search
+  sidebarSearchQuery: string
+  setSidebarSearchQuery: (query: string) => void
+
+  // Mobile drawer
+  mobileDrawerOpen: boolean
+  setMobileDrawerOpen: (open: boolean) => void
+}
+
+// ============================================
 // UI SLICE - Modals and UI state
 // ============================================
 
@@ -195,7 +215,7 @@ interface UISlice {
 // COMBINED STORE TYPE
 // ============================================
 
-export type SherpaStore = AppSlice & WalletSlice & ChatSlice & WorkspaceSlice & UISlice
+export type SherpaStore = AppSlice & WalletSlice & ChatSlice & WorkspaceSlice & ConversationSidebarSlice & UISlice
 
 // ============================================
 // INITIAL STATES
@@ -513,6 +533,24 @@ export const useSherpaStore = create<SherpaStore>()(
             }),
 
           // ============================================
+          // CONVERSATION SIDEBAR SLICE
+          // ============================================
+          sidebarVisible: false,
+          sidebarSearchQuery: '',
+          mobileDrawerOpen: false,
+
+          toggleSidebar: () =>
+            set((state) => ({ sidebarVisible: !state.sidebarVisible })),
+
+          showSidebar: () => set({ sidebarVisible: true }),
+
+          hideSidebar: () => set({ sidebarVisible: false }),
+
+          setSidebarSearchQuery: (query) => set({ sidebarSearchQuery: query }),
+
+          setMobileDrawerOpen: (open) => set({ mobileDrawerOpen: open }),
+
+          // ============================================
           // UI SLICE
           // ============================================
           modals: initialModals,
@@ -559,6 +597,8 @@ export const useSherpaStore = create<SherpaStore>()(
             artifactTabs: state.artifactTabs,
             activeArtifactId: state.activeArtifactId,
             panelWidth: state.panelWidth,
+            // Conversation sidebar persistence
+            sidebarVisible: state.sidebarVisible,
           }),
         }
       )
@@ -681,4 +721,17 @@ export const useArtifacts = () => useSherpaStore((state) => ({
   toggleVisibility: state.toggleVisibility,
   show: state.show,
   hide: state.hide,
+}))
+
+export const useConversationSidebar = () => useSherpaStore((state) => ({
+  // State
+  isVisible: state.sidebarVisible,
+  searchQuery: state.sidebarSearchQuery,
+  mobileDrawerOpen: state.mobileDrawerOpen,
+  // Actions
+  toggleSidebar: state.toggleSidebar,
+  showSidebar: state.showSidebar,
+  hideSidebar: state.hideSidebar,
+  setSidebarSearchQuery: state.setSidebarSearchQuery,
+  setMobileDrawerOpen: state.setMobileDrawerOpen,
 }))

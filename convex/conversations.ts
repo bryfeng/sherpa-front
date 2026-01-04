@@ -2,6 +2,48 @@ import { mutation, query } from "./_generated/server";
 import { v } from "convex/values";
 
 /**
+ * List conversations by wallet address
+ * Looks up wallet by address, then fetches conversations
+ */
+export const listByWalletAddress = query({
+  args: {
+    address: v.string(),
+    chain: v.optional(v.string()),
+    includeArchived: v.optional(v.boolean()),
+  },
+  handler: async (ctx, args) => {
+    const chain = args.chain ?? "ethereum";
+
+    // Find wallet by address
+    const wallet = await ctx.db
+      .query("wallets")
+      .withIndex("by_address_chain", (q) =>
+        q.eq("address", args.address.toLowerCase()).eq("chain", chain)
+      )
+      .first();
+
+    if (!wallet) return [];
+
+    // Fetch conversations
+    if (args.includeArchived) {
+      return await ctx.db
+        .query("conversations")
+        .withIndex("by_wallet", (q) => q.eq("walletId", wallet._id))
+        .order("desc")
+        .collect();
+    }
+
+    return await ctx.db
+      .query("conversations")
+      .withIndex("by_wallet_archived", (q) =>
+        q.eq("walletId", wallet._id).eq("archived", false)
+      )
+      .order("desc")
+      .collect();
+  },
+});
+
+/**
  * List conversations for a wallet
  */
 export const listByWallet = query({

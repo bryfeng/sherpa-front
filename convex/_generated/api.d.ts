@@ -14,6 +14,7 @@ import type * as admin_sessions from "../admin/sessions.js";
 import type * as admin_users from "../admin/users.js";
 import type * as auth from "../auth.js";
 import type * as conversations from "../conversations.js";
+import type * as copyTrading from "../copyTrading.js";
 import type * as crons from "../crons.js";
 import type * as dca from "../dca.js";
 import type * as executions from "../executions.js";
@@ -25,10 +26,12 @@ import type * as riskPolicies from "../riskPolicies.js";
 import type * as scheduler from "../scheduler.js";
 import type * as sessionKeys from "../sessionKeys.js";
 import type * as strategies from "../strategies.js";
+import type * as subscriptions from "../subscriptions.js";
 import type * as systemPolicy from "../systemPolicy.js";
 import type * as tokenCatalog from "../tokenCatalog.js";
 import type * as transactions from "../transactions.js";
 import type * as users from "../users.js";
+import type * as walletActivity from "../walletActivity.js";
 import type * as wallets from "../wallets.js";
 
 import type {
@@ -44,6 +47,7 @@ declare const fullApi: ApiFromModules<{
   "admin/users": typeof admin_users;
   auth: typeof auth;
   conversations: typeof conversations;
+  copyTrading: typeof copyTrading;
   crons: typeof crons;
   dca: typeof dca;
   executions: typeof executions;
@@ -55,10 +59,12 @@ declare const fullApi: ApiFromModules<{
   scheduler: typeof scheduler;
   sessionKeys: typeof sessionKeys;
   strategies: typeof strategies;
+  subscriptions: typeof subscriptions;
   systemPolicy: typeof systemPolicy;
   tokenCatalog: typeof tokenCatalog;
   transactions: typeof transactions;
   users: typeof users;
+  walletActivity: typeof walletActivity;
   wallets: typeof wallets;
 }>;
 

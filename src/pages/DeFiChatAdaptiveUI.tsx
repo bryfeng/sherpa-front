@@ -5,7 +5,7 @@ import { initialShellUIState, shellUIReducer, type ShellUIState } from '../hooks
 import { useDeFiChatController, type DeFiChatAdaptiveUIProps } from '../hooks/useDeFiChatController'
 import { EntitlementsProvider } from '../hooks/useEntitlements'
 import { loadPanelUIState, debouncedSavePanelUI } from '../utils/panelPrefs'
-import { useArtifacts, useSherpaStore } from '../store'
+import { useArtifacts, useConversationSidebar, useSherpaStore } from '../store'
 
 function initializeState(): ShellUIState {
   const savedPanelUI = loadPanelUIState()
@@ -39,9 +39,16 @@ export default function DeFiChatAdaptiveUI(props: DeFiChatAdaptiveUIProps) {
     toggleVisibility,
   } = useArtifacts()
 
-  // Get addWidget from store for pinning
+  // Conversation sidebar state from store
+  const {
+    isVisible: sidebarVisible,
+    toggleSidebar,
+  } = useConversationSidebar()
+
+  // Get addWidget and startNewChat from store
   const addWidget = useSherpaStore((s) => s.addWidget)
   const walletAddress = useSherpaStore((s) => s.wallet.address)
+  const startNewChat = useSherpaStore((s) => s.startNewChat)
 
   // Compute artifact widgets from controller widgets filtered by artifact tabs
   const artifactWidgets = useMemo(() => {
@@ -73,6 +80,10 @@ export default function DeFiChatAdaptiveUI(props: DeFiChatAdaptiveUIProps) {
     <EntitlementsProvider value={entitlementsValue}>
       <DeFiChatShell
         header={headerProps}
+        sidebarVisible={sidebarVisible}
+        onToggleSidebar={toggleSidebar}
+        walletAddress={walletAddress}
+        onNewChat={startNewChat}
         artifactPanelVisible={artifactPanelVisible}
         onToggleArtifactPanel={toggleVisibility}
         artifactButtonLabel="Artifacts"

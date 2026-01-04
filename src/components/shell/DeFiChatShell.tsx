@@ -1,14 +1,23 @@
 import React from 'react'
-import { PanelRight, PanelRightClose } from 'lucide-react'
+import { PanelLeft, PanelLeftClose, PanelRight, PanelRightClose } from 'lucide-react'
 
 import { HeaderBar, type HeaderBarProps } from '../header/HeaderBar'
 import { ChatSurface, type ChatSurfaceProps } from '../surfaces/ChatSurface'
 import { ArtifactPanel, type ArtifactPanelProps } from '../surfaces/ArtifactPanel'
+import { ConversationSidebar } from '../sidebar/ConversationSidebar'
 import { Button, Card } from '../ui/primitives'
 import { ResizablePanel } from '../ui/ResizablePanel'
 
 export interface DeFiChatShellProps {
   header: HeaderBarProps
+  /** Whether the conversation sidebar is visible */
+  sidebarVisible: boolean
+  /** Toggle sidebar visibility */
+  onToggleSidebar: () => void
+  /** Wallet address for conversation history */
+  walletAddress: string | null
+  /** Handler for new chat */
+  onNewChat: () => void
   /** Whether the artifact panel is visible */
   artifactPanelVisible: boolean
   /** Toggle artifact panel visibility */
@@ -24,6 +33,10 @@ export interface DeFiChatShellProps {
 
 export function DeFiChatShell({
   header,
+  sidebarVisible,
+  onToggleSidebar,
+  walletAddress,
+  onNewChat,
   artifactPanelVisible,
   onToggleArtifactPanel,
   artifactButtonLabel,
@@ -43,6 +56,23 @@ export function DeFiChatShell({
             style={{ borderColor: 'var(--line)', background: 'var(--surface-2)' }}
           >
             <div className="flex items-center gap-3">
+              {/* Sidebar toggle */}
+              <Button
+                size="sm"
+                variant={sidebarVisible ? 'secondary' : 'outline'}
+                onClick={onToggleSidebar}
+                aria-pressed={sidebarVisible}
+                className="rounded-md hidden lg:inline-flex"
+              >
+                {sidebarVisible ? (
+                  <PanelLeftClose className="mr-1.5 h-4 w-4" />
+                ) : (
+                  <PanelLeft className="mr-1.5 h-4 w-4" />
+                )}
+                History
+              </Button>
+
+              {/* Artifact toggle */}
               <Button
                 size="sm"
                 variant={artifactPanelVisible ? 'secondary' : 'outline'}
@@ -74,6 +104,14 @@ export function DeFiChatShell({
           </div>
 
           <div className="flex flex-1 flex-col lg:flex-row min-h-0">
+            {/* Conversation Sidebar */}
+            <ConversationSidebar
+              isVisible={sidebarVisible}
+              walletAddress={walletAddress}
+              onNewChat={onNewChat}
+              onCollapse={onToggleSidebar}
+            />
+
             {/* Chat Panel - Desktop */}
             {/* Chat expands when artifact panel is closed OR when no artifacts exist */}
             {artifactPanelVisible && artifactCount > 0 ? (

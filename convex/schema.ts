@@ -812,7 +812,7 @@ export default defineSchema({
     lastActivityAt: v.optional(v.number()),
     errorMessage: v.optional(v.string()),
   })
-    .index("by_id", ["id"])
+    .index("by_external_id", ["id"])
     .index("by_user", ["userId"])
     .index("by_address_chain", ["address", "chain"])
     .index("by_status", ["status"])
@@ -854,7 +854,7 @@ export default defineSchema({
     createdAt: v.number(),
     processedAt: v.optional(v.number()),
   })
-    .index("by_id", ["id"])
+    .index("by_external_id", ["id"])
     .index("by_wallet", ["walletAddress"])
     .index("by_wallet_chain", ["walletAddress", "chain"])
     .index("by_tx_hash", ["txHash"])
@@ -905,4 +905,119 @@ export default defineSchema({
     .index("by_pnl", ["totalPnlUsd"])
     .index("by_followers", ["followerCount"])
     .index("by_active", ["isActive", "lastActiveAt"]),
+
+  // ============================================
+  // Copy Trading: Relationships
+  // ============================================
+  copyRelationships: defineTable({
+    // Identity
+    id: v.string(), // UUID from backend
+    userId: v.string(),
+    followerAddress: v.string(),
+    followerChain: v.string(),
+
+    // Config (embedded)
+    config: v.object({
+      leaderAddress: v.string(),
+      leaderChain: v.string(),
+      leaderLabel: v.optional(v.string()),
+      sizingMode: v.string(), // "percentage", "fixed", "proportional"
+      sizeValue: v.string(), // Decimal as string
+      minTradeUsd: v.string(),
+      maxTradeUsd: v.optional(v.string()),
+      tokenWhitelist: v.optional(v.array(v.string())),
+      tokenBlacklist: v.optional(v.array(v.string())),
+      allowedActions: v.array(v.string()),
+      delaySeconds: v.number(),
+      maxDelaySeconds: v.number(),
+      maxSlippageBps: v.number(),
+      maxDailyTrades: v.number(),
+      maxDailyVolumeUsd: v.string(),
+      sessionKeyId: v.optional(v.string()),
+    }),
+
+    // Status
+    isActive: v.boolean(),
+    isPaused: v.boolean(),
+    pauseReason: v.optional(v.string()),
+
+    // Daily limits (reset daily)
+    dailyTradeCount: v.number(),
+    dailyVolumeUsd: v.string(),
+    dailyResetAt: v.number(),
+
+    // Lifetime stats
+    totalTrades: v.number(),
+    successfulTrades: v.number(),
+    failedTrades: v.number(),
+    skippedTrades: v.number(),
+    totalVolumeUsd: v.string(),
+    totalPnlUsd: v.optional(v.string()),
+
+    // Timestamps
+    createdAt: v.number(),
+    updatedAt: v.number(),
+    lastCopyAt: v.optional(v.number()),
+  })
+    .index("by_external_id", ["id"])
+    .index("by_user", ["userId"])
+    .index("by_follower", ["followerAddress", "followerChain"])
+    .index("by_leader", ["config.leaderAddress", "config.leaderChain"])
+    .index("by_active", ["isActive", "isPaused"]),
+
+  // ============================================
+  // Copy Trading: Executions
+  // ============================================
+  copyExecutions: defineTable({
+    // Identity
+    id: v.string(), // UUID from backend
+    relationshipId: v.string(),
+
+    // Signal info (embedded)
+    signal: v.object({
+      leaderAddress: v.string(),
+      leaderChain: v.string(),
+      txHash: v.string(),
+      blockNumber: v.number(),
+      timestamp: v.number(),
+      action: v.string(),
+      tokenInAddress: v.string(),
+      tokenInSymbol: v.optional(v.string()),
+      tokenInAmount: v.string(),
+      tokenOutAddress: v.string(),
+      tokenOutSymbol: v.optional(v.string()),
+      tokenOutAmount: v.optional(v.string()),
+      valueUsd: v.optional(v.string()),
+      dex: v.optional(v.string()),
+    }),
+
+    // Status
+    status: v.string(), // "pending", "queued", "executing", "completed", "failed", "skipped", "cancelled"
+    skipReason: v.optional(v.string()),
+
+    // Sizing
+    calculatedSizeUsd: v.optional(v.string()),
+    actualSizeUsd: v.optional(v.string()),
+
+    // Transaction
+    txHash: v.optional(v.string()),
+    gasUsed: v.optional(v.number()),
+    gasPriceGwei: v.optional(v.string()),
+    gasCostUsd: v.optional(v.string()),
+
+    // Result
+    tokenOutAmount: v.optional(v.string()),
+    slippageBps: v.optional(v.number()),
+    errorMessage: v.optional(v.string()),
+
+    // Timing
+    signalReceivedAt: v.number(),
+    executionStartedAt: v.optional(v.number()),
+    executionCompletedAt: v.optional(v.number()),
+  })
+    .index("by_external_id", ["id"])
+    .index("by_relationship", ["relationshipId"])
+    .index("by_relationship_status", ["relationshipId", "status"])
+    .index("by_status", ["status"])
+    .index("by_signal_received", ["signalReceivedAt"]),
 });
