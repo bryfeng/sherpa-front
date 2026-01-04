@@ -61,7 +61,7 @@ export const listByUser = query({
     status: v.optional(statusSchema),
   },
   handler: async (ctx, args) => {
-    let query = ctx.db
+    const query = ctx.db
       .query("dcaStrategies")
       .withIndex("by_user", (q) => q.eq("userId", args.userId));
 

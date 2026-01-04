@@ -204,6 +204,14 @@ const MessageBubble = React.memo(
                 <span className="w-1.5 h-1.5 rounded-full animate-bounce" style={{ background: typingColor }}></span>
               </span>
             </div>
+          ) : m.streaming ? (
+            <div className="text-sm leading-relaxed">
+              <MarkdownRenderer text={m.text} />
+              <span
+                className="inline-block w-2 h-4 ml-0.5 animate-pulse"
+                style={{ background: 'var(--accent)', verticalAlign: 'text-bottom' }}
+              />
+            </div>
           ) : (
             <div className="text-sm leading-relaxed">
               {isUser ? <span className="whitespace-pre-wrap">{m.text}</span> : <MarkdownRenderer text={m.text} />}

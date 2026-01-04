@@ -62,6 +62,7 @@ export type AgentMessage = {
   panels?: string[]
   components?: InlineComponent[]  // Inline rich components
   sources?: any[]
-  typing?: boolean
+  typing?: boolean      // Waiting for response (shows loading indicator)
+  streaming?: boolean   // Actively receiving streamed content
   persona?: Persona
 }

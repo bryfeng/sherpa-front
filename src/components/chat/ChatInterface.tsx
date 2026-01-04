@@ -393,9 +393,17 @@ const MessageBubble = memo(function MessageBubble({
             marginLeft: isUser ? 'auto' : undefined,
           }}
         >
-          {/* Typing indicator or content */}
+          {/* Typing indicator, streaming content, or final content */}
           {message.typing ? (
             <TypingIndicator persona={persona} />
+          ) : message.streaming ? (
+            <div>
+              <MarkdownContent text={message.text} />
+              <span
+                className="inline-block w-2 h-4 ml-0.5 animate-pulse"
+                style={{ background: 'var(--accent)', verticalAlign: 'text-bottom' }}
+              />
+            </div>
           ) : (
             <>
               {isUser ? (

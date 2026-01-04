@@ -654,11 +654,12 @@ export function useDeFiChatController({ props, shellState, dispatch }: UseDeFiCh
     const question = raw.trim()
     if (!question) return
 
-    const typingId = uid('msg')
+    const assistantMsgId = uid('msg')
+    let streamedText = ''
     const userMessage: AgentMessage = { id: uid('msg'), role: 'user', text: question }
-    const typingMessage: AgentMessage = { id: typingId, role: 'assistant', text: '', typing: true }
+    const streamingMessage: AgentMessage = { id: assistantMsgId, role: 'assistant', text: '', streaming: true }
 
-    setMessages((previous) => [...previous, userMessage, typingMessage])
+    setMessages((previous) => [...previous, userMessage, streamingMessage])
 
     try {
       const payload = {
@@ -669,7 +670,17 @@ export function useDeFiChatController({ props, shellState, dispatch }: UseDeFiCh
         llm_model: llmModel,
       }
 
-      const response = await api.chat(payload)
+      // Use streaming API
+      const response = await api.chatStream(payload, (delta) => {
+        if (!isMounted.current) return
+        streamedText += delta
+        setMessages((previous) =>
+          previous.map((msg) =>
+            msg.id === assistantMsgId ? { ...msg, text: streamedText } : msg
+          )
+        )
+        scheduleScrollToBottom()
+      })
 
       if (response?.conversation_id && response.conversation_id !== conversationId) {
         setConversationId(response.conversation_id)
@@ -680,7 +691,7 @@ export function useDeFiChatController({ props, shellState, dispatch }: UseDeFiCh
         }
       }
 
-      const newPanels = transformBackendPanels(response.panels)
+      const newPanels = response ? transformBackendPanels(response.panels) : []
       const newWidgets = newPanels.map(panelToWidget)
       const portfolioWidgets = newWidgets.filter((widget) => widget.kind === 'portfolio')
       const nonPortfolioWidgets = newWidgets.filter((widget) => widget.kind !== 'portfolio')
@@ -688,9 +699,11 @@ export function useDeFiChatController({ props, shellState, dispatch }: UseDeFiCh
       if (portfolioWidgets.length) {
         if (!walletAddress) {
           setMessages((previous) =>
-            previous
-              .filter((message) => message.id !== typingId)
-              .concat({ id: uid('msg'), role: 'assistant', text: 'Please connect your wallet to view your portfolio.' }),
+            previous.map((msg) =>
+              msg.id === assistantMsgId
+                ? { ...msg, text: 'Please connect your wallet to view your portfolio.', streaming: false }
+                : msg
+            )
           )
         } else {
           ensurePortfolioPanel({ refresh: true, highlight: true })
@@ -702,20 +715,27 @@ export function useDeFiChatController({ props, shellState, dispatch }: UseDeFiCh
         setHighlight(nonPortfolioWidgets.map((widget) => widget.id))
       }
 
-      const assistantMessage: AgentMessage = {
-        id: uid('msg'),
-        role: 'assistant',
-        text: response.reply || 'Done.',
-        sources: (response.sources || []) as any,
-      }
-
-      setMessages((previous) => previous.filter((message) => message.id !== typingId).concat(assistantMessage))
+      // Finalize the message - remove streaming flag and add sources
+      setMessages((previous) =>
+        previous.map((msg) =>
+          msg.id === assistantMsgId
+            ? {
+                ...msg,
+                text: streamedText || response?.reply || 'Done.',
+                streaming: false,
+                sources: (response?.sources || []) as any,
+              }
+            : msg
+        )
+      )
       return response
     } catch (error: any) {
       setMessages((previous) =>
-        previous
-          .filter((message) => !(message as any).typing)
-          .concat({ id: uid('msg'), role: 'assistant', text: `Sorry, I hit an error contacting the API. ${error?.message || ''}` }),
+        previous.map((msg) =>
+          msg.id === assistantMsgId
+            ? { ...msg, text: `Sorry, I hit an error contacting the API. ${error?.message || ''}`, streaming: false }
+            : msg
+        )
       )
       throw error
     } finally {

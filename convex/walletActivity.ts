@@ -20,7 +20,7 @@ export const getByAddress = query({
     limit: v.optional(v.number()),
   },
   handler: async (ctx, { address, chain, eventType, limit = 50 }) => {
-    let query = ctx.db
+    const query = ctx.db
       .query("walletActivity")
       .withIndex("by_wallet", (q) => q.eq("walletAddress", address.toLowerCase()));
 

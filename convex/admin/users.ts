@@ -34,7 +34,7 @@ export const listUsers = query({
     const offset = (page - 1) * limit;
 
     // Get all users
-    let users = await ctx.db.query("users").order("desc").collect();
+    const users = await ctx.db.query("users").order("desc").collect();
 
     // Get wallets and flags for each user
     const usersWithDetails = await Promise.all(

@@ -134,7 +134,7 @@ export const listByFollower = query({
     followerChain: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
-    let query = ctx.db.query("copyRelationships");
+    const query = ctx.db.query("copyRelationships");
 
     if (args.followerChain) {
       const relationships = await query

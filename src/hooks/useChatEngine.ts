@@ -158,7 +158,126 @@ export function useChatEngine(options: UseChatEngineOptions) {
     requestAnimationFrame(focusInput)
   }, [focusInput, setInputValue])
 
-  // Send a message to the AI
+  // Send a message with streaming response
+  const sendMessageStream = useCallback(async (text: string) => {
+    const question = text.trim()
+    if (!question) return null
+
+    const assistantMsgId = uid('msg')
+    let streamedText = ''
+
+    // Add user message
+    addMessage({
+      id: uid('msg'),
+      role: 'user',
+      text: question,
+    })
+
+    // Add assistant message with streaming flag
+    addMessage({
+      id: assistantMsgId,
+      role: 'assistant',
+      text: '',
+      streaming: true,
+    })
+
+    setIsTyping(true)
+
+    try {
+      const payload = {
+        messages: [{ role: 'user', content: question }],
+        address: walletAddress,
+        chain: 'ethereum',
+        conversation_id: conversationId ?? undefined,
+        llm_model: llmModel,
+      }
+
+      // Stream the response
+      const response = await api.chatStream(payload, (delta) => {
+        if (!isMountedRef.current) return
+        streamedText += delta
+        updateMessage(assistantMsgId, { text: streamedText })
+        scrollToBottom()
+      })
+
+      if (!isMountedRef.current) return null
+
+      // Update conversation ID if changed
+      if (response?.conversation_id && response.conversation_id !== conversationId) {
+        setConversationId(response.conversation_id)
+        try {
+          localStorage.setItem(getStorageKey(walletAddress), response.conversation_id)
+        } catch {
+          // Ignore storage errors
+        }
+      }
+
+      // Process panels into inline components
+      const newPanels = response ? transformBackendPanels(response.panels) : []
+      const portfolioRequested = newPanels.some((p) => p.kind === 'portfolio')
+
+      if (portfolioRequested && walletAddress) {
+        onPortfolioRequested?.()
+      }
+
+      // Convert panels to inline components (embedded in message)
+      const inlineComponents = panelsToInlineComponents(newPanels)
+
+      // Also send to widgets callback for backwards compatibility
+      if (onNewWidgets && newPanels.length > 0) {
+        const nonPortfolioWidgets = newPanels
+          .filter((p) => p.kind !== 'portfolio')
+          .map((panel): Widget => ({
+            id: panel.id,
+            kind: panel.kind,
+            title: panel.title,
+            payload: panel.payload ?? {},
+            sources: [],
+            density: panel.kind === 'chart' ? 'full' : 'rail',
+          }))
+        if (nonPortfolioWidgets.length > 0) {
+          onNewWidgets(nonPortfolioWidgets)
+        }
+      }
+
+      // Finalize the message - remove streaming flag and add components/sources
+      updateMessage(assistantMsgId, {
+        text: streamedText || response?.reply || 'Done.',
+        streaming: false,
+        components: inlineComponents.length > 0 ? inlineComponents : undefined,
+        sources: response?.sources,
+      })
+
+      scrollToBottom()
+      return response
+    } catch (error: any) {
+      if (!isMountedRef.current) return null
+
+      // Update the message to show error
+      updateMessage(assistantMsgId, {
+        text: `Sorry, I encountered an error. ${error?.message || ''}`,
+        streaming: false,
+      })
+
+      scrollToBottom()
+      throw error
+    } finally {
+      setIsTyping(false)
+    }
+  }, [
+    walletAddress,
+    llmModel,
+    conversationId,
+    addMessage,
+    updateMessage,
+    setIsTyping,
+    setConversationId,
+    onNewWidgets,
+    onPortfolioRequested,
+    scrollToBottom,
+  ])
+
+  // Send a message to the AI (non-streaming fallback)
   const sendMessage = useCallback(async (text: string) => {
     const question = text.trim()
     if (!question) return null
@@ -330,6 +449,7 @@ export function useChatEngine(options: UseChatEngineOptions) {
     setInputValue,
     send,
     sendMessage,
+    sendMessageStream,
     startNewChat,
     insertPrompt,
     scrollToBottom,

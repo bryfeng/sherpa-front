@@ -193,7 +193,7 @@ export function RiskPolicyWidget({ artifact, walletAddress }: RiskPolicyWidgetPr
         >
           <AlertTriangle className="h-4 w-4" style={{ color: 'var(--warning)' }} />
           <p className="text-xs" style={{ color: 'var(--warning)' }}>
-            Risk policies are disabled. Your trades won't be protected.
+            Risk policies are disabled. Your trades will not be protected.
           </p>
         </div>
       )}
