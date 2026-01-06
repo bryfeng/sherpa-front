@@ -659,6 +659,7 @@ export function useDeFiChatController({ props, shellState, dispatch }: UseDeFiCh
     const userMessage: AgentMessage = { id: uid('msg'), role: 'user', text: question }
     const streamingMessage: AgentMessage = { id: assistantMsgId, role: 'assistant', text: '', streaming: true }
 
+    // Add messages without flushSync (it causes remounts)
     setMessages((previous) => [...previous, userMessage, streamingMessage])
 
     try {
@@ -670,17 +671,30 @@ export function useDeFiChatController({ props, shellState, dispatch }: UseDeFiCh
         llm_model: llmModel,
       }
 
-      // Use streaming API
+      // Use streaming API with requestAnimationFrame for smooth updates
+      let rafId: number | null = null
+      let pendingUpdate = false
+
       const response = await api.chatStream(payload, (delta) => {
-        if (!isMounted.current) return
         streamedText += delta
-        setMessages((previous) =>
-          previous.map((msg) =>
-            msg.id === assistantMsgId ? { ...msg, text: streamedText } : msg
-          )
-        )
-        scheduleScrollToBottom()
+
+        // Batch updates using requestAnimationFrame
+        if (!pendingUpdate) {
+          pendingUpdate = true
+          rafId = requestAnimationFrame(() => {
+            pendingUpdate = false
+            setMessages((previous) =>
+              previous.map((msg) =>
+                msg.id === assistantMsgId ? { ...msg, text: streamedText } : msg
+              )
+            )
+            scheduleScrollToBottom()
+          })
+        }
       })
+
+      // Cancel any pending RAF
+      if (rafId) cancelAnimationFrame(rafId)
 
       if (response?.conversation_id && response.conversation_id !== conversationId) {
         setConversationId(response.conversation_id)
