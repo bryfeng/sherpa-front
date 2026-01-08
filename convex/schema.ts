@@ -57,8 +57,17 @@ export default defineSchema({
   // ============================================
   strategies: defineTable({
     userId: v.id("users"),
+    walletAddress: v.string(), // Wallet address for this strategy
     name: v.string(),
     description: v.optional(v.string()),
+    strategyType: v.union(
+      v.literal("dca"),
+      v.literal("rebalance"),
+      v.literal("limit_order"),
+      v.literal("stop_loss"),
+      v.literal("take_profit"),
+      v.literal("custom")
+    ),
     config: v.any(), // Strategy configuration object
     status: v.union(
       v.literal("draft"),
@@ -70,11 +79,17 @@ export default defineSchema({
     cronExpression: v.optional(v.string()), // e.g., "0 */4 * * *"
     lastExecutedAt: v.optional(v.number()),
     nextExecutionAt: v.optional(v.number()),
+    // Stats
+    totalExecutions: v.optional(v.number()),
+    successfulExecutions: v.optional(v.number()),
+    failedExecutions: v.optional(v.number()),
+    lastError: v.optional(v.string()),
     createdAt: v.number(),
     updatedAt: v.number(),
   })
     .index("by_user", ["userId"])
     .index("by_user_status", ["userId", "status"])
+    .index("by_wallet", ["walletAddress"])
     .index("by_status", ["status"])
     .index("by_next_execution", ["nextExecutionAt"]),
 

@@ -37,6 +37,54 @@ export const listByUser = query({
 });
 
 /**
+ * List strategies by wallet address
+ * Used by agent tools to query strategies without needing userId
+ */
+export const listByWallet = query({
+  args: {
+    walletAddress: v.string(),
+    status: v.optional(
+      v.union(
+        v.literal("draft"),
+        v.literal("active"),
+        v.literal("paused"),
+        v.literal("archived")
+      )
+    ),
+  },
+  handler: async (ctx, args) => {
+    // First, find the wallet to get the userId
+    // Note: by_address_chain index requires both address and chain, so we filter manually
+    const wallets = await ctx.db
+      .query("wallets")
+      .filter((q) => q.eq(q.field("address"), args.walletAddress.toLowerCase()))
+      .collect();
+    const wallet = wallets[0];
+
+    if (!wallet) {
+      return [];
+    }
+
+    // Then query strategies by userId
+    if (args.status) {
+      return await ctx.db
+        .query("strategies")
+        .withIndex("by_user_status", (q) =>
+          q.eq("userId", wallet.userId).eq("status", args.status!)
+        )
+        .order("desc")
+        .collect();
+    }
+
+    return await ctx.db
+      .query("strategies")
+      .withIndex("by_user", (q) => q.eq("userId", wallet.userId))
+      .order("desc")
+      .collect();
+  },
+});
+
+/**
  * Get a strategy by ID
  */
 export const get = query({
@@ -74,8 +122,17 @@ export const getWithExecutions = query({
 export const create = mutation({
   args: {
     userId: v.id("users"),
+    walletAddress: v.string(),
     name: v.string(),
     description: v.optional(v.string()),
+    strategyType: v.union(
+      v.literal("dca"),
+      v.literal("rebalance"),
+      v.literal("limit_order"),
+      v.literal("stop_loss"),
+      v.literal("take_profit"),
+      v.literal("custom")
+    ),
     config: v.any(),
     cronExpression: v.optional(v.string()),
   },
@@ -83,11 +140,16 @@ export const create = mutation({
     const now = Date.now();
     return await ctx.db.insert("strategies", {
       userId: args.userId,
+      walletAddress: args.walletAddress.toLowerCase(),
       name: args.name,
       description: args.description,
+      strategyType: args.strategyType,
       config: args.config,
       status: "draft",
       cronExpression: args.cronExpression,
+      totalExecutions: 0,
+      successfulExecutions: 0,
+      failedExecutions: 0,
       createdAt: now,
       updatedAt: now,
     });
