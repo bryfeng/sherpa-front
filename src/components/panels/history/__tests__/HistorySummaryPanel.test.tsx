@@ -1,8 +1,12 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi, beforeEach, afterEach } from 'vitest'
 import { render } from '@testing-library/react'
 import { HistorySummaryPanel } from '../HistorySummaryPanel'
 import type { Widget } from '../../../../types/widgets'
 import type { HistorySummaryResponse } from '../../../../types/history'
+
+// Mock Date.now() to return a fixed date for consistent snapshots
+// This date is ~1 year after the test data dates (Oct 2024)
+const MOCK_NOW = new Date('2025-10-15T00:00:00Z').getTime()
 
 const widget: Widget<HistorySummaryResponse> = {
   id: 'history-summary',
@@ -91,6 +95,15 @@ const limitWidget: Widget<HistorySummaryResponse> = {
 }
 
 describe('HistorySummaryPanel', () => {
+  beforeEach(() => {
+    vi.useFakeTimers()
+    vi.setSystemTime(MOCK_NOW)
+  })
+
+  afterEach(() => {
+    vi.useRealTimers()
+  })
+
   it('renders totals, buckets, and exports', () => {
     const { container, getByText } = render(<HistorySummaryPanel widget={widget} />)
     expect(getByText(/Total inflow/i)).toBeInTheDocument()

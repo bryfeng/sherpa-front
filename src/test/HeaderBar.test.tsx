@@ -18,7 +18,7 @@ function renderHeaderBar(overrides: Partial<HeaderBarProps> = {}) {
 
 describe('HeaderBar', () => {
   it('renders persona badge and wallet label', () => {
-    renderHeaderBar({ walletLabel: '0x1234' })
+    renderHeaderBar({ walletLabel: '0x1234', walletConnected: true })
     expect(screen.getByText('Friendly')).toBeInTheDocument()
     expect(screen.getByText('0x1234')).toBeInTheDocument()
   })

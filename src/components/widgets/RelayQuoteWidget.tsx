@@ -3,6 +3,9 @@ import { ChevronDown, ChevronRight, ChevronUp, GripVertical, MessageSquarePlus, 
 import type { Widget } from '../../types/widgets'
 import { ErrorView } from '../ErrorView'
 import { relayQuoteThemes } from './relay-quote-theme'
+import { PolicyCheckList } from '../policy/PolicyCheckList'
+import { usePolicyEvaluation } from '../../hooks/usePolicyEvaluation'
+import { extractTransactionIntent } from '../../utils/extractTransactionIntent'
 
 type RelayQuoteWidgetProps = {
   panel: Widget
@@ -61,6 +64,13 @@ function RelayQuoteWidgetComponent({
   const [txHash, setTxHash] = React.useState<string | null>(null)
   const [showInstructions, setShowInstructions] = React.useState(false)
   const [showQuickPrompts, setShowQuickPrompts] = React.useState(false)
+
+  // Policy evaluation
+  const transactionIntent = React.useMemo(() => extractTransactionIntent(panel), [panel])
+  const policyResult = usePolicyEvaluation({
+    walletAddress: walletAddress || null,
+    intent: transactionIntent,
+  })
 
   const expiryRaw = payload.quote_expiry
   let expiryMs: number | undefined
@@ -155,6 +165,7 @@ function RelayQuoteWidgetComponent({
     if (payload.status !== 'ok') return 'Quote is incomplete. Ask for a refresh.'
     if (expired) return `Quote expired. Refresh before ${actionGerund}.`
     if (walletMismatch) return 'Connect the wallet that requested this quote.'
+    if (!policyResult.canProceed) return 'Policy check failed. Review issues below.'
     return null
   })()
 
@@ -429,6 +440,14 @@ function RelayQuoteWidgetComponent({
               </div>
             )}
           </div>
+        )}
+
+        {/* Policy Check - Compact for collapsed, full for expanded */}
+        {walletReady && transactionIntent && policyResult.checks.length > 0 && (
+          <PolicyCheckList
+            result={policyResult}
+            compact={collapsed}
+          />
         )}
 
         {!collapsed && (

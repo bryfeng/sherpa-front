@@ -30,6 +30,18 @@ const PolicyStatusWidget = React.lazy(() =>
   import('../policy/PolicyStatusWidget').then((m) => ({ default: m.PolicyStatusWidget }))
 )
 
+// Strategy widgets
+const StrategiesWidget = React.lazy(() =>
+  import('../strategies/StrategiesWidget').then((m) => ({ default: m.StrategiesWidget }))
+)
+
+// Type for dca-strategies payload
+interface DCAStrategiesPayload {
+  walletAddress?: string
+  userId?: string
+  walletId?: string
+}
+
 export interface ArtifactContentProps {
   artifact: Widget | null
   walletAddress?: string
@@ -111,6 +123,18 @@ function ArtifactRenderer({
 
     case 'policy-status':
       return <PolicyStatusWidget />
+
+    // Strategy widgets
+    case 'dca-strategies': {
+      const dcaPayload = payload as DCAStrategiesPayload
+      return (
+        <StrategiesWidget
+          walletAddress={dcaPayload?.walletAddress ?? walletAddress ?? null}
+          userId={dcaPayload?.userId as any}
+          walletId={dcaPayload?.walletId as any}
+        />
+      )
+    }
 
     default:
       return (

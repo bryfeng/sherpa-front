@@ -291,3 +291,90 @@ export function formatUsd(value: number): string {
     maximumFractionDigits: 0,
   }).format(value)
 }
+
+// ============================================
+// Transaction Intent & UI Feedback
+// ============================================
+
+/**
+ * Represents a pending transaction for policy evaluation
+ */
+export interface TransactionIntent {
+  type: 'swap' | 'bridge' | 'transfer'
+  fromToken: {
+    address: string
+    symbol: string
+    chainId: number
+  }
+  toToken: {
+    address: string
+    symbol: string
+    chainId: number
+  }
+  amountUsd: number
+  slippagePercent: number
+  gasEstimateUsd: number
+  contractAddress?: string
+}
+
+/**
+ * Individual policy check result for UI display
+ */
+export type PolicyCheckStatus = 'pass' | 'warn' | 'fail'
+
+export interface PolicyCheck {
+  id: string
+  label: string
+  status: PolicyCheckStatus
+  message: string
+  details?: {
+    current: string
+    limit: string
+  }
+}
+
+/**
+ * Aggregated policy evaluation result for UI
+ */
+export interface PolicyEvaluationResult {
+  canProceed: boolean
+  checks: PolicyCheck[]
+  blockingCount: number
+  warningCount: number
+}
+
+/**
+ * Creates a pass check
+ */
+export function createPassCheck(
+  id: string,
+  label: string,
+  message: string,
+  details?: { current: string; limit: string }
+): PolicyCheck {
+  return { id, label, status: 'pass', message, details }
+}
+
+/**
+ * Creates a warning check
+ */
+export function createWarnCheck(
+  id: string,
+  label: string,
+  message: string,
+  details?: { current: string; limit: string }
+): PolicyCheck {
+  return { id, label, status: 'warn', message, details }
+}
+
+/**
+ * Creates a fail check
+ */
+export function createFailCheck(
+  id: string,
+  label: string,
+  message: string,
+  details?: { current: string; limit: string }
+): PolicyCheck {
+  return { id, label, status: 'fail', message, details }
+}

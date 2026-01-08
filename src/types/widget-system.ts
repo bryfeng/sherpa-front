@@ -62,6 +62,9 @@ export type WidgetKind =
   | 'risk-policy'
   | 'session-keys'
   | 'policy-status'
+  // Strategy widgets
+  | 'dca-strategies'
+  | 'my-strategies'
 
 // ============================================
 // WIDGET SIZING
@@ -397,6 +400,15 @@ export interface WidgetPayloads {
     message?: string
     allowedChains: number[]
     maxSingleTxUsd: number
+  }
+  'dca-strategies': {
+    walletAddress: string
+    userId?: string
+    walletId?: string
+  }
+  'my-strategies': {
+    walletAddress: string
+    statusFilter?: 'draft' | 'active' | 'paused' | 'archived'
   }
 }
 

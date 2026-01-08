@@ -7,11 +7,13 @@
 
 import React, { useState, useCallback, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { TrendingUp, TrendingDown, Loader2, AlertCircle, RefreshCw, ChevronDown, ArrowDownUp, Info } from 'lucide-react'
+import { TrendingUp, TrendingDown, Loader2, AlertCircle, RefreshCw, ChevronDown, ArrowDownUp, Info, Play, Pause, Trash2, MoreVertical, Briefcase, Calendar, Zap, MessageSquare, Clock, Archive, ChevronRight } from 'lucide-react'
 import type { Widget } from '../../types/widget-system'
 import { usePortfolioSummary } from '../../workspace/hooks/usePortfolioSummary'
 import { usePriceTicker } from '../../workspace/hooks/usePriceTicker'
 import { useSwapQuote, COMMON_TOKENS, type CommonToken } from '../../workspace/hooks/useSwapQuote'
+import { useConversations, useConversationMutations, type ConversationSummary } from '../../workspace/hooks/useConversationHistory'
+import { useGenericStrategies, useGenericStrategyMutations, type GenericStrategy } from '../../hooks/useStrategies'
 import '../../styles/design-system.css'
 
 // ============================================
@@ -735,6 +737,465 @@ export function WatchlistWidget() {
 }
 
 // ============================================
+// MY STRATEGIES WIDGET
+// ============================================
+
+interface MyStrategiesWidgetProps {
+  walletAddress?: string
+  statusFilter?: 'draft' | 'active' | 'paused' | 'archived'
+}
+
+// Strategy type badge colors
+const STRATEGY_TYPE_COLORS: Record<string, { bg: string; text: string }> = {
+  dca: { bg: 'rgba(96, 165, 250, 0.15)', text: '#60a5fa' },
+  rebalance: { bg: 'rgba(52, 211, 153, 0.15)', text: '#34d399' },
+  limit_order: { bg: 'rgba(251, 191, 36, 0.15)', text: '#fbbf24' },
+  stop_loss: { bg: 'rgba(239, 68, 68, 0.15)', text: '#ef4444' },
+  take_profit: { bg: 'rgba(34, 197, 94, 0.15)', text: '#22c55e' },
+  custom: { bg: 'rgba(167, 139, 250, 0.15)', text: '#a78bfa' },
+}
+
+// Status badge colors
+const STATUS_COLORS: Record<string, { bg: string; text: string }> = {
+  draft: { bg: 'rgba(156, 163, 175, 0.15)', text: '#9ca3af' },
+  active: { bg: 'rgba(34, 197, 94, 0.15)', text: '#22c55e' },
+  paused: { bg: 'rgba(251, 191, 36, 0.15)', text: '#fbbf24' },
+  archived: { bg: 'rgba(107, 114, 128, 0.15)', text: '#6b7280' },
+}
+
+function formatStrategyDate(timestamp: number): string {
+  const date = new Date(timestamp)
+  const now = new Date()
+  const diff = now.getTime() - date.getTime()
+  const days = Math.floor(diff / (1000 * 60 * 60 * 24))
+
+  if (days === 0) return 'Today'
+  if (days === 1) return 'Yesterday'
+  if (days < 7) return `${days} days ago`
+  return date.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })
+}
+
+function formatStrategyConfig(config: Record<string, unknown>, strategyType: string): string {
+  if (strategyType === 'dca') {
+    const fromToken = (config.from_token as string) || 'Token'
+    const toToken = (config.to_token as string) || 'Token'
+    const amount = config.amount_usd || config.amount || '?'
+    const frequency = config.frequency || 'periodic'
+    return `$${amount} ${fromToken} → ${toToken} (${frequency})`
+  }
+  if (strategyType === 'rebalance') {
+    return 'Portfolio rebalancing'
+  }
+  if (strategyType === 'limit_order' || strategyType === 'stop_loss' || strategyType === 'take_profit') {
+    const token = (config.token as string) || 'Token'
+    const price = config.trigger_price_usd || '?'
+    return `${token} @ $${price}`
+  }
+  return 'Custom strategy'
+}
+
+interface StrategyCardProps {
+  strategy: GenericStrategy
+  onActivate: () => void
+  onPause: () => void
+  onDelete: () => void
+}
+
+function StrategyCard({ strategy, onActivate, onPause, onDelete }: StrategyCardProps) {
+  const [showMenu, setShowMenu] = useState(false)
+  const typeColor = STRATEGY_TYPE_COLORS[strategy.strategyType] || STRATEGY_TYPE_COLORS.custom
+  const statusColor = STATUS_COLORS[strategy.status] || STATUS_COLORS.draft
+
+  return (
+    <motion.div
+      className="p-3 rounded-lg"
+      style={{ background: 'var(--surface-2)', border: '1px solid var(--line)' }}
+      initial={{ opacity: 0, y: 8 }}
+      animate={{ opacity: 1, y: 0 }}
+      whileHover={{ borderColor: 'var(--accent)' }}
+    >
+      {/* Header */}
+      <div className="flex items-start justify-between gap-2 mb-2">
+        <div className="flex-1 min-w-0">
+          <h4
+            className="font-medium text-sm truncate"
+            style={{ color: 'var(--text)' }}
+            title={strategy.name}
+          >
+            {strategy.name}
+          </h4>
+          <div className="flex items-center gap-2 mt-1">
+            {/* Type badge */}
+            <span
+              className="px-1.5 py-0.5 text-xs rounded font-medium"
+              style={{ background: typeColor.bg, color: typeColor.text }}
+            >
+              {strategy.strategyType.replace('_', ' ').toUpperCase()}
+            </span>
+            {/* Status badge */}
+            <span
+              className="px-1.5 py-0.5 text-xs rounded"
+              style={{ background: statusColor.bg, color: statusColor.text }}
+            >
+              {strategy.status}
+            </span>
+          </div>
+        </div>
+
+        {/* Actions menu */}
+        <div className="relative">
+          <button
+            onClick={() => setShowMenu(!showMenu)}
+            className="p-1 rounded hover:bg-white/5 transition-colors"
+            style={{ color: 'var(--text-muted)' }}
+          >
+            <MoreVertical className="w-4 h-4" />
+          </button>
+
+          <AnimatePresence>
+            {showMenu && (
+              <>
+                <motion.div
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  exit={{ opacity: 0 }}
+                  className="fixed inset-0 z-40"
+                  onClick={() => setShowMenu(false)}
+                />
+                <motion.div
+                  initial={{ opacity: 0, scale: 0.95 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  exit={{ opacity: 0, scale: 0.95 }}
+                  className="absolute right-0 top-full mt-1 w-32 z-50 rounded-lg overflow-hidden py-1"
+                  style={{ background: 'var(--surface)', border: '1px solid var(--line)', boxShadow: 'var(--shadow-lg)' }}
+                >
+                  {strategy.status === 'draft' && (
+                    <button
+                      onClick={() => { onActivate(); setShowMenu(false) }}
+                      className="w-full flex items-center gap-2 px-3 py-2 text-left text-sm transition-colors hover:bg-white/5"
+                      style={{ color: 'var(--success)' }}
+                    >
+                      <Play className="w-3 h-3" /> Activate
+                    </button>
+                  )}
+                  {strategy.status === 'active' && (
+                    <button
+                      onClick={() => { onPause(); setShowMenu(false) }}
+                      className="w-full flex items-center gap-2 px-3 py-2 text-left text-sm transition-colors hover:bg-white/5"
+                      style={{ color: 'var(--warning)' }}
+                    >
+                      <Pause className="w-3 h-3" /> Pause
+                    </button>
+                  )}
+                  {strategy.status === 'paused' && (
+                    <button
+                      onClick={() => { onActivate(); setShowMenu(false) }}
+                      className="w-full flex items-center gap-2 px-3 py-2 text-left text-sm transition-colors hover:bg-white/5"
+                      style={{ color: 'var(--success)' }}
+                    >
+                      <Play className="w-3 h-3" /> Resume
+                    </button>
+                  )}
+                  <button
+                    onClick={() => { onDelete(); setShowMenu(false) }}
+                    className="w-full flex items-center gap-2 px-3 py-2 text-left text-sm transition-colors hover:bg-white/5"
+                    style={{ color: 'var(--danger)' }}
+                  >
+                    <Trash2 className="w-3 h-3" /> Delete
+                  </button>
+                </motion.div>
+              </>
+            )}
+          </AnimatePresence>
+        </div>
+      </div>
+
+      {/* Config summary */}
+      <p
+        className="text-xs mb-2 line-clamp-1"
+        style={{ color: 'var(--text-muted)' }}
+        title={formatStrategyConfig(strategy.config, strategy.strategyType)}
+      >
+        {formatStrategyConfig(strategy.config, strategy.strategyType)}
+      </p>
+
+      {/* Footer */}
+      <div className="flex items-center gap-3 text-xs" style={{ color: 'var(--text-muted)' }}>
+        <span className="flex items-center gap-1">
+          <Calendar className="w-3 h-3" />
+          {formatStrategyDate(strategy.createdAt)}
+        </span>
+        {strategy.totalExecutions !== undefined && strategy.totalExecutions > 0 && (
+          <span className="flex items-center gap-1">
+            <Zap className="w-3 h-3" />
+            {strategy.totalExecutions} runs
+          </span>
+        )}
+      </div>
+    </motion.div>
+  )
+}
+
+export function MyStrategiesWidget({ walletAddress, statusFilter }: MyStrategiesWidgetProps) {
+  const { strategies, isLoading, isEmpty } = useGenericStrategies(walletAddress || null, statusFilter)
+  const { activate, pause, remove } = useGenericStrategyMutations()
+  const [deletingId, setDeletingId] = useState<string | null>(null)
+
+  const handleActivate = useCallback(async (strategy: GenericStrategy) => {
+    try {
+      await activate(strategy._id)
+    } catch (err) {
+      console.error('Failed to activate strategy:', err)
+    }
+  }, [activate])
+
+  const handlePause = useCallback(async (strategy: GenericStrategy) => {
+    try {
+      await pause(strategy._id)
+    } catch (err) {
+      console.error('Failed to pause strategy:', err)
+    }
+  }, [pause])
+
+  const handleDelete = useCallback(async (strategy: GenericStrategy) => {
+    if (!confirm(`Delete strategy "${strategy.name}"? This cannot be undone.`)) return
+    setDeletingId(strategy._id)
+    try {
+      await remove(strategy._id)
+    } catch (err) {
+      console.error('Failed to delete strategy:', err)
+    } finally {
+      setDeletingId(null)
+    }
+  }, [remove])
+
+  if (!walletAddress) {
+    return (
+      <div className="text-center py-6">
+        <Briefcase className="w-8 h-8 mx-auto mb-2" style={{ color: 'var(--text-muted)' }} />
+        <p className="text-sm" style={{ color: 'var(--text-muted)' }}>
+          Connect wallet to view strategies
+        </p>
+      </div>
+    )
+  }
+
+  if (isLoading) {
+    return <WidgetLoading message="Loading strategies..." />
+  }
+
+  if (isEmpty) {
+    return (
+      <div className="text-center py-6">
+        <Briefcase className="w-8 h-8 mx-auto mb-2" style={{ color: 'var(--text-muted)' }} />
+        <p className="text-sm mb-1" style={{ color: 'var(--text)' }}>
+          No strategies yet
+        </p>
+        <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
+          Ask Sherpa to create a DCA or trading strategy
+        </p>
+      </div>
+    )
+  }
+
+  return (
+    <div className="space-y-2">
+      {/* Strategy count header */}
+      <div className="flex items-center justify-between text-xs mb-1">
+        <span style={{ color: 'var(--text-muted)' }}>
+          {strategies.length} strateg{strategies.length === 1 ? 'y' : 'ies'}
+        </span>
+      </div>
+
+      {/* Strategy list */}
+      <div className="space-y-2 max-h-[300px] overflow-y-auto pr-1">
+        {strategies.map((strategy) => (
+          <StrategyCard
+            key={strategy._id}
+            strategy={strategy}
+            onActivate={() => handleActivate(strategy)}
+            onPause={() => handlePause(strategy)}
+            onDelete={() => handleDelete(strategy)}
+          />
+        ))}
+      </div>
+    </div>
+  )
+}
+
+// ============================================
+// CHAT HISTORY WIDGET
+// ============================================
+
+interface ChatHistoryWidgetProps {
+  walletAddress?: string
+  onSelectConversation?: (conversationId: string) => void
+}
+
+function ConversationItem({
+  conversation,
+  onSelect,
+  onArchive,
+}: {
+  conversation: ConversationSummary
+  onSelect?: (id: string) => void
+  onArchive?: (id: string) => void
+}) {
+  const [showMenu, setShowMenu] = useState(false)
+
+  // Generate preview title from conversation
+  const displayTitle = conversation.title || 'Untitled conversation'
+  const truncatedTitle = displayTitle.length > 40
+    ? displayTitle.substring(0, 40) + '...'
+    : displayTitle
+
+  return (
+    <div
+      className="group relative rounded-lg transition-all cursor-pointer"
+      style={{
+        padding: '12px',
+        background: 'var(--surface-elevated)',
+        border: '1px solid var(--border)',
+      }}
+      onClick={() => onSelect?.(conversation.conversationId)}
+      onMouseEnter={() => setShowMenu(true)}
+      onMouseLeave={() => setShowMenu(false)}
+    >
+      <div className="flex items-start justify-between gap-2">
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-2 mb-1">
+            <MessageSquare className="w-4 h-4 flex-shrink-0" style={{ color: 'var(--accent)' }} />
+            <span
+              className="font-medium text-sm truncate"
+              style={{ color: 'var(--text)' }}
+            >
+              {truncatedTitle}
+            </span>
+          </div>
+          <div className="flex items-center gap-3 text-xs" style={{ color: 'var(--text-muted)' }}>
+            <span className="flex items-center gap-1">
+              <Clock className="w-3 h-3" />
+              {conversation.lastActivityFormatted}
+            </span>
+            {conversation.messageCount > 0 && (
+              <span>{conversation.messageCount} messages</span>
+            )}
+          </div>
+        </div>
+
+        {/* Hover actions */}
+        <AnimatePresence>
+          {showMenu && (
+            <motion.div
+              initial={{ opacity: 0, scale: 0.9 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.9 }}
+              className="flex items-center gap-1"
+            >
+              <button
+                onClick={(e) => {
+                  e.stopPropagation()
+                  onArchive?.(conversation.conversationId)
+                }}
+                className="p-1 rounded transition-colors"
+                style={{ color: 'var(--text-muted)' }}
+                title="Archive"
+              >
+                <Archive className="w-4 h-4" />
+              </button>
+              <ChevronRight className="w-4 h-4" style={{ color: 'var(--text-muted)' }} />
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </div>
+    </div>
+  )
+}
+
+function ChatHistoryWidget({ walletAddress, onSelectConversation }: ChatHistoryWidgetProps) {
+  const { data, status, error, refresh } = useConversations({ walletAddress })
+  const { archiveConversation } = useConversationMutations()
+
+  const handleArchive = async (conversationId: string) => {
+    const success = await archiveConversation(conversationId)
+    if (success) {
+      refresh()
+    }
+  }
+
+  // No wallet connected
+  if (!walletAddress) {
+    return (
+      <div className="flex flex-col items-center justify-center py-8 px-4">
+        <MessageSquare className="w-8 h-8 mb-3" style={{ color: 'var(--text-muted)', opacity: 0.5 }} />
+        <p className="text-sm text-center" style={{ color: 'var(--text-muted)' }}>
+          Connect your wallet to view conversation history
+        </p>
+      </div>
+    )
+  }
+
+  // Loading state
+  if (status === 'loading') {
+    return <WidgetLoading message="Loading conversations..." />
+  }
+
+  // Error state
+  if (status === 'error') {
+    return <WidgetError message={error || 'Failed to load conversations'} onRetry={refresh} />
+  }
+
+  // Empty state
+  if (!data?.hasConversations) {
+    return (
+      <div className="flex flex-col items-center justify-center py-8 px-4">
+        <MessageSquare className="w-8 h-8 mb-3" style={{ color: 'var(--text-muted)', opacity: 0.5 }} />
+        <p className="text-sm text-center mb-1" style={{ color: 'var(--text-muted)' }}>
+          No conversations yet
+        </p>
+        <p className="text-xs text-center" style={{ color: 'var(--text-muted)', opacity: 0.7 }}>
+          Start chatting with Sherpa to see your history here
+        </p>
+      </div>
+    )
+  }
+
+  return (
+    <div className="flex flex-col h-full">
+      {/* Header */}
+      <div className="flex items-center justify-between mb-3 px-1">
+        <span className="text-xs font-medium" style={{ color: 'var(--text-muted)' }}>
+          {data.totalCount} conversation{data.totalCount !== 1 ? 's' : ''}
+        </span>
+        <button
+          onClick={refresh}
+          className="p-1 rounded transition-colors hover:bg-white/10"
+          style={{ color: 'var(--text-muted)' }}
+          title="Refresh"
+        >
+          <RefreshCw className="w-3.5 h-3.5" />
+        </button>
+      </div>
+
+      {/* Conversation list */}
+      <div
+        className="flex-1 overflow-y-auto space-y-2 pr-1"
+        style={{ maxHeight: '300px' }}
+      >
+        {data.conversations.map((conversation) => (
+          <ConversationItem
+            key={conversation.conversationId}
+            conversation={conversation}
+            onSelect={onSelectConversation}
+            onArchive={handleArchive}
+          />
+        ))}
+      </div>
+    </div>
+  )
+}
+
+// ============================================
 // WIDGET CONTENT DISPATCHER
 // ============================================
 
@@ -774,6 +1235,25 @@ export function WidgetContent({ widget, walletAddress, isPro }: WidgetContentPro
 
     case 'watchlist':
       return <WatchlistWidget />
+
+    case 'my-strategies':
+      return (
+        <MyStrategiesWidget
+          walletAddress={walletAddress}
+          statusFilter={(widget.payload as any)?.statusFilter}
+        />
+      )
+
+    case 'chat-history':
+      return (
+        <ChatHistoryWidget
+          walletAddress={walletAddress}
+          onSelectConversation={(id) => {
+            // TODO: Integrate with chat panel to load conversation
+            console.log('Selected conversation:', id)
+          }}
+        />
+      )
 
     default:
       return (

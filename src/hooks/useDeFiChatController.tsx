@@ -353,6 +353,18 @@ export function useDeFiChatController({ props, shellState, dispatch }: UseDeFiCh
     useSherpaStore.getState().addWidget(policyWidget)
   }, [])
 
+  const openStrategies = useCallback(() => {
+    const strategiesWidget: Widget = {
+      id: 'dca-strategies',
+      kind: 'dca-strategies',
+      title: 'DCA Strategies',
+      payload: { walletAddress },
+      sources: [],
+      density: 'full',
+    }
+    useSherpaStore.getState().addWidget(strategiesWidget)
+  }, [walletAddress])
+
   useEffect(() => () => {
     isMounted.current = false
   }, [])
@@ -1111,6 +1123,12 @@ export function useDeFiChatController({ props, shellState, dispatch }: UseDeFiCh
     onNewChat: handleStartNewChat,
     onConnectWallet: () => openAppKit(),
     menuActions: [
+      {
+        id: 'manage-strategies',
+        label: 'DCA Strategies',
+        description: 'Automated dollar-cost averaging',
+        onSelect: openStrategies,
+      },
       {
         id: 'manage-policies',
         label: 'Manage Policies',

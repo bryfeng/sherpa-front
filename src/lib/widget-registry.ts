@@ -537,6 +537,38 @@ export const WIDGET_REGISTRY: Record<WidgetKind, WidgetMetadata> = {
     requiresPro: false,
     tags: ['policy', 'status', 'system', 'health'],
   },
+  'dca-strategies': {
+    kind: 'dca-strategies',
+    category: 'utility',
+    name: 'DCA Strategies',
+    description: 'Dollar cost averaging strategies for automated buying',
+    icon: 'repeat',
+    defaultSize: 'tall',
+    minSize: { cols: 4, rows: 3 },
+    maxSize: { cols: 6, rows: 4 },
+    resizable: true,
+    refreshable: true,
+    defaultRefreshInterval: 60,
+    requiresWallet: true,
+    requiresPro: false,
+    tags: ['dca', 'strategy', 'automation', 'trading'],
+  },
+  'my-strategies': {
+    kind: 'my-strategies',
+    category: 'utility',
+    name: 'My Strategies',
+    description: 'View and manage AI-created trading strategies',
+    icon: 'briefcase',
+    defaultSize: 'tall',
+    minSize: { cols: 4, rows: 3 },
+    maxSize: { cols: 6, rows: 4 },
+    resizable: true,
+    refreshable: true,
+    defaultRefreshInterval: 30,
+    requiresWallet: true,
+    requiresPro: false,
+    tags: ['strategy', 'automation', 'trading', 'ai'],
+  },
 }
 
 // ============================================
@@ -624,6 +656,16 @@ function getDefaultPayload(kind: WidgetKind): WidgetPayload {
       inMaintenance: false,
       allowedChains: [1, 137, 42161, 8453, 10],
       maxSingleTxUsd: 100000,
+    },
+    // Strategy widgets
+    'dca-strategies': {
+      walletAddress: '',
+      userId: undefined,
+      walletId: undefined,
+    },
+    'my-strategies': {
+      walletAddress: '',
+      statusFilter: undefined,
     },
   }
   return defaults[kind]

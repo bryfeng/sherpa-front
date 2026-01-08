@@ -41,7 +41,7 @@ exports[`HistorySummaryPanel > renders totals, buckets, and exports 1`] = `
           role="status"
         >
           Updated 
-          381d
+          349d
         </span>
       </div>
     </header>
@@ -356,7 +356,7 @@ exports[`HistorySummaryPanel > renders totals, buckets, and exports 1`] = `
               class="text-xs"
               style="color: var(--text-muted);"
             >
-              Expires 381d
+              Expires 348d
             </p>
           </div>
           <a
