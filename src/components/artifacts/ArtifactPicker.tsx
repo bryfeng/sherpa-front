@@ -80,6 +80,7 @@ export function ArtifactPicker({ isOpen, onClose, walletAddress }: ArtifactPicke
   const [searchQuery, setSearchQuery] = useState('')
   const addWidget = useSherpaStore((s) => s.addWidget)
   const artifactTabs = useSherpaStore((s) => s.artifactTabs)
+  const widgets = useSherpaStore((s) => s.widgets)
 
   // Filter artifacts based on search
   const filteredArtifacts = useMemo(() => {
@@ -93,10 +94,16 @@ export function ArtifactPicker({ isOpen, onClose, walletAddress }: ArtifactPicke
     )
   }, [searchQuery])
 
-  // Check if artifact is already open
+  // Check if artifact is already open as a tab
+  // Only show as "open" if it's actually in the artifact tabs
   const isArtifactOpen = useCallback(
-    (id: string) => artifactTabs.includes(id),
-    [artifactTabs]
+    (id: string) => {
+      // Check if this artifact ID is in tabs AND the widget actually exists
+      const inTabs = artifactTabs.includes(id)
+      const widgetExists = widgets.some((w) => w.id === id)
+      return inTabs && widgetExists
+    },
+    [artifactTabs, widgets]
   )
 
   // Add artifact to panel

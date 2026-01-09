@@ -408,15 +408,23 @@ export const useSherpaStore = create<SherpaStore>()(
           addWidget: (widget) =>
             set((state) => {
               const existingIndex = state.widgets.findIndex((w) => w.id === widget.id)
-              if (existingIndex !== -1) {
-                const newWidgets = [...state.widgets]
-                newWidgets[existingIndex] = widget
-                return { widgets: newWidgets }
-              }
-              // Also add to artifact tabs and make active
+              // Always ensure widget is in artifact tabs
               const newTabs = state.artifactTabs.includes(widget.id)
                 ? state.artifactTabs
                 : [...state.artifactTabs, widget.id]
+
+              if (existingIndex !== -1) {
+                // Widget exists - update it and ensure it's in tabs
+                const newWidgets = [...state.widgets]
+                newWidgets[existingIndex] = widget
+                return {
+                  widgets: newWidgets,
+                  artifactTabs: newTabs,
+                  activeArtifactId: widget.id,
+                  isVisible: true,
+                }
+              }
+              // New widget - add to widgets and tabs
               return {
                 widgets: [widget, ...state.widgets],
                 artifactTabs: newTabs,
