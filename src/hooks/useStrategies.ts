@@ -32,7 +32,8 @@ export interface GenericStrategy {
   description?: string
   strategyType: 'dca' | 'rebalance' | 'limit_order' | 'stop_loss' | 'take_profit' | 'custom'
   config: Record<string, unknown>
-  status: 'draft' | 'active' | 'paused' | 'archived'
+  status: 'draft' | 'pending_session' | 'active' | 'paused' | 'completed' | 'failed' | 'expired' | 'archived'
+  sessionKeyId?: Id<'sessionKeys'>
   cronExpression?: string
   lastExecutedAt?: number
   nextExecutionAt?: number

@@ -7,12 +7,15 @@
 
 import React, { useState, useCallback, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { TrendingUp, TrendingDown, Loader2, AlertCircle, RefreshCw, ChevronDown, ArrowDownUp, Info, Play, Pause, Trash2, MoreVertical, Briefcase, Calendar, Zap, MessageSquare, Clock, Archive, ChevronRight } from 'lucide-react'
+import { TrendingUp, TrendingDown, Loader2, AlertCircle, RefreshCw, ChevronDown, ArrowDownUp, Info, Play, Pause, Trash2, MoreVertical, Briefcase, Calendar, Zap, MessageSquare, Clock, Archive, ChevronRight, CheckCircle, XCircle, AlertTriangle } from 'lucide-react'
 import type { Widget } from '../../types/widget-system'
 import { usePortfolioSummary } from '../../workspace/hooks/usePortfolioSummary'
 import { usePriceTicker } from '../../workspace/hooks/usePriceTicker'
 import { useSwapQuote, COMMON_TOKENS, type CommonToken } from '../../workspace/hooks/useSwapQuote'
 import { useConversations, useConversationMutations, type ConversationSummary } from '../../workspace/hooks/useConversationHistory'
+import { usePendingApprovals, useExecutionMutations, formatWaitingTime, formatStrategyType, getUrgencyLevel, type PendingExecution } from '../../workspace/hooks/usePendingApprovals'
+import { useStrategyExecution, formatExecutionStatus, getExecutionStatusColor, type ExecutionStatus } from '../../hooks/useStrategyExecution'
+import type { Id } from '../../../convex/_generated/dataModel'
 import { useGenericStrategies, useGenericStrategyMutations, type GenericStrategy } from '../../hooks/useStrategies'
 import '../../styles/design-system.css'
 
@@ -755,12 +758,21 @@ const STRATEGY_TYPE_COLORS: Record<string, { bg: string; text: string }> = {
   custom: { bg: 'rgba(167, 139, 250, 0.15)', text: '#a78bfa' },
 }
 
-// Status badge colors
-const STATUS_COLORS: Record<string, { bg: string; text: string }> = {
-  draft: { bg: 'rgba(156, 163, 175, 0.15)', text: '#9ca3af' },
-  active: { bg: 'rgba(34, 197, 94, 0.15)', text: '#22c55e' },
-  paused: { bg: 'rgba(251, 191, 36, 0.15)', text: '#fbbf24' },
-  archived: { bg: 'rgba(107, 114, 128, 0.15)', text: '#6b7280' },
+// Status badge colors and labels
+const STATUS_COLORS: Record<string, { bg: string; text: string; label: string; tooltip?: string }> = {
+  draft: { bg: 'rgba(156, 163, 175, 0.15)', text: '#9ca3af', label: 'Draft' },
+  pending_session: {
+    bg: 'rgba(251, 191, 36, 0.15)',
+    text: '#fbbf24',
+    label: 'Needs Key',
+    tooltip: 'Requires session key authorization to execute',
+  },
+  active: { bg: 'rgba(34, 197, 94, 0.15)', text: '#22c55e', label: 'Active' },
+  paused: { bg: 'rgba(251, 191, 36, 0.15)', text: '#fbbf24', label: 'Paused' },
+  completed: { bg: 'rgba(107, 114, 128, 0.15)', text: '#6b7280', label: 'Completed' },
+  failed: { bg: 'rgba(239, 68, 68, 0.15)', text: '#ef4444', label: 'Failed' },
+  expired: { bg: 'rgba(107, 114, 128, 0.15)', text: '#6b7280', label: 'Expired' },
+  archived: { bg: 'rgba(107, 114, 128, 0.15)', text: '#6b7280', label: 'Archived' },
 }
 
 function formatStrategyDate(timestamp: number): string {
@@ -836,8 +848,9 @@ function StrategyCard({ strategy, onActivate, onPause, onDelete }: StrategyCardP
             <span
               className="px-1.5 py-0.5 text-xs rounded"
               style={{ background: statusColor.bg, color: statusColor.text }}
+              title={statusColor.tooltip}
             >
-              {strategy.status}
+              {statusColor.label}
             </span>
           </div>
         </div>
@@ -876,6 +889,15 @@ function StrategyCard({ strategy, onActivate, onPause, onDelete }: StrategyCardP
                       style={{ color: 'var(--success)' }}
                     >
                       <Play className="w-3 h-3" /> Activate
+                    </button>
+                  )}
+                  {strategy.status === 'pending_session' && (
+                    <button
+                      onClick={() => { onActivate(); setShowMenu(false) }}
+                      className="w-full flex items-center gap-2 px-3 py-2 text-left text-sm transition-colors hover:bg-white/5"
+                      style={{ color: 'var(--accent)' }}
+                    >
+                      <Zap className="w-3 h-3" /> Authorize Key
                     </button>
                   )}
                   {strategy.status === 'active' && (
@@ -1196,6 +1218,454 @@ function ChatHistoryWidget({ walletAddress, onSelectConversation }: ChatHistoryW
 }
 
 // ============================================
+// PENDING APPROVALS WIDGET
+// ============================================
+
+interface PendingApprovalsWidgetProps {
+  walletAddress?: string
+  onApprove?: (executionId: string) => void
+}
+
+// Urgency indicator colors
+const URGENCY_COLORS: Record<string, { bg: string; text: string; border: string }> = {
+  normal: { bg: 'transparent', text: 'var(--text-muted)', border: 'var(--line)' },
+  warning: { bg: 'rgba(251, 191, 36, 0.1)', text: '#fbbf24', border: 'rgba(251, 191, 36, 0.3)' },
+  urgent: { bg: 'rgba(239, 68, 68, 0.1)', text: '#ef4444', border: 'rgba(239, 68, 68, 0.3)' },
+}
+
+function PendingExecutionCard({
+  execution,
+  onApprove,
+  onSkip,
+  isProcessing,
+}: {
+  execution: PendingExecution
+  onApprove: () => void
+  onSkip: () => void
+  isProcessing: boolean
+}) {
+  const urgency = getUrgencyLevel(execution.createdAt)
+  const urgencyColor = URGENCY_COLORS[urgency]
+  const typeColor = STRATEGY_TYPE_COLORS[execution.strategy?.strategyType || 'custom'] || STRATEGY_TYPE_COLORS.custom
+
+  return (
+    <motion.div
+      className="p-3 rounded-lg"
+      style={{
+        background: urgencyColor.bg || 'var(--surface-2)',
+        border: `1px solid ${urgencyColor.border}`,
+      }}
+      initial={{ opacity: 0, y: 8 }}
+      animate={{ opacity: 1, y: 0 }}
+      exit={{ opacity: 0, y: -8 }}
+    >
+      {/* Header */}
+      <div className="flex items-start justify-between gap-2 mb-2">
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-2 mb-1">
+            {urgency === 'urgent' && (
+              <AlertTriangle className="w-4 h-4 flex-shrink-0" style={{ color: urgencyColor.text }} />
+            )}
+            <h4
+              className="font-medium text-sm truncate"
+              style={{ color: 'var(--text)' }}
+              title={execution.strategy?.name}
+            >
+              {execution.strategy?.name || 'Unknown Strategy'}
+            </h4>
+          </div>
+          <div className="flex items-center gap-2">
+            {/* Strategy type badge */}
+            <span
+              className="px-1.5 py-0.5 text-xs rounded font-medium"
+              style={{ background: typeColor.bg, color: typeColor.text }}
+            >
+              {formatStrategyType(execution.strategy?.strategyType || 'custom')}
+            </span>
+            {/* Waiting time */}
+            <span className="text-xs" style={{ color: urgencyColor.text }}>
+              {formatWaitingTime(execution.createdAt)}
+            </span>
+          </div>
+        </div>
+      </div>
+
+      {/* Approval reason */}
+      {execution.approvalReason && (
+        <p
+          className="text-xs mb-3 line-clamp-2"
+          style={{ color: 'var(--text-muted)' }}
+        >
+          {execution.approvalReason}
+        </p>
+      )}
+
+      {/* Action buttons */}
+      <div className="flex items-center gap-2">
+        <motion.button
+          onClick={onApprove}
+          disabled={isProcessing}
+          className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg text-sm font-medium transition-colors disabled:opacity-50"
+          style={{
+            background: 'var(--accent)',
+            color: 'var(--text-inverse)',
+          }}
+          whileHover={{ scale: 1.02 }}
+          whileTap={{ scale: 0.98 }}
+        >
+          {isProcessing ? (
+            <Loader2 className="w-4 h-4 animate-spin" />
+          ) : (
+            <>
+              <CheckCircle className="w-4 h-4" />
+              Approve
+            </>
+          )}
+        </motion.button>
+        <motion.button
+          onClick={onSkip}
+          disabled={isProcessing}
+          className="px-3 py-2 rounded-lg text-sm transition-colors disabled:opacity-50"
+          style={{
+            background: 'var(--surface-2)',
+            color: 'var(--text-muted)',
+            border: '1px solid var(--line)',
+          }}
+          whileHover={{ scale: 1.02 }}
+          whileTap={{ scale: 0.98 }}
+        >
+          <XCircle className="w-4 h-4" />
+        </motion.button>
+      </div>
+    </motion.div>
+  )
+}
+
+// Execution Modal Component
+function ExecutionModal({
+  execution,
+  executionState,
+  onClose,
+  onRetry,
+}: {
+  execution: PendingExecution
+  executionState: {
+    status: ExecutionStatus
+    currentStep: number
+    totalSteps: number
+    txHash?: string
+    error?: string
+  }
+  onClose: () => void
+  onRetry: () => void
+}) {
+  const statusColor = getExecutionStatusColor(executionState.status)
+  const isComplete = executionState.status === 'completed'
+  const isFailed = executionState.status === 'failed'
+  const isProcessing = !isComplete && !isFailed && executionState.status !== 'idle'
+
+  return (
+    <motion.div
+      className="fixed inset-0 z-50 flex items-center justify-center p-4"
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+    >
+      {/* Backdrop */}
+      <div
+        className="absolute inset-0 bg-black/60 backdrop-blur-sm"
+        onClick={!isProcessing ? onClose : undefined}
+      />
+
+      {/* Modal */}
+      <motion.div
+        className="relative w-full max-w-md rounded-xl p-6"
+        style={{ background: 'var(--surface)', border: '1px solid var(--line)' }}
+        initial={{ scale: 0.95, opacity: 0 }}
+        animate={{ scale: 1, opacity: 1 }}
+        exit={{ scale: 0.95, opacity: 0 }}
+      >
+        {/* Header */}
+        <div className="flex items-start justify-between mb-4">
+          <div>
+            <h3 className="text-lg font-semibold" style={{ color: 'var(--text)' }}>
+              Execute Strategy
+            </h3>
+            <p className="text-sm" style={{ color: 'var(--text-muted)' }}>
+              {execution.strategy?.name || 'Strategy Execution'}
+            </p>
+          </div>
+          {!isProcessing && (
+            <button
+              onClick={onClose}
+              className="p-1 rounded-lg hover:bg-white/10 transition-colors"
+            >
+              <XCircle className="w-5 h-5" style={{ color: 'var(--text-muted)' }} />
+            </button>
+          )}
+        </div>
+
+        {/* Status */}
+        <div
+          className="p-4 rounded-lg mb-4"
+          style={{ background: 'var(--surface-2)', border: '1px solid var(--line)' }}
+        >
+          <div className="flex items-center gap-3 mb-2">
+            {isProcessing && (
+              <Loader2 className="w-5 h-5 animate-spin" style={{ color: statusColor }} />
+            )}
+            {isComplete && (
+              <CheckCircle className="w-5 h-5" style={{ color: statusColor }} />
+            )}
+            {isFailed && (
+              <AlertCircle className="w-5 h-5" style={{ color: statusColor }} />
+            )}
+            <span className="font-medium" style={{ color: statusColor }}>
+              {formatExecutionStatus(executionState.status)}
+            </span>
+          </div>
+
+          {/* Progress */}
+          {executionState.totalSteps > 0 && (
+            <div className="mb-2">
+              <div className="flex justify-between text-xs mb-1" style={{ color: 'var(--text-muted)' }}>
+                <span>Step {executionState.currentStep} of {executionState.totalSteps}</span>
+              </div>
+              <div className="h-1.5 rounded-full overflow-hidden" style={{ background: 'var(--line)' }}>
+                <motion.div
+                  className="h-full rounded-full"
+                  style={{ background: statusColor }}
+                  initial={{ width: 0 }}
+                  animate={{ width: `${(executionState.currentStep / executionState.totalSteps) * 100}%` }}
+                />
+              </div>
+            </div>
+          )}
+
+          {/* Error message */}
+          {executionState.error && (
+            <p className="text-xs mt-2" style={{ color: 'var(--danger)' }}>
+              {executionState.error}
+            </p>
+          )}
+
+          {/* Transaction hash */}
+          {executionState.txHash && (
+            <a
+              href={`https://etherscan.io/tx/${executionState.txHash}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-xs mt-2 flex items-center gap-1 hover:underline"
+              style={{ color: 'var(--accent)' }}
+            >
+              View transaction
+              <ChevronRight className="w-3 h-3" />
+            </a>
+          )}
+        </div>
+
+        {/* Approval reason */}
+        {execution.approvalReason && (
+          <div className="mb-4">
+            <p className="text-xs font-medium mb-1" style={{ color: 'var(--text-muted)' }}>
+              Action
+            </p>
+            <p className="text-sm" style={{ color: 'var(--text)' }}>
+              {execution.approvalReason}
+            </p>
+          </div>
+        )}
+
+        {/* Actions */}
+        <div className="flex gap-2">
+          {isFailed && (
+            <motion.button
+              onClick={onRetry}
+              className="flex-1 py-2.5 rounded-lg font-medium text-sm"
+              style={{ background: 'var(--accent)', color: 'var(--text-inverse)' }}
+              whileHover={{ scale: 1.02 }}
+              whileTap={{ scale: 0.98 }}
+            >
+              Try Again
+            </motion.button>
+          )}
+          <motion.button
+            onClick={onClose}
+            disabled={isProcessing}
+            className="flex-1 py-2.5 rounded-lg font-medium text-sm disabled:opacity-50"
+            style={{
+              background: isComplete ? 'var(--accent)' : 'var(--surface-2)',
+              color: isComplete ? 'var(--text-inverse)' : 'var(--text)',
+              border: isComplete ? 'none' : '1px solid var(--line)',
+            }}
+            whileHover={{ scale: 1.02 }}
+            whileTap={{ scale: 0.98 }}
+          >
+            {isComplete ? 'Done' : isProcessing ? 'Processing...' : 'Close'}
+          </motion.button>
+        </div>
+      </motion.div>
+    </motion.div>
+  )
+}
+
+export function PendingApprovalsWidget({ walletAddress, onApprove }: PendingApprovalsWidgetProps) {
+  const { executions, isLoading, isEmpty, count } = usePendingApprovals(walletAddress || null)
+  const { approve, skip } = useExecutionMutations()
+  const [processingId, setProcessingId] = useState<string | null>(null)
+  const [executingExecution, setExecutingExecution] = useState<PendingExecution | null>(null)
+
+  // Strategy execution hook
+  const {
+    state: executionState,
+    execute,
+    reset: resetExecution,
+    handleTransactionConfirmed,
+  } = useStrategyExecution()
+
+  // Handle approve click - opens execution modal and triggers signing
+  const handleApprove = useCallback(async (execution: PendingExecution) => {
+    if (!walletAddress) return
+
+    setProcessingId(execution._id)
+    setExecutingExecution(execution)
+
+    try {
+      // First, mark as approved in Convex
+      await approve(execution._id, walletAddress)
+
+      // Then trigger the transaction execution
+      if (execution.strategy) {
+        await execute(
+          execution._id as Id<'strategyExecutions'>,
+          execution.strategyId as Id<'strategies'>,
+          execution.strategy.strategyType,
+          execution.strategy.config
+        )
+      }
+
+      onApprove?.(execution._id)
+    } catch (err) {
+      console.error('Failed to approve execution:', err)
+    } finally {
+      setProcessingId(null)
+    }
+  }, [approve, walletAddress, onApprove, execute])
+
+  // Handle retry after failure
+  const handleRetry = useCallback(async () => {
+    if (!executingExecution || !walletAddress) return
+
+    resetExecution()
+
+    if (executingExecution.strategy) {
+      await execute(
+        executingExecution._id as Id<'strategyExecutions'>,
+        executingExecution.strategyId as Id<'strategies'>,
+        executingExecution.strategy.strategyType,
+        executingExecution.strategy.config
+      )
+    }
+  }, [executingExecution, walletAddress, execute, resetExecution])
+
+  // Handle modal close
+  const handleCloseModal = useCallback(() => {
+    setExecutingExecution(null)
+    resetExecution()
+  }, [resetExecution])
+
+  const handleSkip = useCallback(async (execution: PendingExecution) => {
+    setProcessingId(execution._id)
+    try {
+      await skip(execution._id, 'User skipped')
+    } catch (err) {
+      console.error('Failed to skip execution:', err)
+    } finally {
+      setProcessingId(null)
+    }
+  }, [skip])
+
+  // No wallet connected
+  if (!walletAddress) {
+    return (
+      <div className="flex flex-col items-center justify-center py-6">
+        <Clock className="w-8 h-8 mb-2" style={{ color: 'var(--text-muted)' }} />
+        <p className="text-sm text-center" style={{ color: 'var(--text-muted)' }}>
+          Connect wallet to view pending approvals
+        </p>
+      </div>
+    )
+  }
+
+  // Loading state
+  if (isLoading) {
+    return <WidgetLoading message="Loading pending approvals..." />
+  }
+
+  // Empty state - no pending approvals (this is good!)
+  if (isEmpty) {
+    return (
+      <div className="flex flex-col items-center justify-center py-6">
+        <div
+          className="w-12 h-12 rounded-full flex items-center justify-center mb-3"
+          style={{ background: 'rgba(34, 197, 94, 0.15)' }}
+        >
+          <CheckCircle className="w-6 h-6" style={{ color: '#22c55e' }} />
+        </div>
+        <p className="text-sm font-medium mb-1" style={{ color: 'var(--text)' }}>
+          All caught up!
+        </p>
+        <p className="text-xs text-center" style={{ color: 'var(--text-muted)' }}>
+          No pending strategy executions
+        </p>
+      </div>
+    )
+  }
+
+  // Has pending approvals
+  return (
+    <>
+      <div className="space-y-2">
+        {/* Header with count */}
+        <div className="flex items-center justify-between text-xs mb-2">
+          <span className="flex items-center gap-1.5" style={{ color: 'var(--warning)' }}>
+            <AlertCircle className="w-3.5 h-3.5" />
+            {count} pending approval{count !== 1 ? 's' : ''}
+          </span>
+        </div>
+
+        {/* Execution list */}
+        <div className="space-y-2 max-h-[300px] overflow-y-auto pr-1">
+          <AnimatePresence mode="popLayout">
+            {executions.map((execution) => (
+              <PendingExecutionCard
+                key={execution._id}
+                execution={execution}
+                onApprove={() => handleApprove(execution)}
+                onSkip={() => handleSkip(execution)}
+                isProcessing={processingId === execution._id}
+              />
+            ))}
+          </AnimatePresence>
+        </div>
+      </div>
+
+      {/* Execution Modal */}
+      <AnimatePresence>
+        {executingExecution && (
+          <ExecutionModal
+            execution={executingExecution}
+            executionState={executionState}
+            onClose={handleCloseModal}
+            onRetry={handleRetry}
+          />
+        )}
+      </AnimatePresence>
+    </>
+  )
+}
+
+// ============================================
 // WIDGET CONTENT DISPATCHER
 // ============================================
 
@@ -1251,6 +1721,17 @@ export function WidgetContent({ widget, walletAddress, isPro }: WidgetContentPro
           onSelectConversation={(id) => {
             // TODO: Integrate with chat panel to load conversation
             console.log('Selected conversation:', id)
+          }}
+        />
+      )
+
+    case 'pending-approvals':
+      return (
+        <PendingApprovalsWidget
+          walletAddress={walletAddress}
+          onApprove={(executionId) => {
+            // TODO: Trigger transaction signing flow after approval
+            console.log('Approved execution:', executionId)
           }}
         />
       )

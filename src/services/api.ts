@@ -159,4 +159,98 @@ export const api = {
     })
     return data as EntitlementResponse
   },
+
+  /**
+   * Get a swap quote from Relay
+   */
+  async swapQuote(params: {
+    token_in: string
+    token_out: string
+    amount_in: number
+    chain?: string
+    slippage_bps?: number
+    wallet_address: string
+  }): Promise<SwapQuoteResponse> {
+    const { data } = await axios.post(`${BASE}/swap/quote`, params)
+    return data as SwapQuoteResponse
+  },
+
+  /**
+   * Get a bridge quote from Relay
+   */
+  async bridgeQuote(params: {
+    user: string
+    originChainId: number
+    destinationChainId: number
+    originCurrency: string
+    destinationCurrency: string
+    recipient: string
+    amount: string
+    tradeType?: string
+    slippageTolerance?: string
+  }): Promise<RelayQuoteResponse> {
+    const { data } = await axios.post(`${BASE}/tools/relay/quote`, {
+      ...params,
+      tradeType: params.tradeType || 'EXACT_INPUT',
+      referrer: 'sherpa.chat',
+      useExternalLiquidity: true,
+      useDepositAddress: false,
+      topupGas: false,
+    })
+    return data as RelayQuoteResponse
+  },
+}
+
+// ============================================
+// TYPES
+// ============================================
+
+export interface SwapQuoteResponse {
+  success: boolean
+  from_token: string
+  to_token: string
+  amount_in: number
+  amount_out_est: number
+  price_in_usd: number
+  price_out_usd: number
+  fee_est: number
+  slippage_bps: number
+  route: {
+    kind: string
+    request_id?: string
+    steps?: any[]
+    transactions?: any[]
+    tx_ready?: boolean
+    primary_tx?: TransactionData
+    tx?: TransactionData
+  }
+  sources: Array<{ name: string; logo?: string }>
+  warnings: string[]
+}
+
+export interface TransactionData {
+  to: string
+  data: string
+  value?: string
+  chainId?: number
+  gasLimit?: string
+}
+
+export interface RelayQuoteResponse {
+  success: boolean
+  quote: {
+    steps?: Array<{
+      id: string
+      action: string
+      items?: Array<{
+        data?: TransactionData
+      }>
+    }>
+    details?: {
+      currencyIn?: any
+      currencyOut?: any
+    }
+    fees?: any
+    requestId?: string
+  }
 }

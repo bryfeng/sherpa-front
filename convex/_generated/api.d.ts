@@ -26,6 +26,7 @@ import type * as riskPolicies from "../riskPolicies.js";
 import type * as scheduler from "../scheduler.js";
 import type * as sessionKeys from "../sessionKeys.js";
 import type * as strategies from "../strategies.js";
+import type * as strategyExecutions from "../strategyExecutions.js";
 import type * as subscriptions from "../subscriptions.js";
 import type * as systemPolicy from "../systemPolicy.js";
 import type * as tokenCatalog from "../tokenCatalog.js";
@@ -59,6 +60,7 @@ declare const fullApi: ApiFromModules<{
   scheduler: typeof scheduler;
   sessionKeys: typeof sessionKeys;
   strategies: typeof strategies;
+  strategyExecutions: typeof strategyExecutions;
   subscriptions: typeof subscriptions;
   systemPolicy: typeof systemPolicy;
   tokenCatalog: typeof tokenCatalog;

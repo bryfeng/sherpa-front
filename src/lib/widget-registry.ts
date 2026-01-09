@@ -569,6 +569,22 @@ export const WIDGET_REGISTRY: Record<WidgetKind, WidgetMetadata> = {
     requiresPro: false,
     tags: ['strategy', 'automation', 'trading', 'ai'],
   },
+  'pending-approvals': {
+    kind: 'pending-approvals',
+    category: 'action',
+    name: 'Pending Approvals',
+    description: 'Strategy executions waiting for your approval',
+    icon: 'clock',
+    defaultSize: 'standard',
+    minSize: { cols: 4, rows: 2 },
+    maxSize: { cols: 6, rows: 4 },
+    resizable: true,
+    refreshable: true,
+    defaultRefreshInterval: 30,
+    requiresWallet: true,
+    requiresPro: false,
+    tags: ['strategy', 'approval', 'execution', 'pending'],
+  },
 }
 
 // ============================================
@@ -666,6 +682,9 @@ function getDefaultPayload(kind: WidgetKind): WidgetPayload {
     'my-strategies': {
       walletAddress: '',
       statusFilter: undefined,
+    },
+    'pending-approvals': {
+      walletAddress: '',
     },
   }
   return defaults[kind]

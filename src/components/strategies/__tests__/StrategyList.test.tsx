@@ -34,9 +34,8 @@ const mockStrategy: DCAStrategy = {
   totalExecutions: 5,
   successfulExecutions: 5,
   failedExecutions: 0,
+  skippedExecutions: 0,
   averagePriceUsd: 2000,
-  createdAt: Date.now(),
-  updatedAt: Date.now(),
 }
 
 const defaultFilters: StrategyFilters = {

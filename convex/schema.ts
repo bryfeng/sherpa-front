@@ -71,10 +71,16 @@ export default defineSchema({
     config: v.any(), // Strategy configuration object
     status: v.union(
       v.literal("draft"),
+      v.literal("pending_session"), // Waiting for session key authorization
       v.literal("active"),
       v.literal("paused"),
+      v.literal("completed"),
+      v.literal("failed"),
+      v.literal("expired"),
       v.literal("archived")
     ),
+    // Session key for automated execution
+    sessionKeyId: v.optional(v.id("sessionKeys")),
     // Scheduling
     cronExpression: v.optional(v.string()), // e.g., "0 */4 * * *"
     lastExecutedAt: v.optional(v.number()),

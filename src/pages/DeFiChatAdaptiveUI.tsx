@@ -1,6 +1,7 @@
-import React, { useCallback, useEffect, useMemo, useReducer } from 'react'
+import React, { useCallback, useEffect, useMemo, useReducer, useState } from 'react'
 
 import { DeFiChatShell } from '../components/shell/DeFiChatShell'
+import { ArtifactPicker } from '../components/artifacts/ArtifactPicker'
 import { initialShellUIState, shellUIReducer, type ShellUIState } from '../hooks/useShellUIReducer'
 import { useDeFiChatController, type DeFiChatAdaptiveUIProps } from '../hooks/useDeFiChatController'
 import { EntitlementsProvider } from '../hooks/useEntitlements'
@@ -14,6 +15,7 @@ function initializeState(): ShellUIState {
 
 export default function DeFiChatAdaptiveUI(props: DeFiChatAdaptiveUIProps) {
   const [shellState, dispatch] = useReducer(shellUIReducer, undefined, initializeState)
+  const [artifactPickerOpen, setArtifactPickerOpen] = useState(false)
 
   useEffect(() => {
     debouncedSavePanelUI(shellState.panelUI)
@@ -97,9 +99,15 @@ export default function DeFiChatAdaptiveUI(props: DeFiChatAdaptiveUIProps) {
           onTabClick: setActiveArtifact,
           onTabClose: closeArtifactTab,
           onPanelResize: setPanelWidth,
+          onAddArtifact: () => setArtifactPickerOpen(true),
         }}
       />
       {modals}
+      <ArtifactPicker
+        isOpen={artifactPickerOpen}
+        onClose={() => setArtifactPickerOpen(false)}
+        walletAddress={walletAddress ?? undefined}
+      />
     </EntitlementsProvider>
   )
 }

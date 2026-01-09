@@ -202,22 +202,49 @@ export const updateStatus = mutation({
 });
 
 /**
- * Activate a strategy (sets it to active and schedules if cron is set)
+ * Activate a strategy (requires a valid session key)
+ *
+ * A strategy can only be truly "active" if it has an authorized session key.
+ * Without a session key, the strategy goes to "pending_session" status.
  */
 export const activate = mutation({
-  args: { strategyId: v.id("strategies") },
+  args: {
+    strategyId: v.id("strategies"),
+    sessionKeyId: v.optional(v.id("sessionKeys")),
+  },
   handler: async (ctx, args) => {
     const strategy = await ctx.db.get(args.strategyId);
     if (!strategy) throw new Error("Strategy not found");
 
     const now = Date.now();
-    await ctx.db.patch(args.strategyId, {
-      status: "active",
-      updatedAt: now,
-      // If cron expression exists, calculate next execution time
-      // For now, we'll set it to run in 1 minute as a placeholder
-      nextExecutionAt: strategy.cronExpression ? now + 60000 : undefined,
-    });
+
+    // Check if session key is provided and valid
+    let validSessionKey = false;
+    if (args.sessionKeyId) {
+      const sessionKey = await ctx.db.get(args.sessionKeyId);
+      if (sessionKey && sessionKey.status === "active") {
+        // Check if session key hasn't expired
+        if (!sessionKey.expiresAt || sessionKey.expiresAt > now) {
+          validSessionKey = true;
+        }
+      }
+    }
+
+    if (validSessionKey && args.sessionKeyId) {
+      // Fully activate with session key
+      await ctx.db.patch(args.strategyId, {
+        status: "active",
+        sessionKeyId: args.sessionKeyId,
+        updatedAt: now,
+        nextExecutionAt: strategy.cronExpression ? now + 60000 : undefined,
+      });
+    } else {
+      // No valid session key - set to pending
+      await ctx.db.patch(args.strategyId, {
+        status: "pending_session",
+        updatedAt: now,
+      });
+    }
   },
 });
 

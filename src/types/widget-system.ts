@@ -65,6 +65,7 @@ export type WidgetKind =
   // Strategy widgets
   | 'dca-strategies'
   | 'my-strategies'
+  | 'pending-approvals'
 
 // ============================================
 // WIDGET SIZING
@@ -409,6 +410,9 @@ export interface WidgetPayloads {
   'my-strategies': {
     walletAddress: string
     statusFilter?: 'draft' | 'active' | 'paused' | 'archived'
+  }
+  'pending-approvals': {
+    walletAddress: string
   }
 }
 
