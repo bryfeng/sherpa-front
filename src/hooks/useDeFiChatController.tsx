@@ -739,6 +739,10 @@ export function useDeFiChatController({ props, shellState, dispatch }: UseDeFiCh
       if (nonPortfolioWidgets.length) {
         setWidgets((previous) => mergeWidgetsLocal(previous, nonPortfolioWidgets))
         setHighlight(nonPortfolioWidgets.map((widget) => widget.id))
+        // Also add to artifact panel (Zustand store) so they show in the artifact tabs
+        nonPortfolioWidgets.forEach((widget) => {
+          useSherpaStore.getState().addWidget(widget)
+        })
       }
 
       // Finalize the message - remove streaming flag and add sources
