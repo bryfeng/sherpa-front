@@ -24,8 +24,8 @@ import type { Widget } from '../../types/widgets'
 // Available artifacts that can be added
 const AVAILABLE_ARTIFACTS = [
   {
-    id: 'my-strategies',
-    kind: 'my-strategies' as const,
+    id: 'dca-strategies',
+    kind: 'dca-strategies' as const,
     name: 'My Strategies',
     description: 'View and manage your automated trading strategies',
     icon: Repeat,

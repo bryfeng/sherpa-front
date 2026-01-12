@@ -136,30 +136,6 @@ function panelToWidget(panel: Panel): Widget {
   }
 }
 
-function applyOrder(list: Widget[]): Widget[] {
-  return list.map((widget, index) => ({ ...widget, order: index }))
-}
-
-function upsertWidgets(current: Widget[], incoming: Widget[]): Widget[] {
-  const incomingIds = new Set(incoming.map((widget) => widget.id))
-  const filtered = current.filter((widget) => !incomingIds.has(widget.id))
-  return applyOrder([...incoming, ...filtered])
-}
-
-function removeWidgetById(current: Widget[], id: string): Widget[] {
-  return applyOrder(current.filter((widget) => widget.id !== id))
-}
-
-function reorderWidgetList(current: Widget[], activeId: string, overId: string): Widget[] {
-  const oldIndex = current.findIndex((widget) => widget.id === activeId)
-  const newIndex = current.findIndex((widget) => widget.id === overId)
-  if (oldIndex < 0 || newIndex < 0 || oldIndex === newIndex) return current
-  const next = current.slice()
-  const [item] = next.splice(oldIndex, 1)
-  next.splice(newIndex, 0, item)
-  return applyOrder(next)
-}
-
 export interface DeFiChatAdaptiveUIProps {
   persona: Persona
   setPersona: (persona: Persona) => void
@@ -226,7 +202,14 @@ export function useDeFiChatController({ props, shellState, dispatch }: UseDeFiCh
   const storageKey = useCallback((addr?: string | null) => (addr ? `sherpa.conversation_id:${addr.toLowerCase()}` : 'sherpa.conversation_id:guest'), [])
 
   const [messages, setMessages] = useState<AgentMessage[]>(seedIntro)
-  const [widgets, setWidgets] = useState<Widget[]>(seedWidgets)
+
+  // Use global store for widgets instead of local state
+  const widgets = useSherpaStore((s) => s.widgets)
+  const storeAddWidget = useSherpaStore((s) => s.addWidget)
+  const storeRemoveWidget = useSherpaStore((s) => s.removeWidget)
+  const storeSetWidgets = useSherpaStore((s) => s.setWidgets)
+  const storeReorderWidgets = useSherpaStore((s) => s.reorderWidgets)
+
   const hasLiveWidgets = useMemo(
     () =>
       widgets.some((widget) => {
@@ -423,14 +406,12 @@ export function useDeFiChatController({ props, shellState, dispatch }: UseDeFiCh
       sources: [{ label: 'CoinGecko', href: 'https://www.coingecko.com' }],
       density: 'rail',
     }
-    setWidgets((previous) => upsertWidgets(previous, [widget]))
+    storeAddWidget(widget)
     setHighlight(['top_coins'])
-    // Add to artifact panel
-    useSherpaStore.getState().addWidget(widget)
-  }, [setHighlight])
+  }, [setHighlight, storeAddWidget])
 
   const loadTrendingTokensPanel = useCallback(async (options: { highlight?: boolean; addToArtifacts?: boolean } = {}) => {
-    const { highlight: forceHighlight = false, addToArtifacts = false } = options
+    const { highlight: forceHighlight = false } = options
     let tokens: TrendingToken[] = []
     let errorMessage: string | undefined
 
@@ -454,20 +435,15 @@ export function useDeFiChatController({ props, shellState, dispatch }: UseDeFiCh
       density: 'full',
     }
 
-    let existed = false
-    setWidgets((previous) => {
-      existed = previous.some((candidate) => candidate.id === 'trending_tokens')
-      return upsertWidgets(previous, [widget])
-    })
+    // Check if widget already exists before adding (use store state directly to avoid dependency)
+    const currentWidgets = useSherpaStore.getState().widgets
+    const existed = currentWidgets.some((candidate) => candidate.id === 'trending_tokens')
+    storeAddWidget(widget)
 
     if (forceHighlight || !existed) {
       setHighlight(['trending_tokens'])
     }
-    // Add to artifact panel when explicitly requested
-    if (addToArtifacts) {
-      useSherpaStore.getState().addWidget(widget)
-    }
-  }, [setHighlight])
+  }, [setHighlight, storeAddWidget])
 
   useEffect(() => {
     loadTrendingTokensPanel({ highlight: true }).catch(() => {})
@@ -502,7 +478,7 @@ export function useDeFiChatController({ props, shellState, dispatch }: UseDeFiCh
       if (prevId !== null) {
         setConversationId(undefined)
         setMessages(seedIntro)
-        setWidgets(seedWidgets)
+        storeSetWidgets(seedWidgets)
         setHighlight(undefined)
         resetPanelUI()
         try {
@@ -531,7 +507,7 @@ export function useDeFiChatController({ props, shellState, dispatch }: UseDeFiCh
         }))
 
         setMessages(loadedMessages.length > 0 ? loadedMessages : seedIntro)
-        setWidgets(seedWidgets) // Reset widgets for loaded conversation
+        storeSetWidgets(seedWidgets) // Reset widgets for loaded conversation
         setHighlight(undefined)
         resetPanelUI()
 
@@ -543,7 +519,7 @@ export function useDeFiChatController({ props, shellState, dispatch }: UseDeFiCh
       .catch((err) => {
         console.error('Failed to load conversation:', err)
       })
-  }, [storeConversationId, conversationId, storageKey, walletAddress, setHighlight, resetPanelUI])
+  }, [storeConversationId, conversationId, storageKey, walletAddress, setHighlight, resetPanelUI, storeSetWidgets])
 
   useEffect(() => {
     if (hasLiveWidgets && !hasNudgedWorkspace) {
@@ -553,15 +529,13 @@ export function useDeFiChatController({ props, shellState, dispatch }: UseDeFiCh
     }
   }, [hasLiveWidgets, hasNudgedWorkspace, showWorkspace])
 
-  const mergeWidgetsLocal = useCallback((current: Widget[], incoming: Widget[]): Widget[] => upsertWidgets(current, incoming), [])
-
   const portfolioWidgetExistsRef = useRef(false)
 
   useEffect(() => {
     if (!portfolioSummary) {
       prevPortfolioFetchRef.current = null
       portfolioWidgetExistsRef.current = false
-      setWidgets((prev) => removeWidgetById(prev, 'portfolio_overview'))
+      storeRemoveWidget('portfolio_overview')
       return
     }
 
@@ -592,18 +566,19 @@ export function useDeFiChatController({ props, shellState, dispatch }: UseDeFiCh
       density: 'full',
     }
 
-    setWidgets((prev) => {
-      const existed = prev.some((candidate) => candidate.id === 'portfolio_overview')
-      portfolioWidgetExistsRef.current = true
-      if ((needsUpdate || !existed || portfolioHighlightPending.current) && portfolioHighlightPending.current) {
-        setHighlight(['portfolio_overview'])
-        portfolioHighlightPending.current = false
-        // Also add to artifact panel when portfolio is requested
-        useSherpaStore.getState().addWidget(widget)
-      }
-      return upsertWidgets(prev, [widget])
-    })
-  }, [portfolioSummary, setHighlight])
+    // Check existence from store state directly to avoid dependency on widgets array
+    const currentWidgets = useSherpaStore.getState().widgets
+    const existed = currentWidgets.some((candidate) => candidate.id === 'portfolio_overview')
+    portfolioWidgetExistsRef.current = true
+
+    if ((needsUpdate || !existed || portfolioHighlightPending.current) && portfolioHighlightPending.current) {
+      setHighlight(['portfolio_overview'])
+      portfolioHighlightPending.current = false
+    }
+
+    // Add/update widget in store
+    storeAddWidget(widget)
+  }, [portfolioSummary, setHighlight, storeAddWidget, storeRemoveWidget])
 
   const handleProUpsell = useCallback((source: 'cta' | 'action') => {
     onRequestPro(source)
@@ -737,12 +712,11 @@ export function useDeFiChatController({ props, shellState, dispatch }: UseDeFiCh
       }
 
       if (nonPortfolioWidgets.length) {
-        setWidgets((previous) => mergeWidgetsLocal(previous, nonPortfolioWidgets))
-        setHighlight(nonPortfolioWidgets.map((widget) => widget.id))
-        // Also add to artifact panel (Zustand store) so they show in the artifact tabs
+        // Add widgets to store
         nonPortfolioWidgets.forEach((widget) => {
-          useSherpaStore.getState().addWidget(widget)
+          storeAddWidget(widget)
         })
+        setHighlight(nonPortfolioWidgets.map((widget) => widget.id))
       }
 
       // Finalize the message - remove streaming flag and add sources
@@ -771,7 +745,7 @@ export function useDeFiChatController({ props, shellState, dispatch }: UseDeFiCh
     } finally {
       scheduleScrollToBottom()
     }
-  }, [conversationId, ensurePortfolioPanel, llmModel, mergeWidgetsLocal, scheduleScrollToBottom, setHighlight, storageKey, walletAddress])
+  }, [conversationId, ensurePortfolioPanel, llmModel, scheduleScrollToBottom, setHighlight, storeAddWidget, storageKey, walletAddress])
 
   const send = useCallback(async () => {
     const question = input.trim()
@@ -826,10 +800,10 @@ export function useDeFiChatController({ props, shellState, dispatch }: UseDeFiCh
     }
 
     setMessages(seedIntro)
-    setWidgets(seedWidgets)
+    storeSetWidgets(seedWidgets)
     setHighlight(undefined)
     resetPanelUI()
-  }, [resetPanelUI, setHighlight, storageKey, walletAddress])
+  }, [resetPanelUI, setHighlight, storageKey, storeSetWidgets, walletAddress])
 
   const handleRelayExecution = useCallback(async (widget: Widget) => {
     const payload = widget.payload || {}
@@ -1014,8 +988,8 @@ export function useDeFiChatController({ props, shellState, dispatch }: UseDeFiCh
   }, [dispatch])
 
   const reorderWidgets = useCallback((activeId: string, overId: string) => {
-    setWidgets((previous) => reorderWidgetList(previous, activeId, overId))
-  }, [])
+    storeReorderWidgets(activeId, overId)
+  }, [storeReorderWidgets])
 
   const handleAction = useCallback((action: AgentAction) => {
     if (action.gated === 'pro' && !pro) {

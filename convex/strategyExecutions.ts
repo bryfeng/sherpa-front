@@ -57,6 +57,45 @@ export const getPendingApprovals = query({
 });
 
 /**
+ * Get executions ready for wallet signing (state = "executing")
+ * Used by the ExecutionSigning hook to prompt user for signatures
+ */
+export const getReadyToSign = query({
+  args: {
+    walletAddress: v.string(),
+  },
+  handler: async (ctx, args) => {
+    const executions = await ctx.db
+      .query("strategyExecutions")
+      .withIndex("by_wallet_state", (q) =>
+        q.eq("walletAddress", args.walletAddress.toLowerCase()).eq("currentState", "executing")
+      )
+      .order("desc")
+      .collect();
+
+    // Fetch associated strategy details for each execution
+    const executionsWithStrategy = await Promise.all(
+      executions.map(async (execution) => {
+        const strategy = await ctx.db.get(execution.strategyId);
+        return {
+          ...execution,
+          strategy: strategy
+            ? {
+                _id: strategy._id,
+                name: strategy.name,
+                strategyType: strategy.strategyType,
+                config: strategy.config,
+              }
+            : null,
+        };
+      })
+    );
+
+    return executionsWithStrategy;
+  },
+});
+
+/**
  * Get a single execution with full details
  */
 export const get = query({
@@ -362,6 +401,63 @@ export const fail = mutation({
   },
 });
 
+/**
+ * Generic state transition for execution state machine
+ * Phase 13: Used by GenericStrategyExecutor for flexible state updates
+ */
+// Valid execution states
+const executionStates = v.union(
+  v.literal("idle"),
+  v.literal("analyzing"),
+  v.literal("planning"),
+  v.literal("awaiting_approval"),
+  v.literal("executing"),
+  v.literal("monitoring"),
+  v.literal("completed"),
+  v.literal("failed"),
+  v.literal("paused"),
+  v.literal("cancelled")
+);
+
+export const transitionState = mutation({
+  args: {
+    executionId: v.id("strategyExecutions"),
+    toState: executionStates,
+    trigger: v.string(),
+    reason: v.optional(v.string()),
+    context: v.optional(v.any()),
+  },
+  handler: async (ctx, args) => {
+    const execution = await ctx.db.get(args.executionId);
+    if (!execution) throw new Error("Execution not found");
+
+    const now = Date.now();
+
+    // Build new state history entry
+    const newHistoryEntry = {
+      id: `sh_${now}`,
+      fromState: execution.currentState,
+      toState: args.toState,
+      trigger: args.trigger,
+      timestamp: now,
+      reason: args.reason,
+      context: args.context,
+    };
+
+    // Update execution with new state
+    await ctx.db.patch(args.executionId, {
+      currentState: args.toState,
+      stateEnteredAt: now,
+      stateHistory: [...execution.stateHistory, newHistoryEntry],
+      metadata: args.context
+        ? { ...(execution.metadata || {}), lastTransitionContext: args.context }
+        : execution.metadata,
+    });
+
+    return { success: true, newState: args.toState };
+  },
+});
+
 // ============================================
 // HELPERS
 // ============================================
@@ -523,6 +619,91 @@ export const checkDueStrategies = mutation({
       created: results.filter((r) => r.executionId).length,
       results,
     };
+  },
+});
+
+/**
+ * Execute Now - Immediately create a pending execution for user approval
+ * This allows users to manually trigger a strategy execution instead of waiting
+ * for the scheduled time.
+ */
+export const executeNow = mutation({
+  args: {
+    strategyId: v.id("strategies"),
+  },
+  handler: async (ctx, args) => {
+    const strategy = await ctx.db.get(args.strategyId);
+    if (!strategy) throw new Error("Strategy not found");
+
+    // Check strategy is active or draft
+    if (strategy.status !== "active" && strategy.status !== "draft") {
+      throw new Error(`Cannot execute strategy in status: ${strategy.status}`);
+    }
+
+    // Check if there's already a pending execution
+    const existingPending = await ctx.db
+      .query("strategyExecutions")
+      .withIndex("by_strategy", (q) => q.eq("strategyId", args.strategyId))
+      .filter((q) =>
+        q.or(
+          q.eq(q.field("currentState"), "awaiting_approval"),
+          q.eq(q.field("currentState"), "executing"),
+          q.eq(q.field("currentState"), "monitoring")
+        )
+      )
+      .first();
+
+    if (existingPending) {
+      throw new Error("Strategy already has a pending execution. Please approve or skip it first.");
+    }
+
+    const now = Date.now();
+
+    // Generate approval reason based on strategy type
+    const config = strategy.config as Record<string, unknown>;
+    let approvalReason = `Execute ${strategy.name}`;
+
+    if (strategy.strategyType === "dca") {
+      const amount = config.amountPerExecution || config.amount || "?";
+      const fromToken = (config.fromToken as { symbol?: string })?.symbol || "tokens";
+      const toToken = (config.toToken as { symbol?: string })?.symbol || "tokens";
+      approvalReason = `Buy ${toToken} with ${amount} ${fromToken}`;
+    }
+
+    // Create execution in awaiting_approval state
+    const executionId = await ctx.db.insert("strategyExecutions", {
+      strategyId: args.strategyId,
+      walletAddress: strategy.walletAddress.toLowerCase(),
+      currentState: "awaiting_approval",
+      stateEnteredAt: now,
+      steps: [],
+      currentStepIndex: 0,
+      stateHistory: [
+        {
+          id: `sh_${now}`,
+          fromState: "idle",
+          toState: "awaiting_approval",
+          trigger: "manual_execute_now",
+          timestamp: now,
+          reason: "User requested immediate execution",
+        },
+      ],
+      requiresApproval: true,
+      approvalReason,
+      recoverable: true,
+      createdAt: now,
+    });
+
+    // If strategy was in draft, activate it
+    if (strategy.status === "draft") {
+      await ctx.db.patch(args.strategyId, {
+        status: "active",
+        requiresManualApproval: true,
+        updatedAt: now,
+      });
+    }
+
+    return { executionId, approvalReason };
   },
 });
 

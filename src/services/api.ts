@@ -162,11 +162,14 @@ export const api = {
 
   /**
    * Get a swap quote from Relay
+   * @param amount_in - Amount in token units (use this OR amount_usd)
+   * @param amount_usd - Amount in USD to spend (converts to token amount automatically)
    */
   async swapQuote(params: {
     token_in: string
     token_out: string
-    amount_in: number
+    amount_in?: number
+    amount_usd?: number
     chain?: string
     slippage_bps?: number
     wallet_address: string

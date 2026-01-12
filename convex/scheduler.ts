@@ -5,6 +5,12 @@ import { Doc } from "./_generated/dataModel";
 
 /**
  * Check for strategies that need execution and trigger them
+ *
+ * Phase 1 (Manual Approval): If requiresManualApproval is true, creates a pending
+ * execution that the user must approve before wallet signing.
+ *
+ * Phase 2 (Session Keys): If strategy has a valid session key, auto-executes
+ * without requiring manual approval.
  */
 export const checkTriggers = internalAction({
   args: {},
@@ -23,6 +29,36 @@ export const checkTriggers = internalAction({
 
     for (const strategy of readyStrategies) {
       try {
+        // Check if this strategy requires manual approval (Phase 1)
+        if (strategy.requiresManualApproval) {
+          // Check if there's already a pending execution for this strategy
+          const hasPending = await ctx.runQuery(
+            internal.scheduler.hasPendingExecution,
+            { strategyId: strategy._id }
+          );
+
+          if (hasPending) {
+            console.log(`Strategy ${strategy._id} already has pending execution, skipping`);
+            continue;
+          }
+
+          // Create pending execution for user approval
+          await ctx.runMutation(internal.scheduler.createPendingExecution, {
+            strategyId: strategy._id,
+          });
+
+          console.log(`Created pending execution for strategy ${strategy._id} (requires approval)`);
+
+          // Update next execution time so we don't create duplicates
+          await ctx.runMutation(internal.scheduler.updateNextExecution, {
+            strategyId: strategy._id,
+            lastExecutedAt: now,
+          });
+
+          continue;
+        }
+
+        // Phase 2: Auto-execution with session key
         // Get wallet address for the strategy's user
         const wallet = await ctx.runQuery(internal.scheduler.getWalletForUser, {
           userId: strategy.userId,
@@ -82,6 +118,78 @@ export const getAllActiveStrategies = internalQuery({
       .query("strategies")
       .withIndex("by_status", (q) => q.eq("status", "active"))
       .collect();
+  },
+});
+
+/**
+ * Check if a strategy has a pending execution (awaiting_approval or executing)
+ */
+export const hasPendingExecution = internalQuery({
+  args: { strategyId: v.id("strategies") },
+  handler: async (ctx, args): Promise<boolean> => {
+    const pending = await ctx.db
+      .query("strategyExecutions")
+      .withIndex("by_strategy", (q) => q.eq("strategyId", args.strategyId))
+      .filter((q) =>
+        q.or(
+          q.eq(q.field("currentState"), "awaiting_approval"),
+          q.eq(q.field("currentState"), "executing"),
+          q.eq(q.field("currentState"), "monitoring")
+        )
+      )
+      .first();
+
+    return pending !== null;
+  },
+});
+
+/**
+ * Create a pending execution for manual approval
+ */
+export const createPendingExecution = internalMutation({
+  args: { strategyId: v.id("strategies") },
+  handler: async (ctx, args): Promise<string> => {
+    const strategy = await ctx.db.get(args.strategyId);
+    if (!strategy) throw new Error("Strategy not found");
+
+    const now = Date.now();
+
+    // Generate approval reason based on strategy type
+    const config = strategy.config as Record<string, unknown>;
+    let approvalReason = `Execute ${strategy.name}`;
+
+    if (strategy.strategyType === "dca") {
+      const amount = config.amountPerExecution || config.amount || "?";
+      const fromToken = (config.fromToken as { symbol?: string })?.symbol || "tokens";
+      const toToken = (config.toToken as { symbol?: string })?.symbol || "tokens";
+      approvalReason = `Buy ${toToken} with ${amount} ${fromToken}`;
+    }
+
+    // Create execution in awaiting_approval state
+    const executionId = await ctx.db.insert("strategyExecutions", {
+      strategyId: args.strategyId,
+      walletAddress: strategy.walletAddress.toLowerCase(),
+      currentState: "awaiting_approval",
+      stateEnteredAt: now,
+      steps: [],
+      currentStepIndex: 0,
+      stateHistory: [
+        {
+          id: `sh_${now}`,
+          fromState: "idle",
+          toState: "awaiting_approval",
+          trigger: "scheduled_execution",
+          timestamp: now,
+          reason: "Scheduled execution ready",
+        },
+      ],
+      requiresApproval: true,
+      approvalReason,
+      recoverable: true,
+      createdAt: now,
+    });
+
+    return executionId;
   },
 });
 

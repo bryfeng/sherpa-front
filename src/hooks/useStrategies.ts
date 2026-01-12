@@ -34,6 +34,7 @@ export interface GenericStrategy {
   config: Record<string, unknown>
   status: 'draft' | 'pending_session' | 'active' | 'paused' | 'completed' | 'failed' | 'expired' | 'archived'
   sessionKeyId?: Id<'sessionKeys'>
+  requiresManualApproval?: boolean // Phase 1: true means each execution needs user approval
   cronExpression?: string
   lastExecutedAt?: number
   nextExecutionAt?: number
@@ -85,6 +86,7 @@ export function useGenericStrategyMutations() {
   const pauseMutation = useMutation(api.strategies.pause)
   const updateMutation = useMutation(api.strategies.update)
   const removeMutation = useMutation(api.strategies.remove)
+  const executeNowMutation = useMutation(api.strategyExecutions.executeNow)
 
   return {
     activate: useCallback(
@@ -103,6 +105,14 @@ export function useGenericStrategyMutations() {
     remove: useCallback(
       async (strategyId: Id<'strategies'>) => removeMutation({ strategyId }),
       [removeMutation]
+    ),
+    /**
+     * Execute Now - Immediately create a pending execution for approval
+     * Returns the execution ID and approval reason
+     */
+    executeNow: useCallback(
+      async (strategyId: Id<'strategies'>) => executeNowMutation({ strategyId }),
+      [executeNowMutation]
     ),
   }
 }

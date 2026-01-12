@@ -442,6 +442,12 @@ export const useSherpaStore = create<SherpaStore>()(
 
           removeWidget: (id) =>
             set((state) => {
+              // Only update state if widget exists to prevent infinite loops
+              const widgetExists = state.widgets.some((w) => w.id === id)
+              const tabExists = state.artifactTabs.includes(id)
+              if (!widgetExists && !tabExists) {
+                return state
+              }
               const newTabs = state.artifactTabs.filter((tabId) => tabId !== id)
               const newActiveId = state.activeArtifactId === id
                 ? newTabs[0] ?? null

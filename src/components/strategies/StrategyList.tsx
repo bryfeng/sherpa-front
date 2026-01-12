@@ -1,11 +1,11 @@
 import React, { useState } from 'react'
-import { Plus, Filter, Search, TrendingUp } from 'lucide-react'
+import { Plus, Search, TrendingUp } from 'lucide-react'
 import { StrategyCard } from './StrategyCard'
-import type { DCAStrategy, DCAStatus, StrategyFilters } from '../../types/strategy'
-import { STATUS_LABELS } from '../../types/strategy'
+import type { StrategyFilters } from '../../types/strategy'
+import type { GenericStrategy } from '../../hooks/useStrategies'
 
 interface StrategyListProps {
-  strategies: DCAStrategy[]
+  strategies: GenericStrategy[]
   isLoading: boolean
   isEmpty: boolean
   filters: StrategyFilters
@@ -18,11 +18,14 @@ interface StrategyListProps {
   onViewDetails: (id: string) => void
 }
 
-const STATUS_OPTIONS: Array<{ value: DCAStatus | 'all'; label: string }> = [
+type GenericStatus = GenericStrategy['status'] | 'all'
+
+const STATUS_OPTIONS: Array<{ value: GenericStatus; label: string }> = [
   { value: 'all', label: 'All' },
   { value: 'active', label: 'Active' },
   { value: 'paused', label: 'Paused' },
   { value: 'draft', label: 'Draft' },
+  { value: 'pending_session', label: 'Pending' },
   { value: 'completed', label: 'Completed' },
   { value: 'failed', label: 'Failed' },
 ]
@@ -45,15 +48,19 @@ export function StrategyList({
   const filteredStrategies = strategies.filter((s) => {
     if (!searchQuery) return true
     const query = searchQuery.toLowerCase()
+    const config = s.config as Record<string, unknown>
+    const fromToken = (config.from_token as string) || ''
+    const toToken = (config.to_token as string) || ''
     return (
       s.name.toLowerCase().includes(query) ||
-      s.fromToken.symbol.toLowerCase().includes(query) ||
-      s.toToken.symbol.toLowerCase().includes(query)
+      fromToken.toLowerCase().includes(query) ||
+      toToken.toLowerCase().includes(query) ||
+      s.strategyType.toLowerCase().includes(query)
     )
   })
 
   const activeCount = strategies.filter((s) => s.status === 'active').length
-  const totalInvested = strategies.reduce((sum, s) => sum + s.totalAmountSpentUsd, 0)
+  const pendingCount = strategies.filter((s) => s.status === 'pending_session').length
 
   return (
     <div className="flex flex-col h-full">
@@ -62,10 +69,10 @@ export function StrategyList({
         <div className="flex items-center justify-between mb-3">
           <div>
             <h2 className="text-lg font-semibold" style={{ color: 'var(--text)' }}>
-              DCA Strategies
+              Strategies
             </h2>
             <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
-              {activeCount} active · {new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }).format(totalInvested)} invested
+              {activeCount} active{pendingCount > 0 ? ` · ${pendingCount} pending` : ''} · {strategies.length} total
             </p>
           </div>
           <button
@@ -102,7 +109,7 @@ export function StrategyList({
           {/* Status Filter */}
           <select
             value={filters.status ?? 'all'}
-            onChange={(e) => onFiltersChange({ ...filters, status: e.target.value as DCAStatus | 'all' })}
+            onChange={(e) => onFiltersChange({ ...filters, status: e.target.value as GenericStatus })}
             className="px-3 py-2 rounded-lg text-sm outline-none cursor-pointer"
             style={{
               background: 'var(--surface-2)',
@@ -183,7 +190,7 @@ function EmptyState({ onCreateNew }: { onCreateNew: () => void }) {
         No strategies yet
       </h3>
       <p className="text-sm mb-4 max-w-xs" style={{ color: 'var(--text-muted)' }}>
-        Create your first DCA strategy to automatically invest in tokens on a regular schedule.
+        Create automated trading strategies to execute your investment rules.
       </p>
       <button
         onClick={onCreateNew}

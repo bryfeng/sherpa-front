@@ -32,6 +32,9 @@ import DeFiChatAdaptiveUI from './pages/DeFiChatAdaptiveUI'
 // Hooks
 import { usePortfolioSummary } from './workspace/hooks'
 
+// Phase 13.6: Execution signing modal
+import { ExecutionSigningModal } from './workspace/components/ExecutionSigningModal'
+
 // Styles - Import new design system
 import './styles/design-system.css'
 
@@ -348,6 +351,9 @@ function MainApp() {
           llmModel={llmModel}
         />
       </main>
+
+      {/* Phase 13.6: Global modal for strategy execution signing */}
+      {wallet.address && <ExecutionSigningModal />}
     </div>
   )
 }

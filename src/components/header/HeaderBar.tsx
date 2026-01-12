@@ -2,11 +2,14 @@
 
 import React, { useEffect, useId, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
-import { Sparkles } from 'lucide-react'
+import { Sparkles, Bell } from 'lucide-react'
 
 import type { PersonaId as Persona } from '../../types/persona'
 import { Badge, Button } from '../ui/primitives'
 import { HeaderActionMenu, type HeaderActionItem } from './HeaderActionMenu'
+import { ExecutionSigningBadge } from '../../workspace/components/ExecutionSigningModal'
+import { usePendingApprovals } from '../../workspace/hooks/usePendingApprovals'
+import { useAccount } from 'wagmi'
 
 const personaStyles: Record<Persona, { label: string; accent: string; soft: string }> = {
   friendly: {
@@ -237,6 +240,38 @@ function PersonaDropdown({ persona, onSelect }: PersonaDropdownProps) {
   )
 }
 
+/**
+ * Badge showing pending strategy executions count
+ * Uses wagmi's useAccount internally for wallet address
+ */
+function PendingExecutionsBadge() {
+  const { address } = useAccount()
+  const { count } = usePendingApprovals(address ?? null)
+
+  // Don't render anything if no wallet or no pending executions
+  if (!address || count === 0) return null
+
+  return (
+    <div
+      className="relative inline-flex items-center justify-center rounded-md p-2 transition-colors"
+      style={{
+        background: 'var(--bg-elev)',
+        border: '1px solid var(--line)',
+      }}
+      title={`${count} pending execution${count > 1 ? 's' : ''}`}
+    >
+      <Bell className="h-4 w-4" style={{ color: 'var(--text-muted)' }} />
+      <span
+        className="absolute -top-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full text-[10px] font-bold text-white"
+        style={{ backgroundColor: 'var(--accent, #f5a623)' }}
+      >
+        {count > 9 ? '9+' : count}
+      </span>
+      <ExecutionSigningBadge />
+    </div>
+  )
+}
+
 export interface HeaderBarProps {
   persona: Persona
   walletLabel: string
@@ -306,6 +341,7 @@ function HeaderBarComponent({
           <Button size="sm" variant="secondary" onClick={onNewChat} className="rounded-md">
             <Sparkles className="mr-1 h-3 w-3" />New chat
           </Button>
+          <PendingExecutionsBadge />
           <HeaderActionMenu actions={menuActions} />
         </div>
       </header>

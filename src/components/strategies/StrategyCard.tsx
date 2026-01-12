@@ -3,38 +3,72 @@ import {
   Play,
   Pause,
   Square,
-  Settings,
   MoreVertical,
-  TrendingUp,
   Clock,
   DollarSign,
   Repeat,
   AlertTriangle,
   Check,
-  X,
+  Zap,
 } from 'lucide-react'
-import type { DCAStrategy } from '../../types/strategy'
+import type { GenericStrategy } from '../../hooks/useStrategies'
 import {
-  STATUS_LABELS,
-  STATUS_COLORS,
-  FREQUENCY_LABELS,
-} from '../../types/strategy'
-import {
-  canPause,
-  canResume,
-  canStop,
-  canEdit,
   formatNextExecution,
   formatLastExecution,
 } from '../../hooks/useStrategies'
 
 interface StrategyCardProps {
-  strategy: DCAStrategy
+  strategy: GenericStrategy
   onPause: (id: string) => Promise<void>
   onResume: (id: string) => Promise<void>
   onStop: (id: string) => Promise<void>
   onEdit: (id: string) => void
   onViewDetails: (id: string) => void
+}
+
+// Status display helpers
+const STATUS_LABELS: Record<GenericStrategy['status'], string> = {
+  draft: 'Draft',
+  pending_session: 'Pending Setup',
+  active: 'Active',
+  paused: 'Paused',
+  completed: 'Completed',
+  failed: 'Failed',
+  expired: 'Expired',
+  archived: 'Archived',
+}
+
+const STATUS_COLORS: Record<GenericStrategy['status'], string> = {
+  draft: 'var(--text-muted)',
+  pending_session: 'var(--warning)',
+  active: 'var(--success)',
+  paused: 'var(--warning)',
+  completed: 'var(--text-muted)',
+  failed: 'var(--error)',
+  expired: 'var(--error)',
+  archived: 'var(--text-muted)',
+}
+
+const STRATEGY_TYPE_LABELS: Record<GenericStrategy['strategyType'], string> = {
+  dca: 'DCA',
+  rebalance: 'Rebalance',
+  limit_order: 'Limit',
+  stop_loss: 'Stop Loss',
+  take_profit: 'Take Profit',
+  custom: 'Custom',
+}
+
+// Permission helpers
+function canPause(status: GenericStrategy['status']): boolean {
+  return status === 'active'
+}
+
+function canResume(status: GenericStrategy['status']): boolean {
+  return status === 'paused' || status === 'pending_session'
+}
+
+function canStop(status: GenericStrategy['status']): boolean {
+  return status === 'active' || status === 'paused' || status === 'pending_session'
 }
 
 function formatUsd(amount: number): string {
@@ -66,10 +100,17 @@ export function StrategyCard({
   const [showMenu, setShowMenu] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
 
-  const successRate =
-    strategy.totalExecutions > 0
-      ? (strategy.successfulExecutions / strategy.totalExecutions) * 100
-      : 0
+  // Extract config values
+  const config = strategy.config as Record<string, unknown>
+  const amountUsd = config.amount_usd as number | undefined
+  const frequency = config.frequency as string | undefined
+  const fromToken = config.from_token as string | undefined
+  const toToken = config.to_token as string | undefined
+
+  const totalExecutions = strategy.totalExecutions ?? 0
+  const successfulExecutions = strategy.successfulExecutions ?? 0
+  const successRate = totalExecutions > 0 ? (successfulExecutions / totalExecutions) * 100 : 0
+  const requiresManualApproval = (strategy as unknown as { requiresManualApproval?: boolean }).requiresManualApproval
 
   const handleAction = async (action: () => Promise<void>) => {
     setIsLoading(true)
@@ -83,7 +124,7 @@ export function StrategyCard({
 
   return (
     <div
-      className="rounded-lg p-4 transition-colors hover:bg-opacity-80 cursor-pointer"
+      className="rounded-lg p-4 transition-colors hover:bg-opacity-80 cursor-pointer relative"
       style={{
         background: 'var(--surface)',
         border: '1px solid var(--line)',
@@ -105,10 +146,12 @@ export function StrategyCard({
               }}
             >
               {STATUS_LABELS[strategy.status]}
+              {strategy.status === 'active' && requiresManualApproval && ' (Manual)'}
             </span>
           </div>
           <p className="text-xs truncate" style={{ color: 'var(--text-muted)' }}>
-            {strategy.fromToken.symbol} → {strategy.toToken.symbol}
+            {STRATEGY_TYPE_LABELS[strategy.strategyType]}
+            {fromToken && toToken && ` · ${fromToken} → ${toToken}`}
           </p>
         </div>
 
@@ -164,21 +207,7 @@ export function StrategyCard({
                     style={{ color: 'var(--text)' }}
                   >
                     <Play className="h-4 w-4" />
-                    Resume
-                  </button>
-                )}
-                {canEdit(strategy.status) && (
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation()
-                      setShowMenu(false)
-                      onEdit(strategy._id)
-                    }}
-                    className="w-full flex items-center gap-2 px-3 py-2 text-sm hover:bg-black/5"
-                    style={{ color: 'var(--text)' }}
-                  >
-                    <Settings className="h-4 w-4" />
-                    Edit
+                    Activate
                   </button>
                 )}
                 {canStop(strategy.status) && (
@@ -191,7 +220,7 @@ export function StrategyCard({
                     style={{ color: 'var(--error)' }}
                   >
                     <Square className="h-4 w-4" />
-                    Stop
+                    Delete
                   </button>
                 )}
               </div>
@@ -202,59 +231,58 @@ export function StrategyCard({
 
       {/* Stats Grid */}
       <div className="grid grid-cols-2 gap-3 mb-3">
-        {/* Amount per execution */}
+        {/* Strategy Type */}
         <div className="flex items-center gap-2">
-          <DollarSign className="h-4 w-4 shrink-0" style={{ color: 'var(--accent)' }} />
+          <Zap className="h-4 w-4 shrink-0" style={{ color: 'var(--accent)' }} />
           <div>
             <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
-              Per Buy
+              Type
             </p>
             <p className="text-sm font-medium" style={{ color: 'var(--text)' }}>
-              {formatUsd(strategy.amountPerExecutionUsd)}
+              {STRATEGY_TYPE_LABELS[strategy.strategyType]}
             </p>
           </div>
         </div>
 
-        {/* Frequency */}
-        <div className="flex items-center gap-2">
-          <Repeat className="h-4 w-4 shrink-0" style={{ color: 'var(--accent)' }} />
-          <div>
-            <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
-              Frequency
-            </p>
-            <p className="text-sm font-medium" style={{ color: 'var(--text)' }}>
-              {FREQUENCY_LABELS[strategy.frequency]}
-            </p>
+        {/* Amount (if available) */}
+        {amountUsd && (
+          <div className="flex items-center gap-2">
+            <DollarSign className="h-4 w-4 shrink-0" style={{ color: 'var(--accent)' }} />
+            <div>
+              <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
+                Amount
+              </p>
+              <p className="text-sm font-medium" style={{ color: 'var(--text)' }}>
+                {formatUsd(amountUsd)}
+              </p>
+            </div>
           </div>
-        </div>
+        )}
 
-        {/* Total Spent */}
-        <div className="flex items-center gap-2">
-          <TrendingUp className="h-4 w-4 shrink-0" style={{ color: 'var(--success)' }} />
-          <div>
-            <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
-              Total Spent
-            </p>
-            <p className="text-sm font-medium" style={{ color: 'var(--text)' }}>
-              {formatUsd(strategy.totalAmountSpentUsd)}
-            </p>
+        {/* Frequency (if available) */}
+        {frequency && (
+          <div className="flex items-center gap-2">
+            <Repeat className="h-4 w-4 shrink-0" style={{ color: 'var(--accent)' }} />
+            <div>
+              <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
+                Frequency
+              </p>
+              <p className="text-sm font-medium" style={{ color: 'var(--text)' }}>
+                {frequency}
+              </p>
+            </div>
           </div>
-        </div>
+        )}
 
-        {/* Tokens Acquired */}
+        {/* Executions */}
         <div className="flex items-center gap-2">
-          <div
-            className="h-4 w-4 shrink-0 rounded-full flex items-center justify-center text-[10px] font-bold"
-            style={{ background: 'var(--accent-muted)', color: 'var(--accent)' }}
-          >
-            {strategy.toToken.symbol.charAt(0)}
-          </div>
+          <Check className="h-4 w-4 shrink-0" style={{ color: 'var(--success)' }} />
           <div>
             <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
-              Acquired
+              Executions
             </p>
             <p className="text-sm font-medium" style={{ color: 'var(--text)' }}>
-              {formatTokenAmount(strategy.totalTokensAcquired, strategy.toToken.symbol)}
+              {successfulExecutions}/{totalExecutions}
             </p>
           </div>
         </div>
@@ -268,26 +296,26 @@ export function StrategyCard({
         <div className="flex items-center gap-4">
           {/* Success Rate */}
           <div className="flex items-center gap-1">
-            {successRate >= 90 ? (
+            {totalExecutions === 0 ? (
+              <Clock className="h-3 w-3" style={{ color: 'var(--text-muted)' }} />
+            ) : successRate >= 90 ? (
               <Check className="h-3 w-3" style={{ color: 'var(--success)' }} />
-            ) : successRate >= 70 ? (
-              <AlertTriangle className="h-3 w-3" style={{ color: 'var(--warning)' }} />
             ) : (
-              <X className="h-3 w-3" style={{ color: 'var(--error)' }} />
+              <AlertTriangle className="h-3 w-3" style={{ color: 'var(--warning)' }} />
             )}
             <span style={{ color: 'var(--text-muted)' }}>
-              {strategy.successfulExecutions}/{strategy.totalExecutions} executions
+              {totalExecutions === 0 ? 'No executions yet' : `${successRate.toFixed(0)}% success`}
             </span>
           </div>
         </div>
 
-        {/* Next Execution */}
+        {/* Next/Last Execution */}
         <div className="flex items-center gap-1" style={{ color: 'var(--text-muted)' }}>
           <Clock className="h-3 w-3" />
           <span>
             {strategy.status === 'active'
               ? formatNextExecution(strategy.nextExecutionAt)
-              : formatLastExecution(strategy.lastExecutionAt)}
+              : formatLastExecution(strategy.lastExecutedAt)}
           </span>
         </div>
       </div>

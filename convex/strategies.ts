@@ -202,10 +202,13 @@ export const updateStatus = mutation({
 });
 
 /**
- * Activate a strategy (requires a valid session key)
+ * Activate a strategy
  *
- * A strategy can only be truly "active" if it has an authorized session key.
- * Without a session key, the strategy goes to "pending_session" status.
+ * Phase 1 (Manual Approval): Activates the strategy and schedules the next execution.
+ * Each execution will require manual user approval via the chat interface.
+ *
+ * Phase 2 (Session Keys): If a valid session key is provided, executions can happen
+ * automatically without manual approval.
  */
 export const activate = mutation({
   args: {
@@ -230,19 +233,34 @@ export const activate = mutation({
       }
     }
 
+    // Calculate next execution time based on frequency
+    const config = strategy.config as Record<string, unknown>;
+    const frequency = config.frequency as string | undefined;
+    let nextExecutionAt: number | undefined;
+
+    if (frequency) {
+      // Schedule first execution for 1 minute from now (for demo/testing)
+      // In production, this would be based on the cron expression or frequency
+      nextExecutionAt = now + 60000;
+    }
+
     if (validSessionKey && args.sessionKeyId) {
-      // Fully activate with session key
+      // Fully activate with session key (auto-execution enabled)
       await ctx.db.patch(args.strategyId, {
         status: "active",
         sessionKeyId: args.sessionKeyId,
+        requiresManualApproval: false,
         updatedAt: now,
-        nextExecutionAt: strategy.cronExpression ? now + 60000 : undefined,
+        nextExecutionAt,
       });
     } else {
-      // No valid session key - set to pending
+      // Activate with manual approval mode (Phase 1)
+      // Strategy is active but each execution requires user confirmation
       await ctx.db.patch(args.strategyId, {
-        status: "pending_session",
+        status: "active",
+        requiresManualApproval: true,
         updatedAt: now,
+        nextExecutionAt,
       });
     }
   },

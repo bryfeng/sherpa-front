@@ -81,6 +81,8 @@ export default defineSchema({
     ),
     // Session key for automated execution
     sessionKeyId: v.optional(v.id("sessionKeys")),
+    // Manual approval mode (Phase 1 - no session keys)
+    requiresManualApproval: v.optional(v.boolean()),
     // Scheduling
     cronExpression: v.optional(v.string()), // e.g., "0 */4 * * *"
     lastExecutedAt: v.optional(v.number()),
