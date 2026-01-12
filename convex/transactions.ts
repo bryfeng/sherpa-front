@@ -171,6 +171,60 @@ export const markReverted = mutation({
 });
 
 /**
+ * Create a transaction by wallet address (looks up wallet record)
+ */
+export const createByWalletAddress = mutation({
+  args: {
+    executionId: v.optional(v.id("strategyExecutions")),
+    walletAddress: v.string(),
+    chain: v.string(),
+    type: v.union(
+      v.literal("swap"),
+      v.literal("bridge"),
+      v.literal("transfer"),
+      v.literal("approve")
+    ),
+    inputData: v.any(),
+    valueUsd: v.optional(v.number()),
+  },
+  handler: async (ctx, args) => {
+    const walletAddressLower = args.walletAddress.toLowerCase();
+
+    // Find wallet record - try with chain first, then without
+    let wallet = await ctx.db
+      .query("wallets")
+      .withIndex("by_address_chain", (q) =>
+        q.eq("address", walletAddressLower).eq("chain", args.chain)
+      )
+      .first();
+
+    // If not found with specific chain, try just by address
+    if (!wallet) {
+      wallet = await ctx.db
+        .query("wallets")
+        .withIndex("by_address_chain", (q) => q.eq("address", walletAddressLower))
+        .first();
+    }
+
+    if (!wallet) {
+      // Wallet not registered - throw helpful error
+      throw new Error(`Wallet ${walletAddressLower} not found. Please register wallet first.`);
+    }
+
+    return await ctx.db.insert("transactions", {
+      executionId: args.executionId,
+      walletId: wallet._id,
+      chain: args.chain,
+      type: args.type,
+      status: "pending",
+      inputData: args.inputData,
+      valueUsd: args.valueUsd,
+      createdAt: Date.now(),
+    });
+  },
+});
+
+/**
  * Get pending transactions (for monitoring/retrying)
  */
 export const getPending = query({

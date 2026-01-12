@@ -62,6 +62,7 @@ export interface SigningState {
   execution: ExecutionReadyToSign | null
   quote: SwapQuoteResponse | null
   txHash?: string
+  transactionId?: string // Convex transaction record ID
   error?: string
 }
 
@@ -132,6 +133,11 @@ export function useExecutionSigning() {
   const completeMutation = useMutation(api.strategyExecutions.complete)
   const failMutation = useMutation(api.strategyExecutions.fail)
 
+  // Transaction logging mutations
+  const createTransaction = useMutation(api.transactions.createByWalletAddress)
+  const markTransactionSubmitted = useMutation(api.transactions.markSubmitted)
+  const markTransactionConfirmed = useMutation(api.transactions.markConfirmed)
+
   // Wagmi hooks
   const {
     sendTransaction,
@@ -186,6 +192,7 @@ export function useExecutionSigning() {
 
     const fetchQuote = async () => {
       const { execution } = state
+      if (!execution) return
       const strategy = execution.strategy
 
       if (!strategy || !walletAddress) {
@@ -268,8 +275,28 @@ export function useExecutionSigning() {
   }, [state.status, state.execution, walletAddress, chainId])
 
   // ============================================
-  // TRANSACTION CONFIRMATION
+  // TRANSACTION SUBMISSION & CONFIRMATION
   // ============================================
+
+  // When we get a tx hash, mark transaction as submitted
+  useEffect(() => {
+    if (!txHash || !state.transactionId) return
+    if (state.status === 'completed') return
+
+    const markSubmitted = async () => {
+      try {
+        await markTransactionSubmitted({
+          transactionId: state.transactionId as any,
+          txHash,
+        })
+        setState((s) => ({ ...s, status: 'confirming', txHash }))
+      } catch (error) {
+        console.error('Failed to mark transaction submitted:', error)
+      }
+    }
+
+    markSubmitted()
+  }, [txHash, state.transactionId, state.status, markTransactionSubmitted])
 
   // When transaction confirms, record completion
   useEffect(() => {
@@ -278,6 +305,14 @@ export function useExecutionSigning() {
 
     const recordCompletion = async () => {
       try {
+        // Mark transaction as confirmed
+        if (state.transactionId) {
+          await markTransactionConfirmed({
+            transactionId: state.transactionId as any,
+          })
+        }
+
+        // Mark execution as complete
         await completeMutation({
           executionId: state.execution!._id,
           txHash: txHash,
@@ -298,7 +333,7 @@ export function useExecutionSigning() {
     }
 
     recordCompletion()
-  }, [isConfirmed, txHash, state.execution, completeMutation])
+  }, [isConfirmed, txHash, state.execution, state.transactionId, completeMutation, markTransactionConfirmed])
 
   // ============================================
   // ACTIONS
@@ -308,7 +343,7 @@ export function useExecutionSigning() {
    * Sign and submit the transaction
    */
   const signTransaction = useCallback(async () => {
-    if (!state.quote || !state.execution) {
+    if (!state.quote || !state.execution || !walletAddress) {
       console.error('No quote or execution to sign')
       return
     }
@@ -320,6 +355,23 @@ export function useExecutionSigning() {
       if (!txData) {
         throw new Error('No transaction data in quote')
       }
+
+      // Create transaction record in Convex
+      const transactionId = await createTransaction({
+        executionId: state.execution._id,
+        walletAddress,
+        chain: getChainName(chainId || 1),
+        type: 'swap',
+        inputData: {
+          tokenIn: state.quote.from_token,
+          tokenOut: state.quote.to_token,
+          amountIn: state.quote.amount_in,
+          expectedOut: state.quote.amount_out_est,
+        },
+        valueUsd: state.quote.price_in_usd * state.quote.amount_in,
+      })
+
+      setState((s) => ({ ...s, transactionId }))
 
       // Check if we need approval first
       const config = state.execution.strategy?.config || {}
@@ -390,7 +442,7 @@ export function useExecutionSigning() {
         }
       }
     }
-  }, [state.quote, state.execution, walletAddress, publicClient, writeContract, sendTransaction, failMutation])
+  }, [state.quote, state.execution, walletAddress, chainId, publicClient, writeContract, sendTransaction, failMutation, createTransaction])
 
   /**
    * Dismiss the current signing request
