@@ -35,6 +35,11 @@ const StrategiesWidget = React.lazy(() =>
   import('../strategies/StrategiesWidget').then((m) => ({ default: m.StrategiesWidget }))
 )
 
+// Transaction history widget
+const TransactionHistoryWidget = React.lazy(() =>
+  import('../transactions/TransactionHistoryWidget').then((m) => ({ default: m.TransactionHistoryWidget }))
+)
+
 // Type for dca-strategies payload
 interface DCAStrategiesPayload {
   walletAddress?: string
@@ -135,6 +140,10 @@ function ArtifactRenderer({
         />
       )
     }
+
+    // Transaction history widget
+    case 'transaction-history':
+      return <TransactionHistoryWidget />
 
     default:
       return (

@@ -17,6 +17,7 @@ import {
   Repeat,
   Clock,
   Check,
+  History,
 } from 'lucide-react'
 import { useSherpaStore } from '../../store'
 import type { Widget } from '../../types/widgets'
@@ -63,10 +64,19 @@ const AVAILABLE_ARTIFACTS = [
     id: 'history-summary',
     kind: 'history-summary' as const,
     name: 'Wallet History',
-    description: 'View your recent transaction history',
+    description: 'View your historical wallet activity summary',
     icon: Clock,
     category: 'history',
-    tags: ['history', 'transactions', 'activity'],
+    tags: ['history', 'summary', 'analytics'],
+  },
+  {
+    id: 'transaction-history',
+    kind: 'transaction-history' as const,
+    name: 'Transaction History',
+    description: 'View recent transactions and strategy executions',
+    icon: History,
+    category: 'history',
+    tags: ['transactions', 'executions', 'activity', 'history'],
   },
 ]
 

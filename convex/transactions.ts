@@ -227,3 +227,100 @@ export const getWalletStats = query({
     return stats;
   },
 });
+
+/**
+ * List transactions by wallet address (joins with wallets table)
+ */
+export const listByWalletAddress = query({
+  args: {
+    walletAddress: v.string(),
+    limit: v.optional(v.number()),
+    type: v.optional(
+      v.union(
+        v.literal("swap"),
+        v.literal("bridge"),
+        v.literal("transfer"),
+        v.literal("approve")
+      )
+    ),
+  },
+  handler: async (ctx, args) => {
+    // Find wallet by address (using by_address_chain index with just address)
+    const wallet = await ctx.db
+      .query("wallets")
+      .withIndex("by_address_chain", (q) => q.eq("address", args.walletAddress.toLowerCase()))
+      .first();
+
+    if (!wallet) {
+      return [];
+    }
+
+    // Get transactions for this wallet
+    const transactions = await ctx.db
+      .query("transactions")
+      .withIndex("by_wallet", (q) => q.eq("walletId", wallet._id))
+      .order("desc")
+      .take(args.limit || 50);
+
+    // Filter by type if specified
+    if (args.type) {
+      return transactions.filter((tx) => tx.type === args.type);
+    }
+
+    return transactions;
+  },
+});
+
+/**
+ * Get recent activity across all types for a wallet address
+ * Combines transactions and strategy executions
+ */
+export const getRecentActivity = query({
+  args: {
+    walletAddress: v.string(),
+    limit: v.optional(v.number()),
+  },
+  handler: async (ctx, args) => {
+    const limit = args.limit || 20;
+    const walletAddressLower = args.walletAddress.toLowerCase();
+
+    // Get transactions via wallet lookup
+    const wallet = await ctx.db
+      .query("wallets")
+      .withIndex("by_address_chain", (q) => q.eq("address", walletAddressLower))
+      .first();
+
+    const transactions = wallet
+      ? await ctx.db
+          .query("transactions")
+          .withIndex("by_wallet", (q) => q.eq("walletId", wallet._id))
+          .order("desc")
+          .take(limit)
+      : [];
+
+    // Get strategy executions for this wallet
+    const executions = await ctx.db
+      .query("strategyExecutions")
+      .withIndex("by_wallet", (q) => q.eq("walletAddress", walletAddressLower))
+      .order("desc")
+      .take(limit);
+
+    // Get strategy details for each execution
+    const executionsWithStrategy = await Promise.all(
+      executions.map(async (exec) => {
+        const strategy = await ctx.db.get(exec.strategyId);
+        return {
+          ...exec,
+          strategy: strategy
+            ? { name: strategy.name, strategyType: strategy.strategyType }
+            : null,
+        };
+      })
+    );
+
+    return {
+      transactions,
+      executions: executionsWithStrategy,
+    };
+  },
+});
