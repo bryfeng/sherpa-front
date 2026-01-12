@@ -116,8 +116,8 @@ export function TransactionHistoryWidget() {
           <div className="flex items-center justify-center h-full">
             <Loader2 className="h-6 w-6 animate-spin" style={{ color: 'var(--accent)' }} />
           </div>
-        ) : isEmpty ? (
-          <EmptyState />
+        ) : filteredItems.length === 0 ? (
+          <EmptyState filter={filter} />
         ) : (
           <div className="divide-y" style={{ borderColor: 'var(--line)' }}>
             <AnimatePresence mode="popLayout">
@@ -144,7 +144,24 @@ export function TransactionHistoryWidget() {
   )
 }
 
-function EmptyState() {
+function EmptyState({ filter }: { filter: FilterType }) {
+  const messages: Record<FilterType, { title: string; description: string }> = {
+    all: {
+      title: 'No Activity Yet',
+      description: 'Your transactions and strategy executions will appear here.',
+    },
+    transactions: {
+      title: 'No Transactions',
+      description: 'On-chain transactions like swaps, bridges, and transfers will appear here.',
+    },
+    executions: {
+      title: 'No Executions',
+      description: 'Strategy executions from your automated strategies will appear here.',
+    },
+  }
+
+  const { title, description } = messages[filter]
+
   return (
     <div className="flex flex-col items-center justify-center h-full p-8 text-center">
       <div
@@ -154,10 +171,10 @@ function EmptyState() {
         <Clock className="h-8 w-8" style={{ color: 'var(--text-muted)' }} />
       </div>
       <h3 className="font-medium mb-1" style={{ color: 'var(--text)' }}>
-        No Activity Yet
+        {title}
       </h3>
       <p className="text-sm max-w-xs" style={{ color: 'var(--text-muted)' }}>
-        Your transactions and strategy executions will appear here.
+        {description}
       </p>
     </div>
   )
