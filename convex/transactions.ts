@@ -225,6 +225,71 @@ export const createByWalletAddress = mutation({
 });
 
 /**
+ * Backfill a transaction record for an existing execution (admin use)
+ */
+export const backfillTransaction = mutation({
+  args: {
+    txHash: v.string(),
+    walletAddress: v.string(),
+    chain: v.string(),
+    type: v.union(
+      v.literal("swap"),
+      v.literal("bridge"),
+      v.literal("transfer"),
+      v.literal("approve")
+    ),
+    inputData: v.optional(v.any()),
+    valueUsd: v.optional(v.number()),
+  },
+  handler: async (ctx, args) => {
+    const walletAddressLower = args.walletAddress.toLowerCase();
+
+    // Find wallet
+    let wallet = await ctx.db
+      .query("wallets")
+      .withIndex("by_address_chain", (q) => q.eq("address", walletAddressLower))
+      .first();
+
+    if (!wallet) {
+      throw new Error(`Wallet ${walletAddressLower} not found`);
+    }
+
+    // Check if transaction already exists
+    const existing = await ctx.db
+      .query("transactions")
+      .withIndex("by_tx_hash", (q) => q.eq("txHash", args.txHash))
+      .first();
+
+    if (existing) {
+      return existing._id;
+    }
+
+    // Find the completed execution for this wallet (most recent)
+    const execution = await ctx.db
+      .query("strategyExecutions")
+      .withIndex("by_wallet", (q) => q.eq("walletAddress", walletAddressLower))
+      .filter((q) => q.eq(q.field("currentState"), "completed"))
+      .order("desc")
+      .first();
+
+    // Create confirmed transaction
+    const now = Date.now();
+    return await ctx.db.insert("transactions", {
+      executionId: execution?._id,
+      walletId: wallet._id,
+      txHash: args.txHash,
+      chain: args.chain,
+      type: args.type,
+      status: "confirmed",
+      inputData: args.inputData || {},
+      valueUsd: args.valueUsd,
+      createdAt: now,
+      confirmedAt: now,
+    });
+  },
+});
+
+/**
  * Get pending transactions (for monitoring/retrying)
  */
 export const getPending = query({
