@@ -47,7 +47,7 @@ if (projectId && !isTestEnv) {
   const solanaAdapter = new SolanaAdapter()
 
   createAppKit({
-    adapters: [wagmiAdapter, solanaAdapter],
+    adapters: [wagmiAdapter, solanaAdapter as unknown as typeof wagmiAdapter],
     projectId,
     metadata,
     networks: appKitNetworks,

@@ -109,7 +109,7 @@ export function StrategyList({
           {/* Status Filter */}
           <select
             value={filters.status ?? 'all'}
-            onChange={(e) => onFiltersChange({ ...filters, status: e.target.value as GenericStatus })}
+            onChange={(e) => onFiltersChange({ ...filters, status: e.target.value as StrategyFilters['status'] })}
             className="px-3 py-2 rounded-lg text-sm outline-none cursor-pointer"
             style={{
               background: 'var(--surface-2)',

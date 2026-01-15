@@ -14,6 +14,7 @@ import type * as admin_metrics from "../admin/metrics.js";
 import type * as admin_sessions from "../admin/sessions.js";
 import type * as admin_users from "../admin/users.js";
 import type * as auth from "../auth.js";
+import type * as chains from "../chains.js";
 import type * as conversations from "../conversations.js";
 import type * as copyTrading from "../copyTrading.js";
 import type * as crons from "../crons.js";
@@ -50,6 +51,7 @@ declare const fullApi: ApiFromModules<{
   "admin/sessions": typeof admin_sessions;
   "admin/users": typeof admin_users;
   auth: typeof auth;
+  chains: typeof chains;
   conversations: typeof conversations;
   copyTrading: typeof copyTrading;
   crons: typeof crons;

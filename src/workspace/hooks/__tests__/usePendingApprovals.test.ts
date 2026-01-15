@@ -174,9 +174,9 @@ describe('useExecutionMutations hook', () => {
   })
 
   it('provides approve, skip, complete, fail functions', async () => {
-    const mockMutation = vi.fn()
+    const mockMutation = Object.assign(vi.fn(), { withOptimisticUpdate: vi.fn() })
     const { useMutation } = await import('convex/react')
-    vi.mocked(useMutation).mockReturnValue(mockMutation)
+    vi.mocked(useMutation).mockReturnValue(mockMutation as any)
 
     const { useExecutionMutations } = await import('../usePendingApprovals')
     const { result } = renderHook(() => useExecutionMutations())

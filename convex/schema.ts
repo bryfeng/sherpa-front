@@ -786,6 +786,34 @@ export default defineSchema({
     .index("by_enabled", ["enabled"]),
 
   // ============================================
+  // Chain Registry (for multi-chain support)
+  // ============================================
+  chains: defineTable({
+    chainId: v.number(), // 1, 8453, 57073, etc.
+    name: v.string(), // "Ethereum", "Base", "Ink"
+    aliases: v.array(v.string()), // ["eth", "ethereum", "mainnet"]
+
+    // Provider slugs (null = not supported by that provider)
+    alchemySlug: v.optional(v.string()), // "eth-mainnet", "base-mainnet"
+    alchemyVerified: v.optional(v.boolean()), // true if tested & working
+
+    // Native token info
+    nativeSymbol: v.string(), // "ETH", "INK"
+    nativeDecimals: v.number(), // 18
+
+    // Metadata
+    isTestnet: v.boolean(),
+    isEnabled: v.boolean(), // kill switch
+    explorerUrl: v.optional(v.string()), // "https://etherscan.io"
+
+    // Timestamps
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  })
+    .index("by_chain_id", ["chainId"])
+    .index("by_enabled", ["isEnabled"]),
+
+  // ============================================
   // Admin: System Metrics
   // ============================================
   system_metrics: defineTable({

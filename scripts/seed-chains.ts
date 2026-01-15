@@ -1,0 +1,180 @@
+/**
+ * Seed script for chains table
+ * Run with: npx convex run scripts/seed-chains.ts
+ * Or call the mutation directly via dashboard
+ */
+
+// Chain seed data - these are the chains we support
+export const CHAIN_SEED_DATA = [
+  {
+    chainId: 1,
+    name: "Ethereum",
+    aliases: ["eth", "ethereum", "mainnet", "eth-mainnet"],
+    alchemySlug: "eth-mainnet",
+    alchemyVerified: true,
+    nativeSymbol: "ETH",
+    nativeDecimals: 18,
+    isTestnet: false,
+    isEnabled: true,
+    explorerUrl: "https://etherscan.io",
+  },
+  {
+    chainId: 137,
+    name: "Polygon",
+    aliases: ["polygon", "matic", "poly"],
+    alchemySlug: "polygon-mainnet",
+    alchemyVerified: true,
+    nativeSymbol: "MATIC",
+    nativeDecimals: 18,
+    isTestnet: false,
+    isEnabled: true,
+    explorerUrl: "https://polygonscan.com",
+  },
+  {
+    chainId: 8453,
+    name: "Base",
+    aliases: ["base"],
+    alchemySlug: "base-mainnet",
+    alchemyVerified: true,
+    nativeSymbol: "ETH",
+    nativeDecimals: 18,
+    isTestnet: false,
+    isEnabled: true,
+    explorerUrl: "https://basescan.org",
+  },
+  {
+    chainId: 42161,
+    name: "Arbitrum",
+    aliases: ["arbitrum", "arb", "arbitrum-one"],
+    alchemySlug: "arb-mainnet",
+    alchemyVerified: true,
+    nativeSymbol: "ETH",
+    nativeDecimals: 18,
+    isTestnet: false,
+    isEnabled: true,
+    explorerUrl: "https://arbiscan.io",
+  },
+  {
+    chainId: 10,
+    name: "Optimism",
+    aliases: ["optimism", "op"],
+    alchemySlug: "opt-mainnet",
+    alchemyVerified: true,
+    nativeSymbol: "ETH",
+    nativeDecimals: 18,
+    isTestnet: false,
+    isEnabled: true,
+    explorerUrl: "https://optimistic.etherscan.io",
+  },
+  {
+    chainId: 57073,
+    name: "Ink",
+    aliases: ["ink"],
+    alchemySlug: "ink-mainnet",
+    alchemyVerified: false, // Needs testing
+    nativeSymbol: "ETH",
+    nativeDecimals: 18,
+    isTestnet: false,
+    isEnabled: true,
+    explorerUrl: "https://explorer.inkonchain.com",
+  },
+  {
+    chainId: 43114,
+    name: "Avalanche",
+    aliases: ["avalanche", "avax"],
+    alchemySlug: "avax-mainnet",
+    alchemyVerified: false, // Needs testing
+    nativeSymbol: "AVAX",
+    nativeDecimals: 18,
+    isTestnet: false,
+    isEnabled: true,
+    explorerUrl: "https://snowtrace.io",
+  },
+  {
+    chainId: 56,
+    name: "BNB Chain",
+    aliases: ["bnb", "bsc", "binance"],
+    alchemySlug: "bnb-mainnet",
+    alchemyVerified: false, // Needs testing
+    nativeSymbol: "BNB",
+    nativeDecimals: 18,
+    isTestnet: false,
+    isEnabled: true,
+    explorerUrl: "https://bscscan.com",
+  },
+  {
+    chainId: 324,
+    name: "zkSync Era",
+    aliases: ["zksync", "zksync-era"],
+    alchemySlug: "zksync-mainnet",
+    alchemyVerified: false, // Needs testing
+    nativeSymbol: "ETH",
+    nativeDecimals: 18,
+    isTestnet: false,
+    isEnabled: true,
+    explorerUrl: "https://explorer.zksync.io",
+  },
+  {
+    chainId: 59144,
+    name: "Linea",
+    aliases: ["linea"],
+    alchemySlug: "linea-mainnet",
+    alchemyVerified: false, // Needs testing
+    nativeSymbol: "ETH",
+    nativeDecimals: 18,
+    isTestnet: false,
+    isEnabled: true,
+    explorerUrl: "https://lineascan.build",
+  },
+  {
+    chainId: 81457,
+    name: "Blast",
+    aliases: ["blast"],
+    alchemySlug: "blast-mainnet",
+    alchemyVerified: false, // Needs testing
+    nativeSymbol: "ETH",
+    nativeDecimals: 18,
+    isTestnet: false,
+    isEnabled: true,
+    explorerUrl: "https://blastscan.io",
+  },
+  {
+    chainId: 534352,
+    name: "Scroll",
+    aliases: ["scroll"],
+    alchemySlug: "scroll-mainnet",
+    alchemyVerified: false, // Needs testing
+    nativeSymbol: "ETH",
+    nativeDecimals: 18,
+    isTestnet: false,
+    isEnabled: true,
+    explorerUrl: "https://scrollscan.com",
+  },
+  {
+    chainId: 7777777,
+    name: "Zora",
+    aliases: ["zora"],
+    alchemySlug: "zora-mainnet",
+    alchemyVerified: false, // Needs testing
+    nativeSymbol: "ETH",
+    nativeDecimals: 18,
+    isTestnet: false,
+    isEnabled: true,
+    explorerUrl: "https://explorer.zora.energy",
+  },
+  {
+    chainId: 2741,
+    name: "Morph",
+    aliases: ["morph"],
+    alchemySlug: undefined, // No Alchemy support yet
+    alchemyVerified: false,
+    nativeSymbol: "ETH",
+    nativeDecimals: 18,
+    isTestnet: false,
+    isEnabled: true,
+    explorerUrl: "https://explorer.morphl2.io",
+  },
+];
+
+// This is the JSON payload to pass to the upsertBatch mutation
+console.log(JSON.stringify({ chains: CHAIN_SEED_DATA }, null, 2));

@@ -156,11 +156,8 @@ describe('useExecutionSigning', () => {
 
 describe('SigningStatus states', () => {
   it('has all expected status values', async () => {
-    const { SigningStatus } = await import('../useExecutionSigning').catch(() => ({
-      SigningStatus: null,
-    }))
-
-    // Type is a union, so we test by checking the hook's status values
+    // SigningStatus is a TypeScript type, not a runtime value
+    // We test the valid status values directly
     const validStatuses = [
       'idle',
       'fetching_quote',
