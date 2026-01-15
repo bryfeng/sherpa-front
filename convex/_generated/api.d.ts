@@ -9,6 +9,7 @@
  */
 
 import type * as admin_auth from "../admin/auth.js";
+import type * as admin_authActions from "../admin/authActions.js";
 import type * as admin_metrics from "../admin/metrics.js";
 import type * as admin_sessions from "../admin/sessions.js";
 import type * as admin_users from "../admin/users.js";
@@ -20,6 +21,7 @@ import type * as dca from "../dca.js";
 import type * as executions from "../executions.js";
 import type * as health from "../health.js";
 import type * as http from "../http.js";
+import type * as lib_authHelpers from "../lib/authHelpers.js";
 import type * as news from "../news.js";
 import type * as rateLimit from "../rateLimit.js";
 import type * as riskPolicies from "../riskPolicies.js";
@@ -43,6 +45,7 @@ import type {
 
 declare const fullApi: ApiFromModules<{
   "admin/auth": typeof admin_auth;
+  "admin/authActions": typeof admin_authActions;
   "admin/metrics": typeof admin_metrics;
   "admin/sessions": typeof admin_sessions;
   "admin/users": typeof admin_users;
@@ -54,6 +57,7 @@ declare const fullApi: ApiFromModules<{
   executions: typeof executions;
   health: typeof health;
   http: typeof http;
+  "lib/authHelpers": typeof lib_authHelpers;
   news: typeof news;
   rateLimit: typeof rateLimit;
   riskPolicies: typeof riskPolicies;

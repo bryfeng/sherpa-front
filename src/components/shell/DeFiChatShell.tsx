@@ -3,7 +3,7 @@ import { PanelLeft, PanelLeftClose, PanelRight, PanelRightClose } from 'lucide-r
 
 import { HeaderBar, type HeaderBarProps } from '../header/HeaderBar'
 import { ChatSurface, type ChatSurfaceProps } from '../surfaces/ChatSurface'
-import { ArtifactPanel, type ArtifactPanelProps } from '../surfaces/ArtifactPanel'
+import { WidgetPanel, type WidgetPanelProps } from '../surfaces/WidgetPanel'
 import { ConversationSidebar } from '../sidebar/ConversationSidebar'
 import { Button, Card } from '../ui/primitives'
 import { ResizablePanel } from '../ui/ResizablePanel'
@@ -18,17 +18,17 @@ export interface DeFiChatShellProps {
   walletAddress: string | null
   /** Handler for new chat */
   onNewChat: () => void
-  /** Whether the artifact panel is visible */
-  artifactPanelVisible: boolean
-  /** Toggle artifact panel visibility */
-  onToggleArtifactPanel: () => void
-  /** Label for the artifact panel button */
-  artifactButtonLabel: string
-  /** Number of open artifact tabs */
-  artifactCount: number
+  /** Whether the widget panel is visible */
+  widgetPanelVisible: boolean
+  /** Toggle widget panel visibility */
+  onToggleWidgetPanel: () => void
+  /** Label for the widget panel button */
+  widgetButtonLabel: string
+  /** Number of open widget tabs */
+  widgetCount: number
   chat: ChatSurfaceProps
-  /** Artifact panel props */
-  artifacts: Omit<ArtifactPanelProps, 'isVisible' | 'onCollapse'>
+  /** Widget panel props */
+  widgetPanel: Omit<WidgetPanelProps, 'isVisible' | 'onCollapse'>
 }
 
 export function DeFiChatShell({
@@ -37,12 +37,12 @@ export function DeFiChatShell({
   onToggleSidebar,
   walletAddress,
   onNewChat,
-  artifactPanelVisible,
-  onToggleArtifactPanel,
-  artifactButtonLabel,
-  artifactCount,
+  widgetPanelVisible,
+  onToggleWidgetPanel,
+  widgetButtonLabel,
+  widgetCount,
   chat,
-  artifacts,
+  widgetPanel,
 }: DeFiChatShellProps) {
   return (
     <div className="flex h-screen w-full flex-col px-4 py-4 lg:px-6 overflow-hidden">
@@ -72,32 +72,32 @@ export function DeFiChatShell({
                 History
               </Button>
 
-              {/* Artifact toggle */}
+              {/* Widget panel toggle */}
               <Button
                 size="sm"
-                variant={artifactPanelVisible ? 'secondary' : 'outline'}
-                onClick={onToggleArtifactPanel}
-                aria-pressed={artifactPanelVisible}
+                variant={widgetPanelVisible ? 'secondary' : 'outline'}
+                onClick={onToggleWidgetPanel}
+                aria-pressed={widgetPanelVisible}
                 className="rounded-md"
               >
-                {artifactPanelVisible ? (
+                {widgetPanelVisible ? (
                   <PanelRightClose className="mr-1.5 h-4 w-4" />
                 ) : (
                   <PanelRight className="mr-1.5 h-4 w-4" />
                 )}
-                {artifactButtonLabel}
-                {artifactCount > 0 && (
+                {widgetButtonLabel}
+                {widgetCount > 0 && (
                   <span className="ml-1.5 rounded-full bg-[var(--accent)] px-1.5 py-0.5 text-[10px] font-medium text-white">
-                    {artifactCount}
+                    {widgetCount}
                   </span>
                 )}
               </Button>
-              {!artifactPanelVisible && artifactCount > 0 && (
+              {!widgetPanelVisible && widgetCount > 0 && (
                 <span
                   className="text-xs"
                   style={{ color: 'var(--text-muted)' }}
                 >
-                  {artifactCount} artifact{artifactCount !== 1 ? 's' : ''} available
+                  {widgetCount} widget{widgetCount !== 1 ? 's' : ''} available
                 </span>
               )}
             </div>
@@ -113,9 +113,9 @@ export function DeFiChatShell({
             />
 
             {/* Chat Panel - Desktop */}
-            {/* Chat expands when artifact panel is closed OR when no artifacts exist */}
-            {artifactPanelVisible && artifactCount > 0 ? (
-              // Resizable chat when artifact panel is open
+            {/* Chat expands when widget panel is closed OR when no widgets exist */}
+            {widgetPanelVisible && widgetCount > 0 ? (
+              // Resizable chat when widget panel is open
               <ResizablePanel
                 defaultWidth={450}
                 minWidth={350}
@@ -140,7 +140,7 @@ export function DeFiChatShell({
                 </section>
               </ResizablePanel>
             ) : (
-              // Full-width chat when artifact panel is closed
+              // Full-width chat when widget panel is closed
               <section
                 className="hidden lg:flex flex-1 flex-col min-h-0 bg-[var(--surface-2)]/30"
                 style={{ borderColor: 'var(--line)' }}
@@ -175,11 +175,11 @@ export function DeFiChatShell({
               </div>
             </section>
 
-            {/* Artifact Panel */}
-            <ArtifactPanel
-              {...artifacts}
-              isVisible={artifactPanelVisible}
-              onCollapse={onToggleArtifactPanel}
+            {/* Widget Panel */}
+            <WidgetPanel
+              {...widgetPanel}
+              isVisible={widgetPanelVisible}
+              onCollapse={onToggleWidgetPanel}
             />
           </div>
         </Card>

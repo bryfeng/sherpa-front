@@ -1,7 +1,7 @@
 /**
- * ARTIFACT PICKER
+ * WIDGET PICKER
  *
- * Simple picker for adding widgets to the artifact panel.
+ * Simple picker for adding widgets to the widget panel.
  * Works with useSherpaStore (not useWidgetStore).
  */
 
@@ -19,11 +19,11 @@ import {
   Check,
   History,
 } from 'lucide-react'
-import { useSherpaStore } from '../../store'
-import type { Widget } from '../../types/widgets'
+import { useSherpaStore } from '../../../store'
+import type { Widget } from '../../../types/widgets'
 
-// Available artifacts that can be added
-const AVAILABLE_ARTIFACTS = [
+// Available widgets that can be added
+const AVAILABLE_WIDGETS = [
   {
     id: 'dca-strategies',
     kind: 'dca-strategies' as const,
@@ -80,23 +80,23 @@ const AVAILABLE_ARTIFACTS = [
   },
 ]
 
-interface ArtifactPickerProps {
+interface WidgetPickerProps {
   isOpen: boolean
   onClose: () => void
   walletAddress?: string
 }
 
-export function ArtifactPicker({ isOpen, onClose, walletAddress }: ArtifactPickerProps) {
+export function WidgetPicker({ isOpen, onClose, walletAddress }: WidgetPickerProps) {
   const [searchQuery, setSearchQuery] = useState('')
   const addWidget = useSherpaStore((s) => s.addWidget)
-  const artifactTabs = useSherpaStore((s) => s.artifactTabs)
+  const widgetTabs = useSherpaStore((s) => s.widgetTabs)
   const widgets = useSherpaStore((s) => s.widgets)
 
-  // Filter artifacts based on search
-  const filteredArtifacts = useMemo(() => {
-    if (!searchQuery.trim()) return AVAILABLE_ARTIFACTS
+  // Filter widgets based on search
+  const filteredWidgets = useMemo(() => {
+    if (!searchQuery.trim()) return AVAILABLE_WIDGETS
     const query = searchQuery.toLowerCase()
-    return AVAILABLE_ARTIFACTS.filter(
+    return AVAILABLE_WIDGETS.filter(
       (a) =>
         a.name.toLowerCase().includes(query) ||
         a.description.toLowerCase().includes(query) ||
@@ -104,25 +104,25 @@ export function ArtifactPicker({ isOpen, onClose, walletAddress }: ArtifactPicke
     )
   }, [searchQuery])
 
-  // Check if artifact is already open as a tab
-  // Only show as "open" if it's actually in the artifact tabs
-  const isArtifactOpen = useCallback(
+  // Check if widget is already open as a tab
+  // Only show as "open" if it's actually in the widget tabs
+  const isWidgetOpen = useCallback(
     (id: string) => {
-      // Check if this artifact ID is in tabs AND the widget actually exists
-      const inTabs = artifactTabs.includes(id)
+      // Check if this widget ID is in tabs AND the widget actually exists
+      const inTabs = widgetTabs.includes(id)
       const widgetExists = widgets.some((w) => w.id === id)
       return inTabs && widgetExists
     },
-    [artifactTabs, widgets]
+    [widgetTabs, widgets]
   )
 
-  // Add artifact to panel
+  // Add widget to panel
   const handleAdd = useCallback(
-    (artifact: typeof AVAILABLE_ARTIFACTS[number]) => {
+    (item: typeof AVAILABLE_WIDGETS[number]) => {
       const widget: Widget = {
-        id: artifact.id,
-        kind: artifact.kind,
-        title: artifact.name,
+        id: item.id,
+        kind: item.kind,
+        title: item.name,
         payload: {
           walletAddress,
         },
@@ -177,13 +177,13 @@ export function ArtifactPicker({ isOpen, onClose, walletAddress }: ArtifactPicke
                   className="text-base font-semibold"
                   style={{ color: 'var(--text)' }}
                 >
-                  Add to Artifacts
+                  Add Widget
                 </h2>
                 <p
                   className="text-xs mt-0.5"
                   style={{ color: 'var(--text-muted)' }}
                 >
-                  Select a widget to add to your artifact panel
+                  Select a widget to add to your panel
                 </p>
               </div>
               <motion.button
@@ -233,9 +233,9 @@ export function ArtifactPicker({ isOpen, onClose, walletAddress }: ArtifactPicke
               </div>
             </div>
 
-            {/* Artifact list */}
+            {/* Widget list */}
             <div className="flex-1 overflow-y-auto p-4">
-              {filteredArtifacts.length === 0 ? (
+              {filteredWidgets.length === 0 ? (
                 <div className="flex flex-col items-center justify-center py-8">
                   <Search className="w-10 h-10 mb-3" style={{ color: 'var(--text-muted)' }} />
                   <p className="text-sm" style={{ color: 'var(--text-muted)' }}>
@@ -244,14 +244,14 @@ export function ArtifactPicker({ isOpen, onClose, walletAddress }: ArtifactPicke
                 </div>
               ) : (
                 <div className="space-y-2">
-                  {filteredArtifacts.map((artifact) => {
-                    const isOpen = isArtifactOpen(artifact.id)
-                    const Icon = artifact.icon
+                  {filteredWidgets.map((item) => {
+                    const isOpen = isWidgetOpen(item.id)
+                    const Icon = item.icon
 
                     return (
                       <motion.button
-                        key={artifact.id}
-                        onClick={() => !isOpen && handleAdd(artifact)}
+                        key={item.id}
+                        onClick={() => !isOpen && handleAdd(item)}
                         disabled={isOpen}
                         className="w-full text-left p-3 rounded-xl border transition-all flex items-center gap-3"
                         style={{
@@ -280,13 +280,13 @@ export function ArtifactPicker({ isOpen, onClose, walletAddress }: ArtifactPicke
                             className="font-medium text-sm"
                             style={{ color: 'var(--text)' }}
                           >
-                            {artifact.name}
+                            {item.name}
                           </h4>
                           <p
                             className="text-xs mt-0.5 truncate"
                             style={{ color: 'var(--text-muted)' }}
                           >
-                            {artifact.description}
+                            {item.description}
                           </p>
                         </div>
 
@@ -349,4 +349,4 @@ export function ArtifactPicker({ isOpen, onClose, walletAddress }: ArtifactPicke
   )
 }
 
-export default ArtifactPicker
+export default WidgetPicker

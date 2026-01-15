@@ -1,7 +1,7 @@
 Agentic Wallet Frontend
 ======================
 
-React 18 + TypeScript + Vite. The UI consumes the FastAPI backend in `sherpa/app` and now follows the 10 workstreams from the front-end optimisation spec.
+React 18 + TypeScript + Vite. The UI consumes the FastAPI backend in `backend/app` and now follows the 10 workstreams from the front-end optimisation spec.
 
 Getting Started
 ---------------

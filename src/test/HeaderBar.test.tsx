@@ -2,6 +2,21 @@ import { render, screen, fireEvent } from '@testing-library/react'
 import { vi } from 'vitest'
 import { HeaderBar, type HeaderBarProps } from '../components/header/HeaderBar'
 
+// Mock wagmi
+vi.mock('wagmi', () => ({
+  useAccount: vi.fn(() => ({ address: null })),
+}))
+
+// Mock pending approvals hook
+vi.mock('../workspace/hooks/usePendingApprovals', () => ({
+  usePendingApprovals: vi.fn(() => ({ count: 0, executions: [] })),
+}))
+
+// Mock execution signing badge
+vi.mock('../workspace/components/ExecutionSigningModal', () => ({
+  ExecutionSigningBadge: () => null,
+}))
+
 function renderHeaderBar(overrides: Partial<HeaderBarProps> = {}) {
   const props: HeaderBarProps = {
     persona: 'friendly',

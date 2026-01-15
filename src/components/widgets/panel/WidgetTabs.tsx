@@ -1,20 +1,20 @@
 import React from 'react'
 import { X } from 'lucide-react'
-import type { Widget } from '../../types/widgets'
+import type { Widget } from '../../../types/widgets'
 
-export interface ArtifactTabsProps {
+export interface WidgetTabsProps {
   tabs: Widget[]
   activeId: string | null
   onTabClick: (id: string) => void
   onTabClose: (id: string) => void
 }
 
-export function ArtifactTabs({
+export function WidgetTabs({
   tabs,
   activeId,
   onTabClick,
   onTabClose,
-}: ArtifactTabsProps) {
+}: WidgetTabsProps) {
   if (tabs.length === 0) return null
 
   return (
@@ -22,7 +22,7 @@ export function ArtifactTabs({
       className="flex items-center gap-1 overflow-x-auto border-b px-2 py-1"
       style={{ borderColor: 'var(--line)', background: 'var(--surface-2)' }}
       role="tablist"
-      aria-label="Artifact tabs"
+      aria-label="Widget tabs"
     >
       {tabs.map((tab) => {
         const isActive = tab.id === activeId

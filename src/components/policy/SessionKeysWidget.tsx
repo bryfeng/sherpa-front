@@ -6,13 +6,13 @@ import { SessionKeyList } from './SessionKeyList'
 import { SessionKeyForm } from './SessionKeyForm'
 
 interface SessionKeysWidgetProps {
-  artifact?: Widget
+  widget?: Widget
   walletAddress?: string
 }
 
 type Tab = 'list' | 'create'
 
-export function SessionKeysWidget({ artifact, walletAddress }: SessionKeysWidgetProps) {
+export function SessionKeysWidget({ widget, walletAddress }: SessionKeysWidgetProps) {
   const [activeTab, setActiveTab] = useState<Tab>('list')
 
   const {

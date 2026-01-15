@@ -1,43 +1,43 @@
 import React, { Suspense } from 'react'
 import { FileQuestion } from 'lucide-react'
-import type { Widget } from '../../types/widgets'
-import { CardSkeleton } from '../panels/CardSkeleton'
-import { PanelErrorBoundary } from '../panels/PanelErrorBoundary'
+import type { Widget } from '../../../types/widgets'
+import { CardSkeleton } from '../../panels/CardSkeleton'
+import { PanelErrorBoundary } from '../../panels/PanelErrorBoundary'
 
 // Lazy load heavy components
-const ChartPanel = React.lazy(() => import('../panels/ChartPanel'))
+const ChartPanel = React.lazy(() => import('../../panels/ChartPanel'))
 const PortfolioOverview = React.lazy(() =>
-  import('../panels/PortfolioOverview').then((m) => ({ default: m.PortfolioOverview }))
+  import('../../panels/PortfolioOverview').then((m) => ({ default: m.PortfolioOverview }))
 )
 const TopCoinsPanel = React.lazy(() =>
-  import('../panels/TopCoinsPanel').then((m) => ({ default: m.TopCoinsPanel }))
+  import('../../panels/TopCoinsPanel').then((m) => ({ default: m.TopCoinsPanel }))
 )
 const TrendingTokensList = React.lazy(() =>
-  import('../widgets/TrendingTokensWidget').then((m) => ({ default: m.TrendingTokensList }))
+  import('../TrendingTokensWidget').then((m) => ({ default: m.TrendingTokensList }))
 )
 const HistorySummaryPanel = React.lazy(() =>
-  import('../panels/history/HistorySummaryPanel').then((m) => ({ default: m.HistorySummaryPanel }))
+  import('../../panels/history/HistorySummaryPanel').then((m) => ({ default: m.HistorySummaryPanel }))
 )
 
 // Policy widgets
 const RiskPolicyWidget = React.lazy(() =>
-  import('../policy/RiskPolicyWidget').then((m) => ({ default: m.RiskPolicyWidget }))
+  import('../../policy/RiskPolicyWidget').then((m) => ({ default: m.RiskPolicyWidget }))
 )
 const SessionKeysWidget = React.lazy(() =>
-  import('../policy/SessionKeysWidget').then((m) => ({ default: m.SessionKeysWidget }))
+  import('../../policy/SessionKeysWidget').then((m) => ({ default: m.SessionKeysWidget }))
 )
 const PolicyStatusWidget = React.lazy(() =>
-  import('../policy/PolicyStatusWidget').then((m) => ({ default: m.PolicyStatusWidget }))
+  import('../../policy/PolicyStatusWidget').then((m) => ({ default: m.PolicyStatusWidget }))
 )
 
 // Strategy widgets
 const StrategiesWidget = React.lazy(() =>
-  import('../strategies/StrategiesWidget').then((m) => ({ default: m.StrategiesWidget }))
+  import('../../strategies/StrategiesWidget').then((m) => ({ default: m.StrategiesWidget }))
 )
 
 // Transaction history widget
 const TransactionHistoryWidget = React.lazy(() =>
-  import('../transactions/TransactionHistoryWidget').then((m) => ({ default: m.TransactionHistoryWidget }))
+  import('../../transactions/TransactionHistoryWidget').then((m) => ({ default: m.TransactionHistoryWidget }))
 )
 
 // Type for dca-strategies payload
@@ -47,39 +47,39 @@ interface DCAStrategiesPayload {
   walletId?: string
 }
 
-export interface ArtifactContentProps {
-  artifact: Widget | null
+export interface WidgetContentProps {
+  widget: Widget | null
   walletAddress?: string
 }
 
-export function ArtifactContent({ artifact, walletAddress }: ArtifactContentProps) {
-  if (!artifact) {
-    return <ArtifactEmptyState />
+export function WidgetContent({ widget, walletAddress }: WidgetContentProps) {
+  if (!widget) {
+    return <WidgetEmptyState />
   }
 
   return (
     <div className="flex-1 overflow-auto p-4">
       <PanelErrorBoundary>
         <Suspense fallback={<CardSkeleton density="full" />}>
-          <ArtifactRenderer artifact={artifact} walletAddress={walletAddress} />
+          <WidgetRenderer widget={widget} walletAddress={walletAddress} />
         </Suspense>
       </PanelErrorBoundary>
     </div>
   )
 }
 
-function ArtifactRenderer({
-  artifact,
+function WidgetRenderer({
+  widget,
   walletAddress,
 }: {
-  artifact: Widget
+  widget: Widget
   walletAddress?: string
 }) {
-  const payload: any = artifact.payload
+  const payload: any = widget.payload
 
-  switch (artifact.kind) {
+  switch (widget.kind) {
     case 'chart':
-      return <ChartPanel widget={artifact} />
+      return <ChartPanel widget={widget} />
 
     case 'portfolio':
       return (
@@ -104,13 +104,13 @@ function ArtifactRenderer({
     }
 
     case 'history-summary':
-      return <HistorySummaryPanel widget={artifact as any} />
+      return <HistorySummaryPanel widget={widget as any} />
 
     case 'card':
       // Generic card content - render payload as JSON for now
       return (
         <div className="rounded-lg border p-4" style={{ borderColor: 'var(--line)' }}>
-          <h3 className="mb-2 text-sm font-medium">{artifact.title}</h3>
+          <h3 className="mb-2 text-sm font-medium">{widget.title}</h3>
           {payload?.content && (
             <p className="text-sm" style={{ color: 'var(--text-muted)' }}>
               {payload.content}
@@ -121,10 +121,10 @@ function ArtifactRenderer({
 
     // Policy widgets
     case 'risk-policy':
-      return <RiskPolicyWidget artifact={artifact} walletAddress={walletAddress} />
+      return <RiskPolicyWidget widget={widget} walletAddress={walletAddress} />
 
     case 'session-keys':
-      return <SessionKeysWidget artifact={artifact} walletAddress={walletAddress} />
+      return <SessionKeysWidget widget={widget} walletAddress={walletAddress} />
 
     case 'policy-status':
       return <PolicyStatusWidget />
@@ -152,13 +152,13 @@ function ArtifactRenderer({
           style={{ borderColor: 'var(--line)', color: 'var(--text-muted)' }}
         >
           <FileQuestion className="h-8 w-8" />
-          <p className="text-sm">Unknown artifact type: {artifact.kind}</p>
+          <p className="text-sm">Unknown widget type: {widget.kind}</p>
         </div>
       )
   }
 }
 
-function ArtifactEmptyState() {
+function WidgetEmptyState() {
   return (
     <div
       className="flex h-full flex-col items-center justify-center gap-4 p-8 text-center"
@@ -172,7 +172,7 @@ function ArtifactEmptyState() {
       </div>
       <div className="max-w-[240px]">
         <p className="text-sm font-medium" style={{ color: 'var(--text)' }}>
-          No artifact selected
+          No widget selected
         </p>
         <p className="mt-2 text-xs leading-relaxed">
           Pin charts, portfolios, and analysis from chat to keep them visible while you explore.

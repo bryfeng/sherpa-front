@@ -1,16 +1,15 @@
 import React, { memo, useEffect } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
 import type { Widget } from '../../types/widgets'
-import { ResizablePanel } from '../ui/ResizablePanel'
-import { ArtifactHeader } from '../artifacts/ArtifactHeader'
-import { ArtifactTabs } from '../artifacts/ArtifactTabs'
-import { ArtifactContent } from '../artifacts/ArtifactContent'
+import { WidgetPanelHeader } from '../widgets/panel/WidgetPanelHeader'
+import { WidgetTabs } from '../widgets/panel/WidgetTabs'
+import { WidgetContent } from '../widgets/panel/WidgetContent'
 
-export interface ArtifactPanelProps {
-  /** All widgets in the artifact tabs */
-  artifactWidgets: Widget[]
-  /** Currently active artifact ID */
-  activeArtifactId: string | null
+export interface WidgetPanelProps {
+  /** All widgets in the panel tabs */
+  panelWidgets: Widget[]
+  /** Currently active widget ID */
+  activeWidgetId: string | null
   /** Current panel width */
   panelWidth: number
   /** Whether the panel is visible */
@@ -22,12 +21,12 @@ export interface ArtifactPanelProps {
   onTabClose: (id: string) => void
   onCollapse: () => void
   onPanelResize: (width: number) => void
-  onAddArtifact?: () => void
+  onAddWidget?: () => void
 }
 
-function ArtifactPanelComponent({
-  artifactWidgets,
-  activeArtifactId,
+function WidgetPanelComponent({
+  panelWidgets,
+  activeWidgetId,
   panelWidth,
   isVisible,
   walletAddress,
@@ -35,9 +34,9 @@ function ArtifactPanelComponent({
   onTabClose,
   onCollapse,
   onPanelResize,
-  onAddArtifact,
-}: ArtifactPanelProps) {
-  const activeArtifact = artifactWidgets.find((w) => w.id === activeArtifactId) ?? null
+  onAddWidget,
+}: WidgetPanelProps) {
+  const activeWidget = panelWidgets.find((w) => w.id === activeWidgetId) ?? null
 
   // Keyboard shortcut: Escape to close panel
   useEffect(() => {
@@ -71,21 +70,21 @@ function ArtifactPanelComponent({
               background: 'var(--surface)',
             }}
           >
-            <ArtifactHeader
-              tabCount={artifactWidgets.length}
+            <WidgetPanelHeader
+              tabCount={panelWidgets.length}
               onCollapse={onCollapse}
-              onAddArtifact={onAddArtifact}
+              onAddWidget={onAddWidget}
             />
 
-            <ArtifactTabs
-              tabs={artifactWidgets}
-              activeId={activeArtifactId}
+            <WidgetTabs
+              tabs={panelWidgets}
+              activeId={activeWidgetId}
               onTabClick={onTabClick}
               onTabClose={onTabClose}
             />
 
-            <ArtifactContent
-              artifact={activeArtifact}
+            <WidgetContent
+              widget={activeWidget}
               walletAddress={walletAddress}
             />
           </div>
@@ -95,4 +94,4 @@ function ArtifactPanelComponent({
   )
 }
 
-export const ArtifactPanel = memo(ArtifactPanelComponent)
+export const WidgetPanel = memo(WidgetPanelComponent)

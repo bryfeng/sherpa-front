@@ -1,17 +1,17 @@
 import React from 'react'
-import { PanelRightClose, Maximize2, Plus } from 'lucide-react'
+import { PanelRightClose, Plus } from 'lucide-react'
 
-export interface ArtifactHeaderProps {
+export interface WidgetPanelHeaderProps {
   tabCount: number
   onCollapse: () => void
-  onAddArtifact?: () => void
+  onAddWidget?: () => void
 }
 
-export function ArtifactHeader({
+export function WidgetPanelHeader({
   tabCount,
   onCollapse,
-  onAddArtifact,
-}: ArtifactHeaderProps) {
+  onAddWidget,
+}: WidgetPanelHeaderProps) {
   return (
     <div
       className="flex items-center justify-between gap-2 border-b px-4 py-3"
@@ -22,7 +22,7 @@ export function ArtifactHeader({
           className="text-xs font-medium uppercase tracking-wide"
           style={{ color: 'var(--text-muted)' }}
         >
-          Artifacts
+          Widgets
         </span>
         {tabCount > 0 && (
           <span className="badge badge--secondary text-[10px]">
@@ -32,13 +32,13 @@ export function ArtifactHeader({
       </div>
 
       <div className="flex items-center gap-1">
-        {onAddArtifact && (
+        {onAddWidget && (
           <button
             type="button"
-            onClick={onAddArtifact}
+            onClick={onAddWidget}
             className="rounded p-1.5 transition-colors hover:bg-[var(--surface-3)]"
-            aria-label="Add artifact"
-            title="Add artifact"
+            aria-label="Add widget"
+            title="Add widget"
           >
             <Plus className="h-4 w-4" style={{ color: 'var(--text-muted)' }} />
           </button>
@@ -47,7 +47,7 @@ export function ArtifactHeader({
           type="button"
           onClick={onCollapse}
           className="rounded p-1.5 transition-colors hover:bg-[var(--surface-3)]"
-          aria-label="Close artifacts panel"
+          aria-label="Close widgets panel"
           title="Close panel"
         >
           <PanelRightClose className="h-4 w-4" style={{ color: 'var(--text-muted)' }} />

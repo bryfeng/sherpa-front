@@ -125,7 +125,7 @@ interface ChatSlice {
 }
 
 // ============================================
-// WORKSPACE SLICE - Panels and widgets (now Artifact Panel)
+// WORKSPACE SLICE - Panels and widgets (Widget Panel)
 // ============================================
 
 interface WorkspaceSlice {
@@ -140,10 +140,10 @@ interface WorkspaceSlice {
   highlightedWidgets: string[]
   collapsedPanels: Record<string, boolean>
 
-  // Artifact Tabs (NEW)
-  artifactTabs: string[]          // Widget IDs in tab order
-  activeArtifactId: string | null // Currently visible tab
-  panelWidth: number              // Resizable panel width
+  // Widget Panel Tabs
+  widgetTabs: string[]          // Widget IDs in tab order
+  activeWidgetId: string | null // Currently visible tab
+  panelWidth: number            // Resizable panel width
 
   // Widget Actions
   addWidget: (widget: Widget) => void
@@ -156,11 +156,11 @@ interface WorkspaceSlice {
   togglePanelCollapse: (id: string) => void
   setPanelCollapsed: (id: string, collapsed: boolean) => void
 
-  // Artifact Tab Actions (NEW)
-  setActiveArtifact: (id: string | null) => void
-  openArtifactTab: (widgetId: string) => void
-  closeArtifactTab: (widgetId: string) => void
-  reorderArtifactTabs: (fromIndex: number, toIndex: number) => void
+  // Widget Panel Tab Actions
+  setActiveWidget: (id: string | null) => void
+  openWidgetTab: (widgetId: string) => void
+  closeWidgetTab: (widgetId: string) => void
+  reorderWidgetTabs: (fromIndex: number, toIndex: number) => void
   setPanelWidth: (width: number) => void
 
   // Portfolio
@@ -385,14 +385,14 @@ export const useSherpaStore = create<SherpaStore>()(
             }),
 
           // ============================================
-          // WORKSPACE SLICE (now Artifact Panel)
+          // WORKSPACE SLICE (Widget Panel)
           // ============================================
           isVisible: false,
           widgets: seedWidgets,
           highlightedWidgets: [],
           collapsedPanels: {},
-          artifactTabs: [],
-          activeArtifactId: null,
+          widgetTabs: [],
+          activeWidgetId: null,
           panelWidth: 500,
           portfolioSummary: null,
           portfolioStatus: 'idle',
@@ -408,10 +408,10 @@ export const useSherpaStore = create<SherpaStore>()(
           addWidget: (widget) =>
             set((state) => {
               const existingIndex = state.widgets.findIndex((w) => w.id === widget.id)
-              // Always ensure widget is in artifact tabs
-              const newTabs = state.artifactTabs.includes(widget.id)
-                ? state.artifactTabs
-                : [...state.artifactTabs, widget.id]
+              // Always ensure widget is in widget tabs
+              const newTabs = state.widgetTabs.includes(widget.id)
+                ? state.widgetTabs
+                : [...state.widgetTabs, widget.id]
 
               if (existingIndex !== -1) {
                 // Widget exists - update it and ensure it's in tabs
@@ -419,16 +419,16 @@ export const useSherpaStore = create<SherpaStore>()(
                 newWidgets[existingIndex] = widget
                 return {
                   widgets: newWidgets,
-                  artifactTabs: newTabs,
-                  activeArtifactId: widget.id,
+                  widgetTabs: newTabs,
+                  activeWidgetId: widget.id,
                   isVisible: true,
                 }
               }
               // New widget - add to widgets and tabs
               return {
                 widgets: [widget, ...state.widgets],
-                artifactTabs: newTabs,
-                activeArtifactId: widget.id,
+                widgetTabs: newTabs,
+                activeWidgetId: widget.id,
                 isVisible: true, // Auto-show panel when widget added
               }
             }),
@@ -444,18 +444,18 @@ export const useSherpaStore = create<SherpaStore>()(
             set((state) => {
               // Only update state if widget exists to prevent infinite loops
               const widgetExists = state.widgets.some((w) => w.id === id)
-              const tabExists = state.artifactTabs.includes(id)
+              const tabExists = state.widgetTabs.includes(id)
               if (!widgetExists && !tabExists) {
                 return state
               }
-              const newTabs = state.artifactTabs.filter((tabId) => tabId !== id)
-              const newActiveId = state.activeArtifactId === id
+              const newTabs = state.widgetTabs.filter((tabId) => tabId !== id)
+              const newActiveId = state.activeWidgetId === id
                 ? newTabs[0] ?? null
-                : state.activeArtifactId
+                : state.activeWidgetId
               return {
                 widgets: state.widgets.filter((w) => w.id !== id),
-                artifactTabs: newTabs,
-                activeArtifactId: newActiveId,
+                widgetTabs: newTabs,
+                activeWidgetId: newActiveId,
               }
             }),
 
@@ -494,47 +494,47 @@ export const useSherpaStore = create<SherpaStore>()(
               },
             })),
 
-          // Artifact Tab Actions
-          setActiveArtifact: (id) => set({ activeArtifactId: id }),
+          // Widget Panel Tab Actions
+          setActiveWidget: (id) => set({ activeWidgetId: id }),
 
-          openArtifactTab: (widgetId) =>
+          openWidgetTab: (widgetId) =>
             set((state) => {
               // If already in tabs, just activate it
-              if (state.artifactTabs.includes(widgetId)) {
-                return { activeArtifactId: widgetId, isVisible: true }
+              if (state.widgetTabs.includes(widgetId)) {
+                return { activeWidgetId: widgetId, isVisible: true }
               }
               // Add to tabs and activate
               return {
-                artifactTabs: [...state.artifactTabs, widgetId],
-                activeArtifactId: widgetId,
+                widgetTabs: [...state.widgetTabs, widgetId],
+                activeWidgetId: widgetId,
                 isVisible: true,
               }
             }),
 
-          closeArtifactTab: (widgetId) =>
+          closeWidgetTab: (widgetId) =>
             set((state) => {
-              const newTabs = state.artifactTabs.filter((id) => id !== widgetId)
-              const currentIndex = state.artifactTabs.indexOf(widgetId)
+              const newTabs = state.widgetTabs.filter((id) => id !== widgetId)
+              const currentIndex = state.widgetTabs.indexOf(widgetId)
               // If closing active tab, activate the previous tab or next
-              let newActiveId = state.activeArtifactId
-              if (state.activeArtifactId === widgetId) {
+              let newActiveId = state.activeWidgetId
+              if (state.activeWidgetId === widgetId) {
                 newActiveId = newTabs[Math.min(currentIndex, newTabs.length - 1)] ?? null
               }
               return {
-                artifactTabs: newTabs,
-                activeArtifactId: newActiveId,
+                widgetTabs: newTabs,
+                activeWidgetId: newActiveId,
                 // Hide panel if no more tabs
                 isVisible: newTabs.length > 0 ? state.isVisible : false,
               }
             }),
 
-          reorderArtifactTabs: (fromIndex, toIndex) =>
+          reorderWidgetTabs: (fromIndex, toIndex) =>
             set((state) => {
               if (fromIndex === toIndex) return state
-              const newTabs = [...state.artifactTabs]
+              const newTabs = [...state.widgetTabs]
               const [item] = newTabs.splice(fromIndex, 1)
               newTabs.splice(toIndex, 0, item)
-              return { artifactTabs: newTabs }
+              return { widgetTabs: newTabs }
             }),
 
           setPanelWidth: (width) => set({ panelWidth: width }),
@@ -607,9 +607,9 @@ export const useSherpaStore = create<SherpaStore>()(
             coachMarkDismissed: state.coachMarkDismissed,
             hasNudgedWorkspace: state.hasNudgedWorkspace,
             collapsedPanels: state.collapsedPanels,
-            // Artifact panel persistence
-            artifactTabs: state.artifactTabs,
-            activeArtifactId: state.activeArtifactId,
+            // Widget panel persistence
+            widgetTabs: state.widgetTabs,
+            activeWidgetId: state.activeWidgetId,
             panelWidth: state.panelWidth,
             // Conversation sidebar persistence
             sidebarVisible: state.sidebarVisible,
@@ -634,16 +634,16 @@ export const selectWidgets = (state: SherpaStore) => state.widgets
 export const selectWorkspaceVisible = (state: SherpaStore) => state.isVisible
 export const selectModals = (state: SherpaStore) => state.modals
 
-// Artifact selectors
-export const selectArtifactTabs = (state: SherpaStore) => state.artifactTabs
-export const selectActiveArtifactId = (state: SherpaStore) => state.activeArtifactId
+// Widget panel selectors
+export const selectWidgetTabs = (state: SherpaStore) => state.widgetTabs
+export const selectActiveWidgetId = (state: SherpaStore) => state.activeWidgetId
 export const selectPanelWidth = (state: SherpaStore) => state.panelWidth
 
-export const selectActiveArtifact = (state: SherpaStore) =>
-  state.widgets.find((w) => w.id === state.activeArtifactId) ?? null
+export const selectActiveWidget = (state: SherpaStore) =>
+  state.widgets.find((w) => w.id === state.activeWidgetId) ?? null
 
-export const selectArtifactWidgets = (state: SherpaStore) =>
-  state.artifactTabs
+export const selectPanelWidgets = (state: SherpaStore) =>
+  state.widgetTabs
     .map((id) => state.widgets.find((w) => w.id === id))
     .filter((w): w is Widget => w !== undefined)
 
@@ -715,22 +715,22 @@ export const useModals = () => useSherpaStore((state) => ({
   closeAllModals: state.closeAllModals,
 }))
 
-export const useArtifacts = () => useSherpaStore((state) => ({
+export const useWidgetPanel = () => useSherpaStore((state) => ({
   // State
-  artifactTabs: state.artifactTabs,
-  activeArtifactId: state.activeArtifactId,
+  widgetTabs: state.widgetTabs,
+  activeWidgetId: state.activeWidgetId,
   panelWidth: state.panelWidth,
   isVisible: state.isVisible,
   // Computed
-  activeArtifact: state.widgets.find((w) => w.id === state.activeArtifactId) ?? null,
-  artifactWidgets: state.artifactTabs
+  activeWidget: state.widgets.find((w) => w.id === state.activeWidgetId) ?? null,
+  panelWidgets: state.widgetTabs
     .map((id) => state.widgets.find((w) => w.id === id))
     .filter((w): w is Widget => w !== undefined),
   // Actions
-  setActiveArtifact: state.setActiveArtifact,
-  openArtifactTab: state.openArtifactTab,
-  closeArtifactTab: state.closeArtifactTab,
-  reorderArtifactTabs: state.reorderArtifactTabs,
+  setActiveWidget: state.setActiveWidget,
+  openWidgetTab: state.openWidgetTab,
+  closeWidgetTab: state.closeWidgetTab,
+  reorderWidgetTabs: state.reorderWidgetTabs,
   setPanelWidth: state.setPanelWidth,
   toggleVisibility: state.toggleVisibility,
   show: state.show,

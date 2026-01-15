@@ -1,7 +1,7 @@
 /**
  * Strategies Widget
  *
- * A widget for displaying and managing DCA strategies in the artifact panel.
+ * A widget for displaying and managing DCA strategies in the widget panel.
  */
 
 import React, { useState, useCallback } from 'react'

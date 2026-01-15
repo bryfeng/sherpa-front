@@ -6,7 +6,7 @@ import { RiskPolicyForm } from './RiskPolicyForm'
 import { formatUsd } from '../../types/policy'
 
 interface RiskPolicyWidgetProps {
-  artifact?: Widget
+  widget?: Widget
   walletAddress?: string
 }
 
@@ -34,7 +34,7 @@ function StatRow({ label, value, status }: StatRowProps) {
   )
 }
 
-export function RiskPolicyWidget({ artifact, walletAddress }: RiskPolicyWidgetProps) {
+export function RiskPolicyWidget({ widget, walletAddress }: RiskPolicyWidgetProps) {
   const [showForm, setShowForm] = useState(false)
   const { config, isDefault, isLoading, save, reset, applyPreset } = useRiskPolicy({
     walletAddress,

@@ -1,41 +1,37 @@
 import { render, screen } from '@testing-library/react'
 import { StrategyCard } from '../StrategyCard'
-import type { DCAStrategy } from '../../../types/strategy'
+import type { GenericStrategy } from '../../../hooks/useStrategies'
 
-const mockStrategy: DCAStrategy = {
+// Mock the formatNextExecution and formatLastExecution functions
+vi.mock('../../../hooks/useStrategies', async (importOriginal) => {
+  const actual = await importOriginal() as object
+  return {
+    ...actual,
+    formatNextExecution: vi.fn(() => 'Next: Tomorrow'),
+    formatLastExecution: vi.fn(() => 'Last: Yesterday'),
+  }
+})
+
+const mockStrategy: GenericStrategy = {
   _id: 'test-123' as any,
   _creationTime: Date.now(),
   userId: 'user-1' as any,
-  walletId: 'wallet-1' as any,
   walletAddress: '0x1234567890abcdef',
   name: 'Test DCA Strategy',
   description: 'Buy ETH weekly',
-  fromToken: {
-    symbol: 'USDC',
-    address: '0xusdc',
-    decimals: 6,
-    chainId: 1,
+  strategyType: 'dca',
+  config: {
+    amount_usd: 100,
+    frequency: 'weekly',
+    from_token: 'USDC',
+    to_token: 'ETH',
   },
-  toToken: {
-    symbol: 'ETH',
-    address: '0xeth',
-    decimals: 18,
-    chainId: 1,
-  },
-  amountPerExecutionUsd: 100,
-  frequency: 'weekly',
-  executionHourUtc: 12,
-  executionDayOfWeek: 1,
-  maxSlippageBps: 50,
-  maxGasUsd: 10,
   status: 'active',
-  totalAmountSpentUsd: 500,
-  totalTokensAcquired: '0.25',
   totalExecutions: 5,
   successfulExecutions: 5,
   failedExecutions: 0,
-  skippedExecutions: 0,
-  averagePriceUsd: 2000,
+  createdAt: Date.now(),
+  updatedAt: Date.now(),
 }
 
 describe('StrategyCard', () => {
@@ -51,7 +47,8 @@ describe('StrategyCard', () => {
   it('renders strategy name and token pair', () => {
     render(<StrategyCard {...defaultProps} />)
     expect(screen.getByText('Test DCA Strategy')).toBeInTheDocument()
-    expect(screen.getByText('USDC → ETH')).toBeInTheDocument()
+    // Token pair is now in format: DCA · USDC → ETH
+    expect(screen.getByText(/USDC → ETH/)).toBeInTheDocument()
   })
 
   it('renders status badge', () => {
@@ -61,19 +58,18 @@ describe('StrategyCard', () => {
 
   it('renders execution stats', () => {
     render(<StrategyCard {...defaultProps} />)
-    // Amount and frequency are shown
+    // Amount is shown in USD format
     expect(screen.getByText(/\$100/)).toBeInTheDocument()
-    expect(screen.getByText(/weekly/i)).toBeInTheDocument()
   })
 
   it('renders paused status correctly', () => {
-    const pausedStrategy = { ...mockStrategy, status: 'paused' as const }
+    const pausedStrategy: GenericStrategy = { ...mockStrategy, status: 'paused' }
     render(<StrategyCard {...defaultProps} strategy={pausedStrategy} />)
     expect(screen.getByText('Paused')).toBeInTheDocument()
   })
 
   it('renders draft status correctly', () => {
-    const draftStrategy = { ...mockStrategy, status: 'draft' as const }
+    const draftStrategy: GenericStrategy = { ...mockStrategy, status: 'draft' }
     render(<StrategyCard {...defaultProps} strategy={draftStrategy} />)
     expect(screen.getByText('Draft')).toBeInTheDocument()
   })

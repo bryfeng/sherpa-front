@@ -1,12 +1,12 @@
 import React, { useCallback, useEffect, useMemo, useReducer, useState } from 'react'
 
 import { DeFiChatShell } from '../components/shell/DeFiChatShell'
-import { ArtifactPicker } from '../components/artifacts/ArtifactPicker'
+import { WidgetPicker } from '../components/widgets/panel/WidgetPicker'
 import { initialShellUIState, shellUIReducer, type ShellUIState } from '../hooks/useShellUIReducer'
 import { useDeFiChatController, type DeFiChatAdaptiveUIProps } from '../hooks/useDeFiChatController'
 import { EntitlementsProvider } from '../hooks/useEntitlements'
 import { loadPanelUIState, debouncedSavePanelUI } from '../utils/panelPrefs'
-import { useArtifacts, useConversationSidebar, useSherpaStore } from '../store'
+import { useWidgetPanel, useConversationSidebar, useSherpaStore } from '../store'
 
 function initializeState(): ShellUIState {
   const savedPanelUI = loadPanelUIState()
@@ -15,7 +15,7 @@ function initializeState(): ShellUIState {
 
 export default function DeFiChatAdaptiveUI(props: DeFiChatAdaptiveUIProps) {
   const [shellState, dispatch] = useReducer(shellUIReducer, undefined, initializeState)
-  const [artifactPickerOpen, setArtifactPickerOpen] = useState(false)
+  const [widgetPickerOpen, setWidgetPickerOpen] = useState(false)
 
   useEffect(() => {
     debouncedSavePanelUI(shellState.panelUI)
@@ -29,17 +29,17 @@ export default function DeFiChatAdaptiveUI(props: DeFiChatAdaptiveUIProps) {
     modals,
   } = useDeFiChatController({ props, shellState, dispatch })
 
-  // Artifact panel state from store
+  // Widget panel state from store
   const {
-    artifactTabs,
-    activeArtifactId,
+    widgetTabs,
+    activeWidgetId,
     panelWidth,
-    isVisible: artifactPanelVisible,
-    setActiveArtifact,
-    closeArtifactTab,
+    isVisible: widgetPanelVisible,
+    setActiveWidget,
+    closeWidgetTab,
     setPanelWidth,
     toggleVisibility,
-  } = useArtifacts()
+  } = useWidgetPanel()
 
   // Conversation sidebar state from store
   const {
@@ -52,13 +52,13 @@ export default function DeFiChatAdaptiveUI(props: DeFiChatAdaptiveUIProps) {
   const walletAddress = useSherpaStore((s) => s.wallet.address)
   const startNewChat = useSherpaStore((s) => s.startNewChat)
 
-  // Compute artifact widgets from controller widgets filtered by artifact tabs
-  const artifactWidgets = useMemo(() => {
-    return workspaceSurfaceProps.widgets.filter((w) => artifactTabs.includes(w.id))
-  }, [workspaceSurfaceProps.widgets, artifactTabs])
+  // Compute panel widgets from controller widgets filtered by widget tabs
+  const panelWidgets = useMemo(() => {
+    return workspaceSurfaceProps.widgets.filter((w) => widgetTabs.includes(w.id))
+  }, [workspaceSurfaceProps.widgets, widgetTabs])
 
-  // Pin handler that adds widget to artifacts
-  const handlePinToArtifact = useCallback(() => {
+  // Pin handler that adds widget to panel
+  const handlePinToPanel = useCallback(() => {
     const widgets = workspaceSurfaceProps.widgets
     if (widgets.length > 0) {
       // Get the most recent non-seeded widget, or the first widget
@@ -67,11 +67,11 @@ export default function DeFiChatAdaptiveUI(props: DeFiChatAdaptiveUIProps) {
     }
   }, [workspaceSurfaceProps.widgets, addWidget])
 
-  // Enhanced chat surface props with artifact pinning
+  // Enhanced chat surface props with widget pinning
   const enhancedChatSurfaceProps = useMemo(() => ({
     ...chatSurfaceProps,
-    onPinLatest: handlePinToArtifact,
-  }), [chatSurfaceProps, handlePinToArtifact])
+    onPinLatest: handlePinToPanel,
+  }), [chatSurfaceProps, handlePinToPanel])
 
   const entitlementsValue = useMemo(
     () => ({ isPro: props.pro, requestProUpgrade: props.onRequestPro }),
@@ -86,26 +86,26 @@ export default function DeFiChatAdaptiveUI(props: DeFiChatAdaptiveUIProps) {
         onToggleSidebar={toggleSidebar}
         walletAddress={walletAddress}
         onNewChat={startNewChat}
-        artifactPanelVisible={artifactPanelVisible}
-        onToggleArtifactPanel={toggleVisibility}
-        artifactButtonLabel="Artifacts"
-        artifactCount={artifactTabs.length}
+        widgetPanelVisible={widgetPanelVisible}
+        onToggleWidgetPanel={toggleVisibility}
+        widgetButtonLabel="Widgets"
+        widgetCount={widgetTabs.length}
         chat={enhancedChatSurfaceProps}
-        artifacts={{
-          artifactWidgets,
-          activeArtifactId,
+        widgetPanel={{
+          panelWidgets,
+          activeWidgetId,
           panelWidth,
           walletAddress: walletAddress ?? undefined,
-          onTabClick: setActiveArtifact,
-          onTabClose: closeArtifactTab,
+          onTabClick: setActiveWidget,
+          onTabClose: closeWidgetTab,
           onPanelResize: setPanelWidth,
-          onAddArtifact: () => setArtifactPickerOpen(true),
+          onAddWidget: () => setWidgetPickerOpen(true),
         }}
       />
       {modals}
-      <ArtifactPicker
-        isOpen={artifactPickerOpen}
-        onClose={() => setArtifactPickerOpen(false)}
+      <WidgetPicker
+        isOpen={widgetPickerOpen}
+        onClose={() => setWidgetPickerOpen(false)}
         walletAddress={walletAddress ?? undefined}
       />
     </EntitlementsProvider>

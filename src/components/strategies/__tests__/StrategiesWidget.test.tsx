@@ -1,20 +1,34 @@
 import { render, screen } from '@testing-library/react'
 import { StrategiesWidget } from '../StrategiesWidget'
 
+// Mock wagmi
+vi.mock('wagmi', () => ({
+  useAccount: vi.fn(() => ({ address: null })),
+}))
+
 // Mock the hooks
 vi.mock('../../../hooks/useStrategies', () => ({
-  useStrategies: vi.fn(() => ({
+  useGenericStrategies: vi.fn(() => ({
     strategies: [],
     isLoading: false,
     isEmpty: true,
   })),
-  useStrategyMutations: vi.fn(() => ({
-    create: vi.fn(),
+  useGenericStrategyMutations: vi.fn(() => ({
+    activate: vi.fn(),
     pause: vi.fn(),
-    resume: vi.fn(),
-    stop: vi.fn(),
-    updateConfig: vi.fn(),
+    update: vi.fn(),
+    remove: vi.fn(),
+    executeNow: vi.fn(),
   })),
+  formatNextExecution: vi.fn(() => 'Next: in 1 hour'),
+}))
+
+// Mock pending approvals
+vi.mock('../../../workspace/hooks/usePendingApprovals', () => ({
+  useExecutionHistory: vi.fn(() => ({ executions: [], isLoading: false })),
+  useExecutionMutations: vi.fn(() => ({ approve: vi.fn(), reject: vi.fn() })),
+  formatWaitingTime: vi.fn(() => '5 min'),
+  getUrgencyLevel: vi.fn(() => 'normal'),
 }))
 
 describe('StrategiesWidget', () => {

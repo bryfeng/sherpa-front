@@ -410,7 +410,7 @@ export function useDeFiChatController({ props, shellState, dispatch }: UseDeFiCh
     setHighlight(['top_coins'])
   }, [setHighlight, storeAddWidget])
 
-  const loadTrendingTokensPanel = useCallback(async (options: { highlight?: boolean; addToArtifacts?: boolean } = {}) => {
+  const loadTrendingTokensPanel = useCallback(async (options: { highlight?: boolean; addToWidgets?: boolean } = {}) => {
     const { highlight: forceHighlight = false } = options
     let tokens: TrendingToken[] = []
     let errorMessage: string | undefined
@@ -1040,7 +1040,7 @@ export function useDeFiChatController({ props, shellState, dispatch }: UseDeFiCh
         }
         if (panelId === 'trending_tokens') {
           addUserMessage('What are the trending tokens right now?')
-          loadTrendingTokensPanel({ highlight: true, addToArtifacts: true }).catch(() => {})
+          loadTrendingTokensPanel({ highlight: true, addToWidgets: true }).catch(() => {})
           setMessages((previous) => [
             ...previous,
             { id: uid('msg'), role: 'assistant', text: 'Here are the trending tokens based on recent trading activity.' },
