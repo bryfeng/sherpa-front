@@ -3,6 +3,7 @@
 import React from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
 import { Bot, ExternalLink, Send, User } from 'lucide-react'
+import DOMPurify from 'isomorphic-dompurify'
 
 import type { AgentAction, AgentMessage } from '../../types/defi-ui'
 import { Textarea } from '../ui/primitives'
@@ -66,7 +67,17 @@ function MarkdownRenderer({ text }: { text: string }) {
   let listBuffer: string[] = []
 
   function applyInline(value: string) {
-    return value.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+    // First escape HTML to prevent XSS, then apply markdown formatting
+    const escaped = value
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#039;')
+    // Apply markdown bold formatting after escaping
+    const formatted = escaped.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+    // Sanitize with DOMPurify as final protection
+    return DOMPurify.sanitize(formatted, { ALLOWED_TAGS: ['strong'] })
   }
 
   function flushList() {

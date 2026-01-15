@@ -24,11 +24,32 @@ import {
   TrendingUp,
   Wallet,
 } from 'lucide-react'
+import DOMPurify from 'isomorphic-dompurify'
 import type { AgentAction, AgentMessage } from '../../types/defi-ui'
 import type { PersonaId } from '../../store'
 import { InlineComponentRenderer } from '../inline'
 import '../../styles/design-system.css'
 import '../../styles/inline-components.css'
+
+// Helper function to safely escape and format text
+function sanitizeAndFormat(text: string): string {
+  // First escape HTML to prevent XSS
+  const escaped = text
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;')
+  // Apply markdown formatting after escaping
+  const formatted = escaped
+    .replace(/\*\*(.*?)\*\*/g, '<strong class="font-semibold">$1</strong>')
+    .replace(/`(.*?)`/g, '<code class="font-mono text-xs px-1.5 py-0.5 rounded" style="background: var(--surface-2)">$1</code>')
+  // Sanitize with DOMPurify as final protection
+  return DOMPurify.sanitize(formatted, {
+    ALLOWED_TAGS: ['strong', 'code'],
+    ALLOWED_ATTR: ['class', 'style']
+  })
+}
 
 // ============================================
 // PERSONA CONFIGURATION
@@ -155,10 +176,8 @@ function MarkdownContent({ text }: { text: string }) {
       return <div key={key} className="h-3" />
     }
 
-    // Bold and inline code
-    const formattedLine = line
-      .replace(/\*\*(.*?)\*\*/g, '<strong class="font-semibold">$1</strong>')
-      .replace(/`(.*?)`/g, '<code class="font-mono text-xs px-1.5 py-0.5 rounded" style="background: var(--surface-2)">$1</code>')
+    // Bold and inline code - sanitized to prevent XSS
+    const formattedLine = sanitizeAndFormat(line)
 
     return (
       <p
@@ -189,9 +208,7 @@ function MarkdownContent({ text }: { text: string }) {
               style={{ background: 'var(--accent)' }}
             />
             <span dangerouslySetInnerHTML={{
-              __html: item
-                .replace(/\*\*(.*?)\*\*/g, '<strong class="font-semibold">$1</strong>')
-                .replace(/`(.*?)`/g, '<code class="font-mono text-xs px-1 py-0.5 rounded" style="background: var(--surface-2)">$1</code>')
+              __html: sanitizeAndFormat(item)
             }} />
           </li>
         ))}

@@ -1,4 +1,10 @@
-import { mutation, query } from "../_generated/server";
+/**
+ * Admin authentication - queries and mutations.
+ *
+ * Note: Actions that require Node.js (bcrypt, crypto) are in authActions.ts
+ */
+
+import { mutation, query, internalMutation, internalQuery } from "../_generated/server";
 import { v } from "convex/values";
 
 // Verify admin session
@@ -52,49 +58,19 @@ export const getCurrentAdmin = query({
   },
 });
 
-// Login mutation
-export const login = mutation({
+// Internal mutation to create session after password verification
+export const _createAdminSession = internalMutation({
   args: {
-    email: v.string(),
-    password: v.string(),
+    adminId: v.id("admin_users"),
+    sessionId: v.string(),
+    expiresAt: v.number(),
   },
   handler: async (ctx, args) => {
-    const admin = await ctx.db
-      .query("admin_users")
-      .withIndex("by_email", (q) => q.eq("email", args.email))
-      .first();
-
-    if (!admin) {
-      return { success: false, error: "Invalid credentials" };
-    }
-
-    // Check if locked
-    if (admin.lockedUntil && admin.lockedUntil > Date.now()) {
-      return { success: false, error: "Account is locked. Try again later." };
-    }
-
-    // Check if active
-    if (!admin.isActive) {
-      return { success: false, error: "Account is disabled" };
-    }
-
-    // TODO: In production, use bcrypt via Convex action
-    // For now, simple password check (demo only)
-    const expectedHash = `hash_${args.password}`;
-    if (admin.passwordHash !== expectedHash) {
-      // Increment failed attempts
-      await ctx.db.patch(admin._id, {
-        failedLoginAttempts: admin.failedLoginAttempts + 1,
-        lockedUntil:
-          admin.failedLoginAttempts >= 9
-            ? Date.now() + 15 * 60 * 1000
-            : undefined,
-      });
-      return { success: false, error: "Invalid credentials" };
-    }
+    const admin = await ctx.db.get(args.adminId);
+    if (!admin) throw new Error("Admin not found");
 
     // Reset failed attempts on success
-    await ctx.db.patch(admin._id, {
+    await ctx.db.patch(args.adminId, {
       failedLoginAttempts: 0,
       lockedUntil: undefined,
       lastLoginAt: Date.now(),
@@ -102,36 +78,55 @@ export const login = mutation({
     });
 
     // Create session
-    const sessionId = `admin_session_${Date.now()}_${Math.random().toString(36).slice(2)}`;
-    const expiresAt = Date.now() + 4 * 60 * 60 * 1000; // 4 hours
-
     await ctx.db.insert("admin_sessions", {
-      sessionId,
-      adminUserId: admin._id,
-      expiresAt,
+      sessionId: args.sessionId,
+      adminUserId: args.adminId,
+      expiresAt: args.expiresAt,
       createdAt: Date.now(),
     });
 
     // Log audit event
     await ctx.db.insert("audit_log", {
-      adminUserId: admin._id,
+      adminUserId: args.adminId,
       action: "admin.login",
       targetType: "admin_user",
-      targetId: admin._id,
+      targetId: args.adminId,
       createdAt: Date.now(),
     });
 
     return {
-      success: true,
-      sessionId,
-      admin: {
-        _id: admin._id,
-        email: admin.email,
-        name: admin.name,
-        role: admin.role,
-        avatar: admin.avatar,
-      },
+      _id: admin._id,
+      email: admin.email,
+      name: admin.name,
+      role: admin.role,
+      avatar: admin.avatar,
     };
+  },
+});
+
+// Internal mutation to increment failed login attempts
+export const _incrementFailedAttempts = internalMutation({
+  args: { adminId: v.id("admin_users") },
+  handler: async (ctx, args) => {
+    const admin = await ctx.db.get(args.adminId);
+    if (!admin) return;
+
+    const newAttempts = admin.failedLoginAttempts + 1;
+    await ctx.db.patch(args.adminId, {
+      failedLoginAttempts: newAttempts,
+      lockedUntil: newAttempts >= 10 ? Date.now() + 15 * 60 * 1000 : undefined,
+    });
+  },
+});
+
+// Internal query to get admin by email (for use in action)
+export const getAdminByEmail = internalQuery({
+  args: { email: v.string() },
+  handler: async (ctx, args) => {
+    return ctx.db
+      .query("admin_users")
+      .withIndex("by_email", (q) => q.eq("email", args.email))
+      .first();
   },
 });
 
@@ -187,24 +182,24 @@ export const refreshSession = mutation({
   },
 });
 
-// Create initial admin (one-time setup)
-export const createInitialAdmin = mutation({
+// Internal mutation to create admin with hashed password
+export const _createAdminUser = internalMutation({
   args: {
     email: v.string(),
-    password: v.string(),
+    passwordHash: v.string(),
     name: v.string(),
   },
   handler: async (ctx, args) => {
     // Check if any admin exists
     const existingAdmin = await ctx.db.query("admin_users").first();
     if (existingAdmin) {
-      return { success: false, error: "Admin already exists" };
+      return { success: false, error: "Admin already exists", adminId: null };
     }
 
     // Create super admin
     const adminId = await ctx.db.insert("admin_users", {
       email: args.email,
-      passwordHash: `hash_${args.password}`, // TODO: Use bcrypt in production
+      passwordHash: args.passwordHash,
       name: args.name,
       role: "super_admin",
       isActive: true,
@@ -213,6 +208,6 @@ export const createInitialAdmin = mutation({
       updatedAt: Date.now(),
     });
 
-    return { success: true, adminId };
+    return { success: true, adminId, error: null };
   },
 });
