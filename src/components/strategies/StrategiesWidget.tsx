@@ -152,7 +152,7 @@ export function StrategiesWidget({
                   Strategies are created through the chat interface.
                 </p>
                 <p className="text-sm" style={{ color: 'var(--text-muted)' }}>
-                  Try asking: "Set up a weekly DCA strategy to buy ETH"
+                  Try asking: &quot;Set up a weekly DCA strategy to buy ETH&quot;
                 </p>
               </div>
             </div>

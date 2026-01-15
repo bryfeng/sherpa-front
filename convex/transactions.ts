@@ -245,7 +245,7 @@ export const backfillTransaction = mutation({
     const walletAddressLower = args.walletAddress.toLowerCase();
 
     // Find wallet
-    let wallet = await ctx.db
+    const wallet = await ctx.db
       .query("wallets")
       .withIndex("by_address_chain", (q) => q.eq("address", walletAddressLower))
       .first();
