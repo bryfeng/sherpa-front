@@ -415,13 +415,13 @@ export const useSherpaStore = create<SherpaStore>()(
 
               if (existingIndex !== -1) {
                 // Widget exists - update it and ensure it's in tabs
+                // Preserve visibility state - don't force panel open on data refresh
                 const newWidgets = [...state.widgets]
                 newWidgets[existingIndex] = widget
                 return {
                   widgets: newWidgets,
                   widgetTabs: newTabs,
-                  activeWidgetId: widget.id,
-                  isVisible: true,
+                  activeWidgetId: state.activeWidgetId ?? widget.id,
                 }
               }
               // New widget - add to widgets and tabs
@@ -429,7 +429,7 @@ export const useSherpaStore = create<SherpaStore>()(
                 widgets: [widget, ...state.widgets],
                 widgetTabs: newTabs,
                 activeWidgetId: widget.id,
-                isVisible: true, // Auto-show panel when widget added
+                isVisible: true, // Auto-show panel when NEW widget added
               }
             }),
 
