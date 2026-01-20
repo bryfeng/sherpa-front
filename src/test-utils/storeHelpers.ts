@@ -39,7 +39,7 @@ export const WIDGET_PANEL_UI_KEYS: (keyof SherpaStore)[] = [
  * )
  * ```
  */
-export function expectNoStateChange<T extends Record<string, unknown>>(
+export function expectNoStateChange<T>(
   getState: () => T,
   action: () => void,
   keysToCheck: (keyof T)[]
@@ -69,7 +69,7 @@ export function expectNoStateChange<T extends Record<string, unknown>>(
  * )
  * ```
  */
-export function expectStateChange<T extends Record<string, unknown>>(
+export function expectStateChange<T>(
   getState: () => T,
   action: () => void,
   keysToCheck: (keyof T)[]
@@ -90,7 +90,7 @@ export function expectStateChange<T extends Record<string, unknown>>(
 /**
  * Create a snapshot of specific store keys for comparison.
  */
-export function createStateSnapshot<T extends Record<string, unknown>>(
+export function createStateSnapshot<T>(
   state: T,
   keys: (keyof T)[]
 ): Partial<T> {
@@ -157,7 +157,7 @@ export function createMockWidget(overrides: Partial<{
     title: overrides.title ?? 'Test Widget',
     payload: overrides.payload ?? {},
     sources: [],
-    density: 'compact' as const,
+    density: 'full' as const,
   }
 }
 

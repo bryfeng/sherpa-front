@@ -5,6 +5,7 @@ import { HeaderBar, type HeaderBarProps } from '../header/HeaderBar'
 import { ChatSurface, type ChatSurfaceProps } from '../surfaces/ChatSurface'
 import { WidgetPanel, type WidgetPanelProps } from '../surfaces/WidgetPanel'
 import { ConversationSidebar } from '../sidebar/ConversationSidebar'
+import { ChatErrorBoundary, ErrorBoundary } from '../errors'
 import { Button, Card } from '../ui/primitives'
 import { ResizablePanel } from '../ui/ResizablePanel'
 
@@ -44,6 +45,13 @@ export function DeFiChatShell({
   chat,
   widgetPanel,
 }: DeFiChatShellProps) {
+  // Wrapped ChatSurface with error boundary
+  const chatContent = (
+    <ChatErrorBoundary onStartNewChat={onNewChat}>
+      <ChatSurface {...chat} />
+    </ChatErrorBoundary>
+  )
+
   return (
     <div className="flex h-screen w-full flex-col px-4 py-4 lg:px-6 overflow-hidden">
       <div className="shrink-0">
@@ -135,7 +143,7 @@ export function DeFiChatShell({
                     <span className="badge badge--secondary">Active</span>
                   </div>
                   <div className="flex-1 min-h-0">
-                    <ChatSurface {...chat} />
+                    {chatContent}
                   </div>
                 </section>
               </ResizablePanel>
@@ -153,7 +161,7 @@ export function DeFiChatShell({
                   <span className="badge badge--secondary">Active</span>
                 </div>
                 <div className="flex-1 min-h-0">
-                  <ChatSurface {...chat} />
+                  {chatContent}
                 </div>
               </section>
             )}
@@ -171,16 +179,18 @@ export function DeFiChatShell({
                 <span className="badge badge--secondary">Active</span>
               </div>
               <div className="flex-1 min-h-0">
-                <ChatSurface {...chat} />
+                {chatContent}
               </div>
             </section>
 
             {/* Widget Panel */}
-            <WidgetPanel
-              {...widgetPanel}
-              isVisible={widgetPanelVisible}
-              onCollapse={onToggleWidgetPanel}
-            />
+            <ErrorBoundary name="widget-panel" resetLabel="Reload widgets">
+              <WidgetPanel
+                {...widgetPanel}
+                isVisible={widgetPanelVisible}
+                onCollapse={onToggleWidgetPanel}
+              />
+            </ErrorBoundary>
           </div>
         </Card>
     </div>

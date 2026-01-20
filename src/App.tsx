@@ -26,6 +26,7 @@ import type { LLMProviderInfo } from './types/llm'
 
 // Components
 import { ToastProvider } from './providers/ToastProvider'
+import { AppErrorBoundary } from './components/errors'
 import WidgetPlayground from './pages/WidgetPlayground'
 import DeFiChatAdaptiveUI from './pages/DeFiChatAdaptiveUI'
 
@@ -373,9 +374,11 @@ export function App() {
   }
 
   return (
-    <ToastProvider>
-      <MainApp />
-    </ToastProvider>
+    <AppErrorBoundary>
+      <ToastProvider>
+        <MainApp />
+      </ToastProvider>
+    </AppErrorBoundary>
   )
 }
 
