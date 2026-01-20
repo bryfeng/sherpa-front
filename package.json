@@ -13,6 +13,8 @@
     "format:write": "prettier --write .",
     "test": "vitest",
     "test:ci": "vitest run --pool=forks",
+    "test:stability": "vitest run stability Snapshot",
+    "test:store": "vitest run src/store",
     "typecheck": "tsc -b --noEmit",
     "workspace:status": "node scripts/workspace-status.js",
     "convex:dev": "convex dev",
