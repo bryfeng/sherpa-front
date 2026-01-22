@@ -2,7 +2,7 @@ import { mutation, query } from "./_generated/server";
 import { v } from "convex/values";
 
 /**
- * Create a nonce for SIWE authentication
+ * Create a nonce for wallet sign-in
  */
 export const createNonce = mutation({
   args: {
@@ -89,7 +89,7 @@ export const createSession = mutation({
   args: {
     sessionId: v.string(),
     walletAddress: v.string(),
-    chainId: v.number(),
+    chainId: v.union(v.number(), v.string()),
     userId: v.optional(v.string()),
     walletId: v.optional(v.string()),
     expiresAt: v.number(),

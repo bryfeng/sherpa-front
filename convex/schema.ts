@@ -190,13 +190,13 @@ export default defineSchema({
     fromToken: v.object({
       symbol: v.string(),
       address: v.string(),
-      chainId: v.number(),
+      chainId: v.union(v.number(), v.string()), // int for EVM, "solana" for Solana
       decimals: v.number(),
     }),
     toToken: v.object({
       symbol: v.string(),
       address: v.string(),
-      chainId: v.number(),
+      chainId: v.union(v.number(), v.string()), // int for EVM, "solana" for Solana
       decimals: v.number(),
     }),
 
@@ -301,8 +301,12 @@ export default defineSchema({
     marketConditions: v.optional(
       v.object({
         tokenPriceUsd: v.number(),
-        gasGwei: v.number(),
         estimatedGasUsd: v.number(),
+        // EVM-specific (optional for Solana)
+        gasGwei: v.optional(v.number()),
+        // Solana-specific (optional for EVM)
+        priorityFeeLamports: v.optional(v.number()),
+        isSolana: v.optional(v.boolean()),
       })
     ),
 
@@ -319,7 +323,7 @@ export default defineSchema({
 
     // Transaction details (if executed)
     txHash: v.optional(v.string()),
-    chainId: v.number(),
+    chainId: v.union(v.number(), v.string()), // int for EVM, "solana" for Solana
     actualInputAmount: v.optional(v.string()),
     actualOutputAmount: v.optional(v.string()),
     actualPriceUsd: v.optional(v.number()), // Actual price paid
@@ -390,7 +394,7 @@ export default defineSchema({
   }).index("by_execution", ["executionId"]),
 
   // ============================================
-  // Auth: Nonces (for SIWE)
+  // Auth: Nonces (wallet sign-in)
   // ============================================
   nonces: defineTable({
     walletAddress: v.string(),
@@ -408,7 +412,7 @@ export default defineSchema({
   sessions: defineTable({
     sessionId: v.string(),
     walletAddress: v.string(),
-    chainId: v.number(),
+    chainId: v.union(v.number(), v.string()),
     userId: v.optional(v.string()),
     walletId: v.optional(v.string()),
     scopes: v.array(v.string()),

@@ -5,7 +5,7 @@
  * the requested resources. Use these in query and mutation handlers
  * to enforce ownership checks.
  *
- * IMPORTANT: Since this app uses wallet-based auth (SIWE) where the
+ * IMPORTANT: Since this app uses wallet-based auth where the
  * wallet address is the identity, authorization checks should verify
  * that the requested resources belong to the authenticated wallet.
  *
@@ -36,7 +36,12 @@ export async function verifyWalletOwnership(
     throw new Error("Wallet not found");
   }
 
-  if (wallet.address.toLowerCase() !== callerAddress.toLowerCase()) {
+  const isEvm = wallet.chain !== "solana";
+  const matches = isEvm
+    ? wallet.address.toLowerCase() === callerAddress.toLowerCase()
+    : wallet.address === callerAddress;
+
+  if (!matches) {
     throw new Error("Unauthorized: You do not own this wallet");
   }
 
@@ -69,7 +74,12 @@ export async function verifyConversationOwnership(
     throw new Error("Associated wallet not found");
   }
 
-  if (wallet.address.toLowerCase() !== callerAddress.toLowerCase()) {
+  const isEvm = wallet.chain !== "solana";
+  const matches = isEvm
+    ? wallet.address.toLowerCase() === callerAddress.toLowerCase()
+    : wallet.address === callerAddress;
+
+  if (!matches) {
     throw new Error("Unauthorized: You do not own this conversation");
   }
 
@@ -102,9 +112,12 @@ export async function verifyUserAccess(
     .collect();
 
   // Check if any of the user's wallets match the caller's address
-  const hasAccess = wallets.some(
-    (w) => w.address.toLowerCase() === callerAddress.toLowerCase()
-  );
+  const hasAccess = wallets.some((w) => {
+    const isEvm = w.chain !== "solana";
+    return isEvm
+      ? w.address.toLowerCase() === callerAddress.toLowerCase()
+      : w.address === callerAddress;
+  });
 
   if (!hasAccess) {
     throw new Error("Unauthorized: No access to this user");

@@ -8,22 +8,6 @@ import { query, mutation } from "./_generated/server";
  * Each wallet can have one risk policy that controls limits and safety checks.
  */
 
-// Default risk policy configuration
-const DEFAULT_RISK_CONFIG = {
-  maxPositionPercent: 25,
-  maxPositionValueUsd: 10000,
-  maxDailyVolumeUsd: 50000,
-  maxDailyLossUsd: 1000,
-  maxSingleTxUsd: 5000,
-  requireApprovalAboveUsd: 2000,
-  maxSlippagePercent: 3.0,
-  warnSlippagePercent: 1.5,
-  maxGasPercent: 5.0,
-  warnGasPercent: 2.0,
-  minLiquidityUsd: 100000,
-  enabled: true,
-};
-
 // Risk policy config validator
 const riskConfigValidator = v.object({
   maxPositionPercent: v.number(),
@@ -57,8 +41,8 @@ export const getByWallet = query({
 });
 
 /**
- * Get risk policy with defaults.
- * Always returns a valid config, using defaults if no policy exists.
+ * Get risk policy or null.
+ * Returns the policy if it exists, or null if no policy is set.
  */
 export const getOrDefault = query({
   args: { walletAddress: v.string() },
@@ -68,20 +52,13 @@ export const getOrDefault = query({
       .withIndex("by_wallet", (q) => q.eq("walletAddress", walletAddress.toLowerCase()))
       .first();
 
-    if (policy) {
-      return {
-        ...policy,
-        isDefault: false,
-      };
+    if (!policy) {
+      return null;
     }
 
-    // Return default config
     return {
-      _id: null,
-      walletAddress: walletAddress.toLowerCase(),
-      config: DEFAULT_RISK_CONFIG,
-      updatedAt: Date.now(),
-      isDefault: true,
+      ...policy,
+      isDefault: false,
     };
   },
 });
@@ -144,7 +121,7 @@ export const upsert = mutation({
 });
 
 /**
- * Reset risk policy to defaults.
+ * Reset risk policy (removes it entirely).
  */
 export const reset = mutation({
   args: { walletAddress: v.string() },
@@ -156,21 +133,12 @@ export const reset = mutation({
       .withIndex("by_wallet", (q) => q.eq("walletAddress", normalizedAddress))
       .first();
 
-    const now = Date.now();
-
     if (existing) {
-      await ctx.db.patch(existing._id, {
-        config: DEFAULT_RISK_CONFIG,
-        updatedAt: now,
-      });
-      return existing._id;
-    } else {
-      return await ctx.db.insert("riskPolicies", {
-        walletAddress: normalizedAddress,
-        config: DEFAULT_RISK_CONFIG,
-        updatedAt: now,
-      });
+      await ctx.db.delete(existing._id);
+      return true;
     }
+
+    return false;
   },
 });
 

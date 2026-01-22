@@ -3,22 +3,38 @@ import type { ChatRequest, ChatResponse } from '../types/chat'
 import type { EntitlementResponse } from '../types/entitlement'
 import type { PortfolioAPIResponse } from '../types/portfolio'
 import type { LLMProvidersResponse } from '../types/llm'
+import { getAccessToken } from './authStorage'
 
 const BASE = (import.meta as any).env?.VITE_API_BASE_URL || 'http://localhost:8000'
+const client = axios.create({ baseURL: BASE })
+
+client.interceptors.request.use((config) => {
+  const token = getAccessToken()
+  if (token) {
+    config.headers = { ...(config.headers || {}), Authorization: `Bearer ${token}` }
+  }
+  return config
+})
+
+function buildAuthHeaders() {
+  const token = getAccessToken()
+  if (!token) return undefined
+  return { Authorization: `Bearer ${token}` }
+}
 
 export const api = {
   async health() {
-    const { data } = await axios.get(`${BASE}/healthz`)
+    const { data } = await client.get(`/healthz`)
     return data
   },
 
   async chat(payload: ChatRequest): Promise<ChatResponse> {
-    const { data } = await axios.post(`${BASE}/chat`, payload)
+    const { data } = await client.post(`/chat`, payload)
     return data
   },
 
   async llmProviders(): Promise<LLMProvidersResponse> {
-    const { data } = await axios.get(`${BASE}/llm/providers`)
+    const { data } = await client.get(`/llm/providers`)
     return data as LLMProvidersResponse
   },
 
@@ -36,6 +52,7 @@ export const api = {
         headers: {
           'Content-Type': 'application/json',
           Accept: 'text/event-stream',
+          ...(buildAuthHeaders() || {}),
         },
         body: JSON.stringify(payload),
         signal: controller.signal,
@@ -114,29 +131,29 @@ export const api = {
   },
 
   async portfolio(address: string, chain = 'ethereum'): Promise<PortfolioAPIResponse> {
-    const { data } = await axios.get(`${BASE}/tools/portfolio`, {
+    const { data } = await client.get(`/tools/portfolio`, {
       params: { address, chain },
     })
     return data
   },
 
   async listConversations(address: string) {
-    const { data } = await axios.get(`${BASE}/conversations`, { params: { address } })
+    const { data } = await client.get(`/conversations`, { params: { address } })
     return data as Array<{ conversation_id: string; title?: string | null; last_activity: string; message_count: number; archived: boolean }>
   },
 
   async createConversation(address: string, title?: string) {
-    const { data } = await axios.post(`${BASE}/conversations`, { address, title })
+    const { data } = await client.post(`/conversations`, { address, title })
     return data as { conversation_id: string; title?: string | null }
   },
 
   async updateConversation(conversation_id: string, payload: { title?: string; archived?: boolean }) {
-    const { data } = await axios.patch(`${BASE}/conversations/${conversation_id}`, payload)
+    const { data } = await client.patch(`/conversations/${conversation_id}`, payload)
     return data as { conversation_id: string; title?: string | null; last_activity: string; message_count: number; archived: boolean }
   },
 
   async getConversation(conversation_id: string) {
-    const { data } = await axios.get(`${BASE}/conversations/${conversation_id}`)
+    const { data } = await client.get(`/conversations/${conversation_id}`)
     return data as {
       conversation_id: string
       owner_address?: string | null
@@ -154,7 +171,7 @@ export const api = {
   },
 
   async entitlement(address: string, chain?: string): Promise<EntitlementResponse> {
-    const { data } = await axios.get(`${BASE}/entitlement`, {
+    const { data } = await client.get(`/entitlement`, {
       params: { address, chain },
     })
     return data as EntitlementResponse
@@ -174,7 +191,7 @@ export const api = {
     slippage_bps?: number
     wallet_address: string
   }): Promise<SwapQuoteResponse> {
-    const { data } = await axios.post(`${BASE}/swap/quote`, params)
+    const { data } = await client.post(`/swap/quote`, params)
     return data as SwapQuoteResponse
   },
 
@@ -192,7 +209,7 @@ export const api = {
     tradeType?: string
     slippageTolerance?: string
   }): Promise<RelayQuoteResponse> {
-    const { data } = await axios.post(`${BASE}/tools/relay/quote`, {
+    const { data } = await client.post(`/tools/relay/quote`, {
       ...params,
       tradeType: params.tradeType || 'EXACT_INPUT',
       referrer: 'sherpa.chat',

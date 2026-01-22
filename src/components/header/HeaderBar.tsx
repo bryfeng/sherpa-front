@@ -5,6 +5,7 @@ import { createPortal } from 'react-dom'
 import { Sparkles, Bell } from 'lucide-react'
 
 import type { PersonaId as Persona } from '../../types/persona'
+import type { AuthStatus } from '../../store'
 import { Badge, Button } from '../ui/primitives'
 import { HeaderActionMenu, type HeaderActionItem } from './HeaderActionMenu'
 import { ExecutionSigningBadge } from '../../workspace/components/ExecutionSigningModal'
@@ -277,6 +278,9 @@ export interface HeaderBarProps {
   walletLabel: string
   walletConnected: boolean
   proLabel: string
+  authStatus?: AuthStatus
+  authError?: string | null
+  onRetryAuth?: () => void
   onPersonaChange: (persona: Persona) => void
   onNewChat: () => void
   onConnectWallet?: () => void
@@ -288,11 +292,28 @@ function HeaderBarComponent({
   walletLabel,
   walletConnected,
   proLabel,
+  authStatus,
+  authError,
+  onRetryAuth,
   onPersonaChange,
   onNewChat,
   onConnectWallet,
   menuActions = [],
 }: HeaderBarProps) {
+  const authLabel =
+    authStatus && authStatus !== 'idle'
+      ? authStatus === 'signed_in'
+        ? 'Signed in'
+        : authStatus === 'signing'
+          ? 'Signing in…'
+          : 'Sign-in failed'
+      : null
+  const authTone =
+    authStatus === 'signed_in'
+      ? 'var(--success)'
+      : authStatus === 'error'
+        ? 'var(--danger)'
+        : 'var(--text-muted)'
 
   return (
     <div className="flex flex-col gap-4" style={{ color: 'var(--text)' }}>
@@ -334,6 +355,31 @@ function HeaderBarComponent({
             >
               Connect Wallet
             </button>
+          )}
+          {walletConnected && authLabel && (
+            <div className="inline-flex items-center gap-2">
+              <Badge
+                variant="outline"
+                className="rounded-md px-2.5 py-0.5 text-xs"
+                style={{ color: authTone, borderColor: authTone }}
+                title={authError || undefined}
+              >
+                {authLabel}
+              </Badge>
+              {authStatus === 'error' && onRetryAuth && (
+                <button
+                  onClick={onRetryAuth}
+                  className="rounded-md px-2 py-0.5 text-[11px] font-medium"
+                  style={{
+                    background: 'var(--surface-2)',
+                    border: '1px solid var(--line)',
+                    color: 'var(--text)',
+                  }}
+                >
+                  Retry
+                </button>
+              )}
+            </div>
           )}
           <Badge variant="outline" className="rounded-md px-2.5 py-0.5 text-xs">
             {proLabel}

@@ -59,4 +59,11 @@ crons.interval(
   internal.scheduler.processNews
 );
 
+// Reset copy trading daily limits at midnight UTC
+crons.daily(
+  "reset-copy-trading-daily-limits",
+  { hourUTC: 0, minuteUTC: 0 },
+  internal.scheduler.resetCopyTradingDailyLimits
+);
+
 export default crons;

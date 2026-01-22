@@ -527,3 +527,15 @@ export const cleanupSessionKeys = internalMutation({
     return { expiredCount, deletedCount };
   },
 });
+
+/**
+ * Reset daily limits for copy trading relationships
+ * Called at midnight UTC via cron
+ */
+export const resetCopyTradingDailyLimits = internalAction({
+  args: {},
+  handler: async (ctx): Promise<void> => {
+    const result = await ctx.runMutation(internal.copyTrading.resetDailyLimits);
+    console.log(`Reset daily limits for ${result.resetCount} copy trading relationships`);
+  },
+});

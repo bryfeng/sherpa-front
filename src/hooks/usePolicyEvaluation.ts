@@ -26,7 +26,7 @@ export function usePolicyEvaluation({
   intent,
 }: UsePolicyEvaluationOptions): PolicyEvaluationResult {
   // Fetch policy data
-  const riskPolicy = useRiskPolicyConfig(walletAddress ?? undefined)
+  const { config: riskPolicy, hasPolicy } = useRiskPolicyConfig(walletAddress ?? undefined)
   const { status: systemStatus, canTrade, statusMessage } = usePolicyStatus()
   const { sessions } = useSessionKeys({ walletAddress: walletAddress ?? undefined })
 
@@ -144,17 +144,27 @@ export function usePolicyEvaluation({
     // Risk Policy Checks
     // ============================================
 
-    // Transaction size limit
-    const txLimitCheck = evaluateTxLimit(intent, riskPolicy)
-    checks.push(txLimitCheck)
+    if (!hasPolicy || !riskPolicy) {
+      checks.push(
+        createFailCheck(
+          'risk-policy-missing',
+          'Risk policy',
+          'No risk policy configured. Draft a policy to enable autonomous execution.',
+        ),
+      )
+    } else {
+      // Transaction size limit
+      const txLimitCheck = evaluateTxLimit(intent, riskPolicy)
+      checks.push(txLimitCheck)
 
-    // Slippage check
-    const slippageCheck = evaluateSlippage(intent, riskPolicy)
-    checks.push(slippageCheck)
+      // Slippage check
+      const slippageCheck = evaluateSlippage(intent, riskPolicy)
+      checks.push(slippageCheck)
 
-    // Gas cost check
-    const gasCheck = evaluateGasCost(intent, riskPolicy)
-    checks.push(gasCheck)
+      // Gas cost check
+      const gasCheck = evaluateGasCost(intent, riskPolicy)
+      checks.push(gasCheck)
+    }
 
     // ============================================
     // Session Key Checks (if active)
@@ -183,6 +193,7 @@ export function usePolicyEvaluation({
     walletAddress,
     intent,
     riskPolicy,
+    hasPolicy,
     systemStatus,
     canTrade,
     statusMessage,

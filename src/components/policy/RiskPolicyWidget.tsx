@@ -3,7 +3,7 @@ import { Shield, Settings, Check, AlertTriangle } from 'lucide-react'
 import type { Widget } from '../../types/widgets'
 import { useRiskPolicy } from '../../hooks/useRiskPolicy'
 import { RiskPolicyForm } from './RiskPolicyForm'
-import { formatUsd } from '../../types/policy'
+import { RISK_POLICY_DEFAULTS, formatUsd } from '../../types/policy'
 
 interface RiskPolicyWidgetProps {
   widget?: Widget
@@ -36,9 +36,10 @@ function StatRow({ label, value, status }: StatRowProps) {
 
 export function RiskPolicyWidget({ widget, walletAddress }: RiskPolicyWidgetProps) {
   const [showForm, setShowForm] = useState(false)
-  const { config, isDefault, isLoading, save, reset, applyPreset } = useRiskPolicy({
+  const { config, hasPolicy, isLoading, save, reset, applyPreset } = useRiskPolicy({
     walletAddress,
   })
+  const draftConfig = config ?? RISK_POLICY_DEFAULTS
 
   if (!walletAddress) {
     return (
@@ -73,8 +74,8 @@ export function RiskPolicyWidget({ widget, walletAddress }: RiskPolicyWidgetProp
     return (
       <div className="p-4">
         <RiskPolicyForm
-          config={config}
-          isDefault={isDefault}
+          config={draftConfig}
+          hasPolicy={hasPolicy}
           onSave={async (newConfig) => {
             await save(newConfig)
             setShowForm(false)
@@ -94,6 +95,35 @@ export function RiskPolicyWidget({ widget, walletAddress }: RiskPolicyWidgetProp
     )
   }
 
+  if (!hasPolicy) {
+    return (
+      <div className="p-4 space-y-4">
+        <div
+          className="flex items-center gap-3 rounded-xl border p-4"
+          style={{ borderColor: 'var(--warning)', background: 'var(--warning)/5' }}
+        >
+          <AlertTriangle className="h-5 w-5" style={{ color: 'var(--warning)' }} />
+          <div>
+            <p className="text-sm font-medium" style={{ color: 'var(--text)' }}>
+              No risk policy configured
+            </p>
+            <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
+              Draft a policy to enable autonomous execution.
+            </p>
+          </div>
+        </div>
+        <button
+          type="button"
+          onClick={() => setShowForm(true)}
+          className="w-full rounded-lg border px-3 py-2 text-xs font-medium transition hover:bg-[var(--surface-2)]"
+          style={{ borderColor: 'var(--line)', color: 'var(--text)' }}
+        >
+          Create Policy
+        </button>
+      </div>
+    )
+  }
+
   return (
     <div className="p-4 space-y-4">
       {/* Header */}
@@ -101,11 +131,11 @@ export function RiskPolicyWidget({ widget, walletAddress }: RiskPolicyWidgetProp
         <div className="flex items-center gap-3">
           <div
             className="flex h-10 w-10 items-center justify-center rounded-xl"
-            style={{ background: config.enabled ? 'var(--accent)/10' : 'var(--surface-3)' }}
+            style={{ background: draftConfig.enabled ? 'var(--accent)/10' : 'var(--surface-3)' }}
           >
             <Shield
               className="h-5 w-5"
-              style={{ color: config.enabled ? 'var(--accent)' : 'var(--text-muted)' }}
+              style={{ color: draftConfig.enabled ? 'var(--accent)' : 'var(--text-muted)' }}
             />
           </div>
           <div>
@@ -113,8 +143,7 @@ export function RiskPolicyWidget({ widget, walletAddress }: RiskPolicyWidgetProp
               Risk Policy
             </p>
             <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
-              {config.enabled ? 'Active' : 'Disabled'}
-              {isDefault && ' (defaults)'}
+              {draftConfig.enabled ? 'Active' : 'Disabled'}
             </p>
           </div>
         </div>
@@ -137,35 +166,35 @@ export function RiskPolicyWidget({ widget, walletAddress }: RiskPolicyWidgetProp
         <div className="px-3" style={{ borderColor: 'var(--line)' }}>
           <StatRow
             label="Max single transaction"
-            value={formatUsd(config.maxSingleTxUsd)}
+            value={formatUsd(draftConfig.maxSingleTxUsd)}
             status="ok"
           />
         </div>
         <div className="px-3" style={{ borderColor: 'var(--line)' }}>
           <StatRow
             label="Daily volume limit"
-            value={formatUsd(config.maxDailyVolumeUsd)}
+            value={formatUsd(draftConfig.maxDailyVolumeUsd)}
             status="ok"
           />
         </div>
         <div className="px-3" style={{ borderColor: 'var(--line)' }}>
           <StatRow
             label="Max position size"
-            value={`${config.maxPositionPercent}%`}
+            value={`${draftConfig.maxPositionPercent}%`}
             status="ok"
           />
         </div>
         <div className="px-3" style={{ borderColor: 'var(--line)' }}>
           <StatRow
             label="Approval required above"
-            value={formatUsd(config.requireApprovalAboveUsd)}
+            value={formatUsd(draftConfig.requireApprovalAboveUsd)}
           />
         </div>
         <div className="px-3" style={{ borderColor: 'var(--line)' }}>
           <StatRow
             label="Max slippage"
-            value={`${config.maxSlippagePercent}%`}
-            status={config.maxSlippagePercent > 3 ? 'warning' : 'ok'}
+            value={`${draftConfig.maxSlippagePercent}%`}
+            status={draftConfig.maxSlippagePercent > 3 ? 'warning' : 'ok'}
           />
         </div>
       </div>
@@ -186,7 +215,7 @@ export function RiskPolicyWidget({ widget, walletAddress }: RiskPolicyWidgetProp
       </div>
 
       {/* Status */}
-      {!config.enabled && (
+      {!draftConfig.enabled && (
         <div
           className="flex items-center gap-2 rounded-lg border px-3 py-2"
           style={{ borderColor: 'var(--warning)', background: 'var(--warning)/5' }}

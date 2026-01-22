@@ -1,11 +1,11 @@
 import React, { useState, useCallback, useEffect } from 'react'
 import { Shield, RotateCcw, Save, ChevronDown, ChevronRight } from 'lucide-react'
 import type { RiskPolicyConfig, RiskPresetKey } from '../../types/policy'
-import { RISK_POLICY_DEFAULTS, RISK_PRESETS, formatUsd } from '../../types/policy'
+import { RISK_PRESETS, formatUsd } from '../../types/policy'
 
 interface RiskPolicyFormProps {
   config: RiskPolicyConfig
-  isDefault: boolean
+  hasPolicy: boolean
   isSaving?: boolean
   onSave: (config: RiskPolicyConfig) => Promise<void>
   onReset: () => Promise<void>
@@ -149,7 +149,7 @@ function CurrencyField({ label, value, hint, onChange }: CurrencyFieldProps) {
 
 export function RiskPolicyForm({
   config,
-  isDefault,
+  hasPolicy,
   isSaving = false,
   onSave,
   onReset,
@@ -393,11 +393,17 @@ export function RiskPolicyForm({
         <button
           type="button"
           onClick={onReset}
+          disabled={!hasPolicy}
           className="flex items-center gap-1.5 rounded-lg border px-3 py-2 text-xs font-medium transition hover:bg-[var(--surface-2)]"
-          style={{ borderColor: 'var(--line)', color: 'var(--text-muted)' }}
+          style={{
+            borderColor: 'var(--line)',
+            color: 'var(--text-muted)',
+            opacity: hasPolicy ? 1 : 0.5,
+            cursor: hasPolicy ? 'pointer' : 'not-allowed',
+          }}
         >
           <RotateCcw className="h-3.5 w-3.5" />
-          Reset to Defaults
+          Remove Policy
         </button>
         <button
           type="button"
@@ -415,9 +421,9 @@ export function RiskPolicyForm({
       </div>
 
       {/* Status */}
-      {isDefault && (
+      {!hasPolicy && (
         <p className="text-center text-xs" style={{ color: 'var(--text-muted)' }}>
-          Using default settings. Save to create your custom policy.
+          No policy set yet. Save to create your policy.
         </p>
       )}
     </div>

@@ -10,8 +10,8 @@ export interface UseRiskPolicyOptions {
 
 export interface UseRiskPolicyReturn {
   // Data
-  config: RiskPolicyConfig
-  isDefault: boolean
+  config: RiskPolicyConfig | null
+  hasPolicy: boolean
   isLoading: boolean
   isSaving: boolean
 
@@ -42,13 +42,10 @@ export function useRiskPolicy({ walletAddress }: UseRiskPolicyOptions): UseRiskP
   // Derive state
   const isLoading = policyData === undefined && walletAddress !== undefined
   const config = useMemo(() => {
-    if (policyData?.config) {
-      return policyData.config as RiskPolicyConfig
-    }
-    return RISK_POLICY_DEFAULTS
+    return policyData?.config ? (policyData.config as RiskPolicyConfig) : null
   }, [policyData])
 
-  const isDefault = policyData?.isDefault ?? true
+  const hasPolicy = !!policyData?.config
 
   // Save handler
   const save = useCallback(
@@ -93,7 +90,7 @@ export function useRiskPolicy({ walletAddress }: UseRiskPolicyOptions): UseRiskP
 
   return {
     config,
-    isDefault,
+    hasPolicy,
     isLoading,
     isSaving: false, // Convex mutations are instant
     save,
@@ -107,16 +104,19 @@ export function useRiskPolicy({ walletAddress }: UseRiskPolicyOptions): UseRiskP
  * Simpler hook that just returns the config without mutation capabilities.
  * Useful for read-only displays.
  */
-export function useRiskPolicyConfig(walletAddress?: string): RiskPolicyConfig {
+export function useRiskPolicyConfig(
+  walletAddress?: string
+): { config: RiskPolicyConfig | null; hasPolicy: boolean } {
   const policyData = useQuery(
     api.riskPolicies.getOrDefault,
     walletAddress ? { walletAddress } : 'skip'
   )
 
-  return useMemo(() => {
-    if (policyData?.config) {
-      return policyData.config as RiskPolicyConfig
-    }
-    return RISK_POLICY_DEFAULTS
-  }, [policyData])
+  return useMemo(
+    () => ({
+      config: policyData?.config ? (policyData.config as RiskPolicyConfig) : null,
+      hasPolicy: !!policyData?.config,
+    }),
+    [policyData],
+  )
 }

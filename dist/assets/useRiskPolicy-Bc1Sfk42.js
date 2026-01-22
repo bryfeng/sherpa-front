@@ -1,0 +1,6 @@
+import{d9 as R,da as a,db as n,dc as u,dd as r}from"./index-Dide1ZUj.js";import{R as s,a as v}from"./policy-BUGY-p8W.js";/**
+ * @license lucide-react v0.454.0 - ISC
+ *
+ * This source code is licensed under the ISC license.
+ * See the LICENSE file in the root directory of this source tree.
+ */const S=R("ChevronRight",[["path",{d:"m9 18 6-6-6-6",key:"mthhwq"}]]);function M({walletAddress:i}){const o=a(n.riskPolicies.getOrDefault,i?{walletAddress:i}:"skip"),e=u(n.riskPolicies.upsert),c=u(n.riskPolicies.reset),f=o===void 0&&i!==void 0,g=r.useMemo(()=>o!=null&&o.config?o.config:s,[o]),p=(o==null?void 0:o.isDefault)??!0,k=r.useCallback(async t=>{if(!i)throw new Error("Wallet address required to save policy");await e({walletAddress:i,config:t})},[i,e]),h=r.useCallback(async()=>{if(!i)throw new Error("Wallet address required to reset policy");await c({walletAddress:i})},[i,c]),C=r.useCallback(async t=>{if(!i)throw new Error("Wallet address required to apply preset");const P=v[t],m={...s,...P.config};await e({walletAddress:i,config:m})},[i,e]);return{config:g,isDefault:p,isLoading:f,isSaving:!1,save:k,reset:h,applyPreset:C,error:null}}function b(i){const o=a(n.riskPolicies.getOrDefault,i?{walletAddress:i}:"skip");return r.useMemo(()=>o!=null&&o.config?o.config:s,[o])}export{S as C,b as a,M as u};
