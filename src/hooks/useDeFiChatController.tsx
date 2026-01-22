@@ -20,6 +20,7 @@ import { BridgeModal } from '../components/modals/BridgeModal'
 import { RelayQuoteModal } from '../components/modals/RelayQuoteModal'
 import { PortfolioRailChip } from '../components/conversation/PortfolioRailChip'
 import { ExpandedPanelModal } from '../components/panels/ExpandedPanelModal'
+import { SettingsModal } from '../components/settings/SettingsModal'
 import type { HeaderBarProps } from '../components/header/HeaderBar'
 import type { ChatSurfaceProps } from '../components/surfaces/ChatSurface'
 import type { WorkspaceSurfaceProps } from '../components/surfaces/WorkspaceSurface'
@@ -209,6 +210,8 @@ export function useDeFiChatController({ props, shellState, dispatch }: UseDeFiCh
   const storeRemoveWidget = useSherpaStore((s) => s.removeWidget)
   const storeSetWidgets = useSherpaStore((s) => s.setWidgets)
   const storeReorderWidgets = useSherpaStore((s) => s.reorderWidgets)
+  const streamingEnabled = useSherpaStore((s) => s.streamingEnabled)
+  const auth = useSherpaStore((s) => s.auth)
 
   const hasLiveWidgets = useMemo(
     () =>
@@ -230,6 +233,7 @@ export function useDeFiChatController({ props, shellState, dispatch }: UseDeFiCh
       return undefined
     }
   })
+  const [settingsOpen, setSettingsOpen] = useState(false)
 
   // Watch store's conversationId for sidebar selection
   const storeConversationId = useSherpaStore((state) => state.conversationId)
@@ -324,6 +328,14 @@ export function useDeFiChatController({ props, shellState, dispatch }: UseDeFiCh
     setShowProInfo(true)
   }, [setCopiedToken, setShowProInfo])
 
+  const openSettings = useCallback(() => {
+    setSettingsOpen(true)
+  }, [])
+
+  const closeSettings = useCallback(() => {
+    setSettingsOpen(false)
+  }, [])
+
   const openPolicies = useCallback(() => {
     const policyWidget: Widget = {
       id: 'risk-policy',
@@ -334,6 +346,18 @@ export function useDeFiChatController({ props, shellState, dispatch }: UseDeFiCh
       density: 'full',
     }
     useSherpaStore.getState().addWidget(policyWidget)
+  }, [])
+
+  const openSessionKeys = useCallback(() => {
+    const sessionWidget: Widget = {
+      id: 'session-keys',
+      kind: 'session-keys',
+      title: 'Session Keys',
+      payload: { sessions: [], status: 'loading' },
+      sources: [],
+      density: 'full',
+    }
+    useSherpaStore.getState().addWidget(sessionWidget)
   }, [])
 
   const openStrategies = useCallback(() => {
@@ -644,45 +668,21 @@ export function useDeFiChatController({ props, shellState, dispatch }: UseDeFiCh
     const assistantMsgId = uid('msg')
     let streamedText = ''
     const userMessage: AgentMessage = { id: uid('msg'), role: 'user', text: question }
-    const streamingMessage: AgentMessage = { id: assistantMsgId, role: 'assistant', text: '', streaming: true }
+    const assistantMessage: AgentMessage = streamingEnabled
+      ? { id: assistantMsgId, role: 'assistant', text: '', streaming: true }
+      : { id: assistantMsgId, role: 'assistant', text: '', typing: true }
 
-    // Add messages without flushSync (it causes remounts)
-    setMessages((previous) => [...previous, userMessage, streamingMessage])
+    setMessages((previous) => [...previous, userMessage, assistantMessage])
 
-    try {
-      const payload = {
-        messages: [{ role: 'user', content: question }],
-        address: walletAddress,
-        chain: 'ethereum',
-        conversation_id: conversationId,
-        llm_model: llmModel,
-      }
+    const payload = {
+      messages: [{ role: 'user', content: question }],
+      address: walletAddress,
+      chain: 'ethereum',
+      conversation_id: conversationId,
+      llm_model: llmModel,
+    }
 
-      // Use streaming API with requestAnimationFrame for smooth updates
-      let rafId: number | null = null
-      let pendingUpdate = false
-
-      const response = await api.chatStream(payload, (delta) => {
-        streamedText += delta
-
-        // Batch updates using requestAnimationFrame
-        if (!pendingUpdate) {
-          pendingUpdate = true
-          rafId = requestAnimationFrame(() => {
-            pendingUpdate = false
-            setMessages((previous) =>
-              previous.map((msg) =>
-                msg.id === assistantMsgId ? { ...msg, text: streamedText } : msg
-              )
-            )
-            scheduleScrollToBottom()
-          })
-        }
-      })
-
-      // Cancel any pending RAF
-      if (rafId) cancelAnimationFrame(rafId)
-
+    const applyResponse = (response: any, finalText: string) => {
       if (response?.conversation_id && response.conversation_id !== conversationId) {
         setConversationId(response.conversation_id)
         try {
@@ -702,7 +702,7 @@ export function useDeFiChatController({ props, shellState, dispatch }: UseDeFiCh
           setMessages((previous) =>
             previous.map((msg) =>
               msg.id === assistantMsgId
-                ? { ...msg, text: 'Please connect your wallet to view your portfolio.', streaming: false }
+                ? { ...msg, text: 'Please connect your wallet to view your portfolio.', streaming: false, typing: false }
                 : msg
             )
           )
@@ -712,32 +712,66 @@ export function useDeFiChatController({ props, shellState, dispatch }: UseDeFiCh
       }
 
       if (nonPortfolioWidgets.length) {
-        // Add widgets to store
         nonPortfolioWidgets.forEach((widget) => {
           storeAddWidget(widget)
         })
         setHighlight(nonPortfolioWidgets.map((widget) => widget.id))
       }
 
-      // Finalize the message - remove streaming flag and add sources
       setMessages((previous) =>
         previous.map((msg) =>
           msg.id === assistantMsgId
             ? {
                 ...msg,
-                text: streamedText || response?.reply || 'Done.',
+                text: finalText,
                 streaming: false,
+                typing: false,
                 sources: (response?.sources || []) as any,
               }
             : msg
         )
       )
       return response
+    }
+
+    try {
+      if (streamingEnabled) {
+        let rafId: number | null = null
+        let pendingUpdate = false
+
+        const response = await api.chatStream(payload, (delta) => {
+          streamedText += delta
+
+          if (!pendingUpdate) {
+            pendingUpdate = true
+            rafId = requestAnimationFrame(() => {
+              pendingUpdate = false
+              setMessages((previous) =>
+                previous.map((msg) =>
+                  msg.id === assistantMsgId ? { ...msg, text: streamedText } : msg
+                )
+              )
+              scheduleScrollToBottom()
+            })
+          }
+        })
+
+        if (rafId) cancelAnimationFrame(rafId)
+        return applyResponse(response, streamedText || response?.reply || 'Done.')
+      }
+
+      const response = await api.chat(payload)
+      return applyResponse(response, response?.reply || 'Done.')
     } catch (error: any) {
       setMessages((previous) =>
         previous.map((msg) =>
           msg.id === assistantMsgId
-            ? { ...msg, text: `Sorry, I hit an error contacting the API. ${error?.message || ''}`, streaming: false }
+            ? {
+                ...msg,
+                text: `Sorry, I hit an error contacting the API. ${error?.message || ''}`,
+                streaming: false,
+                typing: false,
+              }
             : msg
         )
       )
@@ -745,7 +779,7 @@ export function useDeFiChatController({ props, shellState, dispatch }: UseDeFiCh
     } finally {
       scheduleScrollToBottom()
     }
-  }, [conversationId, ensurePortfolioPanel, llmModel, scheduleScrollToBottom, setHighlight, storeAddWidget, storageKey, walletAddress])
+  }, [conversationId, ensurePortfolioPanel, llmModel, scheduleScrollToBottom, setConversationId, setHighlight, storeAddWidget, storageKey, streamingEnabled, walletAddress])
 
   const send = useCallback(async () => {
     const question = input.trim()
@@ -1097,10 +1131,18 @@ export function useDeFiChatController({ props, shellState, dispatch }: UseDeFiCh
     walletLabel: walletAddress ? truncateAddress(walletAddress) : 'Guest session',
     walletConnected: Boolean(walletAddress),
     proLabel: proBadgeLabel,
+    authStatus: auth.status,
+    authError: auth.error,
     onPersonaChange: setPersona,
     onNewChat: handleStartNewChat,
     onConnectWallet: () => openAppKit(),
     menuActions: [
+      {
+        id: 'open-settings',
+        label: 'Settings',
+        description: 'Model, density, notifications',
+        onSelect: openSettings,
+      },
       {
         id: 'manage-strategies',
         label: 'DCA Strategies',
@@ -1195,6 +1237,12 @@ export function useDeFiChatController({ props, shellState, dispatch }: UseDeFiCh
 
   const modals = (
     <>
+      <SettingsModal
+        isOpen={settingsOpen}
+        onClose={closeSettings}
+        onOpenRiskPolicy={openPolicies}
+        onOpenSessionKeys={openSessionKeys}
+      />
       {showSim && (
         <SimulateModal
           from={showSim.from}

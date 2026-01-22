@@ -6,6 +6,7 @@ import { Bot, ExternalLink, Send, User } from 'lucide-react'
 import DOMPurify from 'isomorphic-dompurify'
 
 import type { AgentAction, AgentMessage } from '../../types/defi-ui'
+import { useSherpaStore } from '../../store'
 import { Textarea } from '../ui/primitives'
 
 function SourceBadge({ src }: { src: any }) {
@@ -290,7 +291,13 @@ function ChatSurfaceComponent({
   onInputChange,
   onSend,
 }: ChatSurfaceProps) {
+  const chatDensity = useSherpaStore((state) => state.chatDensity)
   const canSend = inputValue.trim().length > 0
+  const messageSpacing =
+    chatDensity === 'compact'
+      ? 'space-y-3 px-3 pt-3 pb-4'
+      : 'space-y-4 px-4 pt-4 pb-6'
+  const composerPadding = chatDensity === 'compact' ? 'px-3 py-3' : 'px-4 py-4'
 
   const placeholderExamples = [
     'Ask about a token, protocol, or action…',
@@ -320,7 +327,7 @@ function ChatSurfaceComponent({
     <div className="flex h-full flex-col min-h-0 overflow-hidden">
       <div
         ref={containerRef}
-        className="flex-1 space-y-4 overflow-y-auto px-4 pt-4 pb-6 min-h-0"
+        className={`flex-1 overflow-y-auto min-h-0 ${messageSpacing}`}
         role="log"
         aria-live="polite"
         aria-relevant="additions text"
@@ -345,7 +352,7 @@ function ChatSurfaceComponent({
         {ariaAnnouncement}
       </div>
       <div
-        className="border-t px-4 py-4 shrink-0"
+        className={`border-t shrink-0 ${composerPadding}`}
         style={{ borderColor: 'var(--line)', background: 'var(--bg-elev)' }}
       >
         <div className="space-y-3">

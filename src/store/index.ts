@@ -24,13 +24,27 @@ import type { PortfolioSummaryViewModel } from '../workspace/types'
 
 export type PersonaId = 'friendly' | 'technical' | 'professional' | 'educational'
 export type ThemeId = 'dark' | 'light'
+export type ChatDensity = 'comfortable' | 'compact'
 export type Chain = 'ethereum' | 'solana' | 'polygon' | 'arbitrum' | 'optimism'
+export type AuthStatus = 'idle' | 'signing' | 'signed_in' | 'error'
 
 export interface WalletState {
   address: string | null
   chain: Chain
   isConnected: boolean
   isManual: boolean
+}
+
+export interface AuthSessionState {
+  status: AuthStatus
+  error: string | null
+  session: {
+    accessToken: string
+    refreshToken: string
+    expiresAt: string
+    walletAddress: string
+    chainId: number | 'solana'
+  } | null
 }
 
 export interface ChatMessage extends AgentMessage {
@@ -88,10 +102,13 @@ interface WalletSlice {
   wallet: WalletState
   entitlement: EntitlementSnapshot
   proOverride: boolean
+  auth: AuthSessionState
 
   // Actions
   setWallet: (wallet: Partial<WalletState>) => void
   clearWallet: () => void
+  setAuth: (auth: Partial<AuthSessionState>) => void
+  clearAuth: () => void
   setEntitlement: (entitlement: EntitlementSnapshot) => void
   setProOverride: (override: boolean) => void
 
@@ -191,6 +208,19 @@ interface ConversationSidebarSlice {
 }
 
 // ============================================
+// SETTINGS SLICE - User preferences
+// ============================================
+
+interface SettingsSlice {
+  streamingEnabled: boolean
+  chatDensity: ChatDensity
+  txNotifications: boolean
+  setStreamingEnabled: (enabled: boolean) => void
+  setChatDensity: (density: ChatDensity) => void
+  setTxNotifications: (enabled: boolean) => void
+}
+
+// ============================================
 // UI SLICE - Modals and UI state
 // ============================================
 
@@ -215,7 +245,7 @@ interface UISlice {
 // COMBINED STORE TYPE
 // ============================================
 
-export type SherpaStore = AppSlice & WalletSlice & ChatSlice & WorkspaceSlice & ConversationSidebarSlice & UISlice
+export type SherpaStore = AppSlice & WalletSlice & ChatSlice & WorkspaceSlice & ConversationSidebarSlice & SettingsSlice & UISlice
 
 // ============================================
 // INITIAL STATES
@@ -232,6 +262,12 @@ const initialEntitlement: EntitlementSnapshot = {
   status: 'idle',
   pro: false,
   chain: null,
+}
+
+const initialAuth: AuthSessionState = {
+  status: 'idle',
+  error: null,
+  session: null,
 }
 
 const initialModals: ModalState = {
@@ -312,6 +348,7 @@ export const useSherpaStore = create<SherpaStore>()(
           wallet: initialWallet,
           entitlement: initialEntitlement,
           proOverride: false,
+          auth: initialAuth,
 
           setWallet: (walletUpdate) =>
             set((state) => ({
@@ -324,6 +361,13 @@ export const useSherpaStore = create<SherpaStore>()(
               entitlement: initialEntitlement,
               proOverride: false,
             }),
+
+          setAuth: (authUpdate) =>
+            set((state) => ({
+              auth: { ...state.auth, ...authUpdate },
+            })),
+
+          clearAuth: () => set({ auth: initialAuth }),
 
           setEntitlement: (entitlement) => set({ entitlement }),
 
@@ -565,6 +609,19 @@ export const useSherpaStore = create<SherpaStore>()(
           setMobileDrawerOpen: (open) => set({ mobileDrawerOpen: open }),
 
           // ============================================
+          // SETTINGS SLICE
+          // ============================================
+          streamingEnabled: false,
+          chatDensity: 'comfortable',
+          txNotifications: true,
+
+          setStreamingEnabled: (enabled) => set({ streamingEnabled: enabled }),
+
+          setChatDensity: (density) => set({ chatDensity: density }),
+
+          setTxNotifications: (enabled) => set({ txNotifications: enabled }),
+
+          // ============================================
           // UI SLICE
           // ============================================
           modals: initialModals,
@@ -613,6 +670,10 @@ export const useSherpaStore = create<SherpaStore>()(
             panelWidth: state.panelWidth,
             // Conversation sidebar persistence
             sidebarVisible: state.sidebarVisible,
+            // Settings persistence
+            streamingEnabled: state.streamingEnabled,
+            chatDensity: state.chatDensity,
+            txNotifications: state.txNotifications,
           }),
         }
       )
@@ -629,6 +690,7 @@ export const selectTheme = (state: SherpaStore) => state.theme
 export const selectPersona = (state: SherpaStore) => state.persona
 export const selectWallet = (state: SherpaStore) => state.wallet
 export const selectIsConnected = (state: SherpaStore) => state.wallet.isConnected
+export const selectAuth = (state: SherpaStore) => state.auth
 export const selectMessages = (state: SherpaStore) => state.messages
 export const selectWidgets = (state: SherpaStore) => state.widgets
 export const selectWorkspaceVisible = (state: SherpaStore) => state.isVisible
@@ -679,6 +741,12 @@ export const useWallet = () => useSherpaStore((state) => ({
   clearWallet: state.clearWallet,
   isPro: state.isPro,
   entitlement: state.entitlement,
+}))
+
+export const useAuth = () => useSherpaStore((state) => ({
+  auth: state.auth,
+  setAuth: state.setAuth,
+  clearAuth: state.clearAuth,
 }))
 
 export const useChat = () => useSherpaStore((state) => ({
@@ -748,4 +816,13 @@ export const useConversationSidebar = () => useSherpaStore((state) => ({
   hideSidebar: state.hideSidebar,
   setSidebarSearchQuery: state.setSidebarSearchQuery,
   setMobileDrawerOpen: state.setMobileDrawerOpen,
+}))
+
+export const useSettings = () => useSherpaStore((state) => ({
+  streamingEnabled: state.streamingEnabled,
+  chatDensity: state.chatDensity,
+  txNotifications: state.txNotifications,
+  setStreamingEnabled: state.setStreamingEnabled,
+  setChatDensity: state.setChatDensity,
+  setTxNotifications: state.setTxNotifications,
 }))

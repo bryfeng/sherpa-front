@@ -9,7 +9,7 @@
  * - New widget system for workspace
  */
 
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo } from 'react'
 import { useAccount, useReconnect } from 'wagmi'
 import { useAppKitAccount } from '@reown/appkit/react'
 
@@ -29,6 +29,7 @@ import { ToastProvider } from './providers/ToastProvider'
 import { AppErrorBoundary } from './components/errors'
 import WidgetPlayground from './pages/WidgetPlayground'
 import DeFiChatAdaptiveUI from './pages/DeFiChatAdaptiveUI'
+import { useWalletAuth } from './hooks/useWalletAuth'
 
 // Hooks
 import { usePortfolioSummary } from './workspace/hooks'
@@ -103,8 +104,9 @@ function useWalletSync() {
 // ============================================
 
 function useLLMProviders() {
-  const [llmProviders, setLlmProviders] = useState<LLMProviderInfo[]>([])
-  const [llmProvidersLoading, setLlmProvidersLoading] = useState(true)
+  const llmProviders = useSherpaStore((s) => s.llmProviders)
+  const llmProvidersLoading = useSherpaStore((s) => s.llmProvidersLoading)
+  const setLlmProviders = useSherpaStore((s) => s.setLlmProviders)
 
   const llmModel = useSherpaStore((s) => s.llmModel)
   const setLlmModel = useSherpaStore((s) => s.setLlmModel)
@@ -113,7 +115,7 @@ function useLLMProviders() {
     let cancelled = false
 
     const fetchProviders = async () => {
-      setLlmProvidersLoading(true)
+      setLlmProviders(useSherpaStore.getState().llmProviders, true)
       try {
         const res = await api.llmProviders()
         if (cancelled) return
@@ -121,7 +123,7 @@ function useLLMProviders() {
         const providers = Array.isArray(res?.providers)
           ? (res.providers as LLMProviderInfo[])
           : []
-        setLlmProviders(providers)
+        setLlmProviders(providers, false)
 
         // Build set of available models
         const availableModels = new Set<string>()
@@ -155,10 +157,7 @@ function useLLMProviders() {
       } catch (error) {
         if (!cancelled) {
           console.warn('Failed to load LLM providers', error)
-        }
-      } finally {
-        if (!cancelled) {
-          setLlmProvidersLoading(false)
+          setLlmProviders(useSherpaStore.getState().llmProviders, false)
         }
       }
     }
@@ -168,7 +167,7 @@ function useLLMProviders() {
     return () => {
       cancelled = true
     }
-  }, [llmModel, setLlmModel])
+  }, [llmModel, setLlmModel, setLlmProviders])
 
   return { llmProviders, llmProvidersLoading }
 }
@@ -291,7 +290,8 @@ function MainApp() {
   const wallet = useSherpaStore((s) => s.wallet)
 
   // Sync wallet state
-  useWalletSync()
+  const activeWallet = useWalletSync()
+  useWalletAuth(activeWallet ? { address: activeWallet.address, chain: activeWallet.chain } : null)
 
   // Hooks
   useHealthCheck()

@@ -137,19 +137,6 @@ export function SettingsMenu({ selectedModel, providers, onSelectModel, onOpenPo
               )}
             </div>
 
-            <div>
-              <button
-                type="button"
-                className="flex w-full items-center justify-between rounded-xl border border-dashed border-slate-200 px-3 py-2 text-left text-slate-500"
-                disabled
-              >
-                <span>
-                  <div className="text-sm font-semibold text-slate-600">Theme</div>
-                  <div className="text-xs text-slate-400">Theme presets arriving soon.</div>
-                </span>
-                <ChevronRight className="h-4 w-4" />
-              </button>
-            </div>
           </div>
         </div>
       )}

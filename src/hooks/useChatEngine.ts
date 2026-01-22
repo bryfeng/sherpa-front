@@ -98,6 +98,7 @@ export function useChatEngine(options: UseChatEngineOptions) {
     setConversationId: state.setConversationId,
     startNewChat: state.startNewChat,
   }))
+  const streamingEnabled = useSherpaStore((state) => state.streamingEnabled)
 
   const prefersReducedMotion = useReducedMotion() ?? false
   const scrollRef = useRef<HTMLDivElement>(null)
@@ -398,11 +399,15 @@ export function useChatEngine(options: UseChatEngineOptions) {
     if (!text) return
     setInputValue('')
     try {
-      await sendMessage(text)
+      if (streamingEnabled) {
+        await sendMessageStream(text)
+      } else {
+        await sendMessage(text)
+      }
     } catch {
       // Error already handled in sendMessage
     }
-  }, [inputValue, sendMessage, setInputValue])
+  }, [inputValue, sendMessage, sendMessageStream, setInputValue, streamingEnabled])
 
   // Start new conversation
   const startNewChat = useCallback(async () => {
