@@ -518,6 +518,31 @@ export default defineSchema({
   }),
 
   // ============================================
+  // Fee Policy (paymaster + fee asset order)
+  // ============================================
+  feeConfigs: defineTable({
+    chainId: v.union(v.number(), v.string()),
+    stablecoinSymbol: v.string(), // "USDC"
+    stablecoinAddress: v.optional(v.string()), // EVM token address or Solana mint
+    stablecoinDecimals: v.number(),
+    allowNativeFallback: v.boolean(),
+    nativeSymbol: v.string(), // "ETH", "SOL"
+    nativeDecimals: v.number(),
+    feeAssetOrder: v.array(
+      v.union(v.literal("stablecoin"), v.literal("native"))
+    ), // e.g. ["stablecoin", "native"]
+    reimbursementMode: v.union(
+      v.literal("per_tx"),
+      v.literal("batch"),
+      v.literal("none")
+    ),
+    isEnabled: v.boolean(),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+    updatedBy: v.optional(v.string()),
+  }).index("by_chain_id", ["chainId"]),
+
+  // ============================================
   // Admin: Users (separate from regular users)
   // ============================================
   admin_users: defineTable({

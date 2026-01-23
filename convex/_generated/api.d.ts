@@ -20,6 +20,7 @@ import type * as copyTrading from "../copyTrading.js";
 import type * as crons from "../crons.js";
 import type * as dca from "../dca.js";
 import type * as executions from "../executions.js";
+import type * as feeConfig from "../feeConfig.js";
 import type * as health from "../health.js";
 import type * as http from "../http.js";
 import type * as lib_authHelpers from "../lib/authHelpers.js";
@@ -57,6 +58,7 @@ declare const fullApi: ApiFromModules<{
   crons: typeof crons;
   dca: typeof dca;
   executions: typeof executions;
+  feeConfig: typeof feeConfig;
   health: typeof health;
   http: typeof http;
   "lib/authHelpers": typeof lib_authHelpers;

@@ -36,7 +36,7 @@ export const listUserSessions = query({
     const sessions: Array<{
       sessionId: string;
       walletAddress: string;
-      chainId: number;
+      chainId: number | string;
       createdAt: number;
       expiresAt: number;
     }> = [];
