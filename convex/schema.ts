@@ -434,7 +434,140 @@ export default defineSchema({
   }).index("by_key", ["key"]),
 
   // ============================================
-  // Session Keys (for autonomous agent access)
+  // Session Wallets (Turnkey signing wallets for autonomous execution)
+  // ============================================
+  sessionWallets: defineTable({
+    walletAddress: v.string(), // User's main wallet address
+    chainType: v.string(), // "evm" or "solana"
+    turnkeyWalletId: v.string(), // Turnkey's internal wallet ID
+    turnkeyAddress: v.string(), // Session signing address (to register as session key)
+    status: v.union(
+      v.literal("active"),
+      v.literal("revoked"),
+      v.literal("expired")
+    ),
+    // Metadata
+    label: v.optional(v.string()),
+    createdAt: v.number(),
+    updatedAt: v.optional(v.number()),
+    revokedAt: v.optional(v.number()),
+    revokeReason: v.optional(v.string()),
+    // Usage stats
+    totalSignatures: v.optional(v.number()),
+    lastUsedAt: v.optional(v.number()),
+  })
+    .index("by_wallet", ["walletAddress"])
+    .index("by_wallet_chain", ["walletAddress", "chainType"])
+    .index("by_wallet_chain_status", ["walletAddress", "chainType", "status"])
+    .index("by_turnkey_address", ["turnkeyAddress"])
+    .index("by_turnkey_wallet_id", ["turnkeyWalletId"]),
+
+  // ============================================
+  // Smart Accounts (Rhinestone ERC-7579 accounts)
+  // ============================================
+  smartAccounts: defineTable({
+    ownerAddress: v.string(), // EOA that owns the Smart Account
+    smartAccountAddress: v.string(), // ERC-7579 Smart Account address
+    deployedChains: v.array(v.number()), // Chain IDs where deployed
+    installedModules: v.array(v.string()), // Module names (e.g., "smart-sessions")
+    // Status
+    status: v.union(
+      v.literal("active"),
+      v.literal("inactive")
+    ),
+    // Metadata
+    createdAt: v.number(),
+    updatedAt: v.optional(v.number()),
+  })
+    .index("by_owner", ["ownerAddress"])
+    .index("by_smart_account", ["smartAccountAddress"]),
+
+  // ============================================
+  // Smart Sessions (Rhinestone on-chain permissions)
+  // ============================================
+  smartSessions: defineTable({
+    smartAccountAddress: v.string(), // Smart Account this session is for
+    sessionId: v.string(), // On-chain session identifier
+    // Permission configuration
+    spendingLimitUsd: v.number(), // Max USD per session
+    allowedContracts: v.array(v.string()), // Contract addresses
+    allowedTokens: v.array(v.string()), // Token addresses
+    allowedActions: v.array(v.string()), // Action types: ["swap", "bridge"]
+    // Timing
+    validUntil: v.number(), // Expiry timestamp
+    createdAt: v.number(),
+    // Status
+    status: v.union(
+      v.literal("active"),
+      v.literal("expired"),
+      v.literal("revoked")
+    ),
+    // Usage tracking
+    totalSpentUsd: v.optional(v.number()),
+    transactionCount: v.optional(v.number()),
+    lastUsedAt: v.optional(v.number()),
+    // Grant transaction
+    grantTxHash: v.optional(v.string()),
+    revokeTxHash: v.optional(v.string()),
+  })
+    .index("by_smart_account", ["smartAccountAddress"])
+    .index("by_smart_account_status", ["smartAccountAddress", "status"])
+    .index("by_session_id", ["sessionId"]),
+
+  // ============================================
+  // Swig Wallets (Solana smart wallets)
+  // ============================================
+  swigWallets: defineTable({
+    ownerAddress: v.string(), // Solana wallet that owns the Swig wallet
+    swigWalletAddress: v.string(), // Swig smart wallet address
+    // Status
+    status: v.union(
+      v.literal("active"),
+      v.literal("inactive")
+    ),
+    // Metadata
+    createdAt: v.number(),
+    updatedAt: v.optional(v.number()),
+  })
+    .index("by_owner", ["ownerAddress"])
+    .index("by_swig_wallet", ["swigWalletAddress"]),
+
+  // ============================================
+  // Swig Sessions (Solana role-based permissions)
+  // ============================================
+  swigSessions: defineTable({
+    swigWalletAddress: v.string(), // Swig wallet this session is for
+    sessionId: v.string(), // On-chain session identifier
+    // Role configuration
+    role: v.string(), // Role name: "agent", "dca", "copy_trading"
+    // Permission configuration
+    spendingLimitUsd: v.number(), // Max USD per session
+    allowedPrograms: v.array(v.string()), // Program IDs
+    allowedTokens: v.array(v.string()), // Token mint addresses
+    allowedActions: v.array(v.string()), // Action types: ["swap", "transfer"]
+    // Timing
+    validUntil: v.number(), // Expiry timestamp
+    createdAt: v.number(),
+    // Status
+    status: v.union(
+      v.literal("active"),
+      v.literal("expired"),
+      v.literal("revoked")
+    ),
+    // Usage tracking
+    totalSpentUsd: v.optional(v.number()),
+    transactionCount: v.optional(v.number()),
+    lastUsedAt: v.optional(v.number()),
+    // Grant transaction
+    grantTxSignature: v.optional(v.string()),
+    revokeTxSignature: v.optional(v.string()),
+  })
+    .index("by_swig_wallet", ["swigWalletAddress"])
+    .index("by_swig_wallet_status", ["swigWalletAddress", "status"])
+    .index("by_session_id", ["sessionId"]),
+
+  // ============================================
+  // Session Keys (for autonomous agent access) - LEGACY: Use Smart Sessions
   // ============================================
   sessionKeys: defineTable({
     sessionId: v.string(),

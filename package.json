@@ -41,7 +41,10 @@
     "recharts": "^2.12.7",
     "viem": "^2.21.3",
     "wagmi": "^2.12.10",
-    "zustand": "^4.5.2"
+    "zustand": "^4.5.2",
+    "@rhinestone/sdk": "^0.1.0",
+    "@swig-wallet/sdk": "^0.2.0",
+    "@solana/web3.js": "^2.0.0"
   },
   "devDependencies": {
     "@testing-library/jest-dom": "^6.4.8",
