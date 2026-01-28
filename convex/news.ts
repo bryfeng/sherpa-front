@@ -66,6 +66,124 @@ export const getRecent = query({
 });
 
 /**
+ * Get recent news with source diversity.
+ * Uses weighted round-robin to ensure a mix of sources (RSS, CoinGecko, DefiLlama).
+ * This prevents any single source from dominating the results.
+ */
+export const getRecentDiversified = query({
+  args: {
+    category: v.optional(
+      v.union(
+        v.literal("regulatory"),
+        v.literal("technical"),
+        v.literal("partnership"),
+        v.literal("tokenomics"),
+        v.literal("market"),
+        v.literal("hack"),
+        v.literal("upgrade"),
+        v.literal("general")
+      )
+    ),
+    limit: v.optional(v.number()),
+    sinceTimestamp: v.optional(v.number()),
+  },
+  handler: async (ctx, args) => {
+    const limit = args.limit ?? 15;
+    // Fetch more items to have a pool for diversification
+    const fetchLimit = Math.max(limit * 5, 100);
+
+    let query = ctx.db.query("newsItems").withIndex("by_published");
+
+    if (args.sinceTimestamp) {
+      query = query.filter((q) =>
+        q.gte(q.field("publishedAt"), args.sinceTimestamp!)
+      );
+    }
+
+    let items = await query.order("desc").take(fetchLimit);
+
+    // Filter by category if specified
+    if (args.category) {
+      items = items.filter((item) => item.category === args.category);
+    }
+
+    // Group items by source type
+    const sourceGroups: Record<string, typeof items> = {
+      rss: [],
+      coingecko: [],
+      defillama: [],
+      other: [],
+    };
+
+    for (const item of items) {
+      if (item.source.startsWith("rss:")) {
+        sourceGroups.rss.push(item);
+      } else if (item.source.startsWith("coingecko:")) {
+        sourceGroups.coingecko.push(item);
+      } else if (item.source.startsWith("defillama:")) {
+        sourceGroups.defillama.push(item);
+      } else {
+        sourceGroups.other.push(item);
+      }
+    }
+
+    // Sort each group by importance (higher first), then by publishedAt
+    const sortByImportance = (a: (typeof items)[0], b: (typeof items)[0]) => {
+      const aScore = a.importance?.score ?? 0.5;
+      const bScore = b.importance?.score ?? 0.5;
+      if (bScore !== aScore) return bScore - aScore;
+      return b.publishedAt - a.publishedAt;
+    };
+
+    sourceGroups.rss.sort(sortByImportance);
+    sourceGroups.coingecko.sort(sortByImportance);
+    sourceGroups.defillama.sort(sortByImportance);
+    sourceGroups.other.sort(sortByImportance);
+
+    // Weighted round-robin: RSS gets more weight since it has real news articles
+    // Weights represent how many items to take per round from each source
+    const weights = {
+      rss: 3,        // 3 RSS articles per round (real news)
+      coingecko: 1,  // 1 trending token per round
+      defillama: 1,  // 1 TVL update per round
+      other: 1,
+    };
+
+    const result: typeof items = [];
+    const indices = { rss: 0, coingecko: 0, defillama: 0, other: 0 };
+
+    // Round-robin selection with weights
+    while (result.length < limit) {
+      let addedThisRound = false;
+
+      for (const [sourceType, weight] of Object.entries(weights)) {
+        const group = sourceGroups[sourceType as keyof typeof sourceGroups];
+        const idx = indices[sourceType as keyof typeof indices];
+
+        // Take up to 'weight' items from this source
+        for (let i = 0; i < weight && result.length < limit; i++) {
+          if (idx + i < group.length) {
+            result.push(group[idx + i]);
+            addedThisRound = true;
+          }
+        }
+        indices[sourceType as keyof typeof indices] = idx + weight;
+      }
+
+      // If we couldn't add anything this round, we've exhausted all sources
+      if (!addedThisRound) break;
+    }
+
+    // Final sort by publishedAt to maintain chronological feel while keeping diversity
+    // But keep the first few items in their diversified order for visibility
+    const topItems = result.slice(0, Math.min(5, result.length));
+    const restItems = result.slice(5).sort((a, b) => b.publishedAt - a.publishedAt);
+
+    return [...topItems, ...restItems];
+  },
+});
+
+/**
  * Get news items by category
  */
 export const getByCategory = query({
