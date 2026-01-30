@@ -2,10 +2,11 @@
 
 import React, { useEffect, useId, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
-import { Sparkles, Bell } from 'lucide-react'
+import { Sparkles, Bell, Cpu } from 'lucide-react'
 
 import type { PersonaId as Persona } from '../../types/persona'
 import type { AuthStatus } from '../../store'
+import { useSherpaStore } from '../../store'
 import { Badge, Button } from '../ui/primitives'
 import { HeaderActionMenu, type HeaderActionItem } from './HeaderActionMenu'
 import { ExecutionSigningBadge } from '../../workspace/components/ExecutionSigningModal'
@@ -51,6 +52,48 @@ function PersonaBadge({ persona }: { persona: Persona }) {
     >
       {style.label}
     </Badge>
+  )
+}
+
+/**
+ * Displays the current LLM model being used
+ */
+function ModelIndicator() {
+  const llmModel = useSherpaStore((state) => state.llmModel)
+  const llmProviders = useSherpaStore((state) => state.llmProviders)
+
+  const modelLabel = useMemo(() => {
+    for (const provider of llmProviders) {
+      const match = provider.models?.find((m) => m.id === llmModel)
+      if (match) return match.label
+    }
+    // Fallback: show abbreviated model ID if no label found
+    if (llmModel) {
+      // e.g. "claude-sonnet-4-20250514" -> "Claude Sonnet 4"
+      const parts = llmModel.split('-')
+      if (parts.length >= 3) {
+        return parts.slice(0, 3).map((p) => p.charAt(0).toUpperCase() + p.slice(1)).join(' ')
+      }
+      return llmModel
+    }
+    return 'Model'
+  }, [llmModel, llmProviders])
+
+  return (
+    <div
+      className="inline-flex items-center gap-1.5 rounded-md px-2 py-1 text-xs"
+      style={{
+        background: 'var(--bg-elev)',
+        border: '1px solid var(--line)',
+        color: 'var(--text-muted)',
+      }}
+      title={`Current model: ${llmModel}`}
+    >
+      <Cpu className="h-3 w-3" style={{ color: 'var(--accent)' }} />
+      <span className="font-medium" style={{ color: 'var(--text)' }}>
+        {modelLabel}
+      </span>
+    </div>
   )
 }
 
@@ -284,6 +327,7 @@ export interface HeaderBarProps {
   onPersonaChange: (persona: Persona) => void
   onNewChat: () => void
   onConnectWallet?: () => void
+  onDisconnectWallet?: () => void
   menuActions?: HeaderActionItem[]
 }
 
@@ -298,6 +342,7 @@ function HeaderBarComponent({
   onPersonaChange,
   onNewChat,
   onConnectWallet,
+  onDisconnectWallet,
   menuActions = [],
 }: HeaderBarProps) {
   const authLabel =
@@ -340,10 +385,27 @@ function HeaderBarComponent({
               <PersonaDropdown persona={persona} onSelect={onPersonaChange} />
             </div>
           </div>
+          <ModelIndicator />
           {walletConnected ? (
-            <Badge variant="secondary" className="rounded-md px-2.5 py-0.5 text-xs">
-              {walletLabel}
-            </Badge>
+            <div className="inline-flex items-center gap-1.5">
+              <Badge variant="secondary" className="rounded-md px-2.5 py-0.5 text-xs">
+                {walletLabel}
+              </Badge>
+              {onDisconnectWallet && (
+                <button
+                  onClick={onDisconnectWallet}
+                  className="rounded-md px-2 py-0.5 text-[11px] font-medium transition-colors hover:bg-[var(--surface-3)]"
+                  style={{
+                    background: 'var(--surface-2)',
+                    border: '1px solid var(--line)',
+                    color: 'var(--text-muted)',
+                  }}
+                  title="Disconnect wallet"
+                >
+                  Disconnect
+                </button>
+              )}
+            </div>
           ) : (
             <button
               onClick={onConnectWallet}
