@@ -10,6 +10,7 @@
 
 import type * as admin_auth from "../admin/auth.js";
 import type * as admin_authActions from "../admin/authActions.js";
+import type * as admin_config from "../admin/config.js";
 import type * as admin_metrics from "../admin/metrics.js";
 import type * as admin_sessions from "../admin/sessions.js";
 import type * as admin_users from "../admin/users.js";
@@ -28,6 +29,7 @@ import type * as news from "../news.js";
 import type * as rateLimit from "../rateLimit.js";
 import type * as riskPolicies from "../riskPolicies.js";
 import type * as scheduler from "../scheduler.js";
+import type * as seedTokens from "../seedTokens.js";
 import type * as sessionKeys from "../sessionKeys.js";
 import type * as sessionWallets from "../sessionWallets.js";
 import type * as smartAccounts from "../smartAccounts.js";
@@ -53,6 +55,7 @@ import type {
 declare const fullApi: ApiFromModules<{
   "admin/auth": typeof admin_auth;
   "admin/authActions": typeof admin_authActions;
+  "admin/config": typeof admin_config;
   "admin/metrics": typeof admin_metrics;
   "admin/sessions": typeof admin_sessions;
   "admin/users": typeof admin_users;
@@ -71,6 +74,7 @@ declare const fullApi: ApiFromModules<{
   rateLimit: typeof rateLimit;
   riskPolicies: typeof riskPolicies;
   scheduler: typeof scheduler;
+  seedTokens: typeof seedTokens;
   sessionKeys: typeof sessionKeys;
   sessionWallets: typeof sessionWallets;
   smartAccounts: typeof smartAccounts;

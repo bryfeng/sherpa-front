@@ -1,6 +1,14 @@
 import { v } from "convex/values";
 import { mutation, query } from "./_generated/server";
 
+// ChainId type: number for EVM chains, "solana" for Solana
+const chainIdValidator = v.union(v.number(), v.literal("solana"));
+
+// Helper to normalize addresses (lowercase for EVM, keep original for Solana)
+function normalizeAddress(address: string, chainId: number | "solana"): string {
+  return typeof chainId === "number" ? address.toLowerCase() : address;
+}
+
 // =============================================================================
 // Queries
 // =============================================================================
@@ -10,14 +18,15 @@ import { mutation, query } from "./_generated/server";
  */
 export const get = query({
   args: {
-    chainId: v.number(),
+    chainId: chainIdValidator,
     address: v.string(),
   },
   handler: async (ctx, args) => {
+    const address = normalizeAddress(args.address, args.chainId);
     const token = await ctx.db
       .query("tokenCatalog")
       .withIndex("by_chain_address", (q) =>
-        q.eq("chainId", args.chainId).eq("address", args.address.toLowerCase())
+        q.eq("chainId", args.chainId).eq("address", address)
       )
       .first();
 
@@ -32,7 +41,7 @@ export const getBatch = query({
   args: {
     tokens: v.array(
       v.object({
-        chainId: v.number(),
+        chainId: chainIdValidator,
         address: v.string(),
       })
     ),
@@ -40,10 +49,11 @@ export const getBatch = query({
   handler: async (ctx, args) => {
     const results = await Promise.all(
       args.tokens.map(async (t) => {
+        const address = normalizeAddress(t.address, t.chainId);
         const token = await ctx.db
           .query("tokenCatalog")
           .withIndex("by_chain_address", (q) =>
-            q.eq("chainId", t.chainId).eq("address", t.address.toLowerCase())
+            q.eq("chainId", t.chainId).eq("address", address)
           )
           .first();
         return token;
@@ -173,6 +183,108 @@ export const search = query({
 });
 
 // =============================================================================
+// Swap Token Resolution Queries
+// =============================================================================
+
+/**
+ * List all tokens enabled for swaps on a specific chain (or all chains)
+ * Used by TokenService to refresh cache
+ */
+export const listEnabledForSwaps = query({
+  args: {
+    chainId: v.optional(chainIdValidator),
+  },
+  handler: async (ctx, args) => {
+    const chainId = args.chainId;
+
+    if (chainId !== undefined) {
+      // Filter by specific chain
+      const tokens = await ctx.db
+        .query("tokenCatalog")
+        .withIndex("by_chain_enabled", (q) =>
+          q.eq("chainId", chainId).eq("isEnabled", true)
+        )
+        .collect();
+
+      // Also include tokens where isEnabled is undefined (default true)
+      const tokensDefaultEnabled = await ctx.db
+        .query("tokenCatalog")
+        .withIndex("by_chain_address")
+        .filter((q) =>
+          q.and(
+            q.eq(q.field("chainId"), chainId),
+            q.eq(q.field("isEnabled"), undefined)
+          )
+        )
+        .collect();
+
+      return [...tokens, ...tokensDefaultEnabled];
+    }
+
+    // Return all enabled tokens across all chains
+    const allTokens = await ctx.db.query("tokenCatalog").collect();
+    return allTokens.filter((t) => t.isEnabled !== false);
+  },
+});
+
+/**
+ * Resolve a token by exact symbol match on a chain
+ */
+export const resolveBySymbol = query({
+  args: {
+    chainId: chainIdValidator,
+    symbol: v.string(),
+  },
+  handler: async (ctx, args) => {
+    const token = await ctx.db
+      .query("tokenCatalog")
+      .withIndex("by_chain_symbol", (q) =>
+        q.eq("chainId", args.chainId).eq("symbol", args.symbol.toUpperCase())
+      )
+      .first();
+
+    // If not found by uppercase, try case-insensitive search
+    if (!token) {
+      const tokens = await ctx.db
+        .query("tokenCatalog")
+        .withIndex("by_chain_address")
+        .filter((q) => q.eq(q.field("chainId"), args.chainId))
+        .collect();
+
+      return tokens.find(
+        (t) => t.symbol.toLowerCase() === args.symbol.toLowerCase()
+      );
+    }
+
+    return token;
+  },
+});
+
+/**
+ * Resolve a token by alias on a chain
+ * Searches the aliases array for a match
+ */
+export const resolveByAlias = query({
+  args: {
+    chainId: chainIdValidator,
+    alias: v.string(),
+  },
+  handler: async (ctx, args) => {
+    const aliasLower = args.alias.toLowerCase();
+
+    // Get all tokens for the chain
+    const tokens = await ctx.db
+      .query("tokenCatalog")
+      .withIndex("by_chain_address")
+      .filter((q) => q.eq(q.field("chainId"), args.chainId))
+      .collect();
+
+    // Search aliases
+    return tokens.find((t) => t.aliases?.includes(aliasLower));
+  },
+});
+
+// =============================================================================
 // Mutations
 // =============================================================================
 
@@ -182,7 +294,7 @@ export const search = query({
 export const upsert = mutation({
   args: {
     address: v.string(),
-    chainId: v.number(),
+    chainId: chainIdValidator,
     symbol: v.string(),
     name: v.string(),
     decimals: v.number(),
@@ -207,7 +319,7 @@ export const upsert = mutation({
     relatedTokens: v.array(
       v.object({
         address: v.string(),
-        chainId: v.number(),
+        chainId: chainIdValidator,
         relationship: v.string(),
       })
     ),
@@ -217,7 +329,11 @@ export const upsert = mutation({
     tags: v.array(v.string()),
   },
   handler: async (ctx, args) => {
-    const address = args.address.toLowerCase();
+    // Normalize address (lowercase for EVM, keep original for Solana)
+    const address =
+      typeof args.chainId === "number"
+        ? args.address.toLowerCase()
+        : args.address;
 
     // Check if token exists
     const existing = await ctx.db
@@ -257,7 +373,7 @@ export const upsertBatch = mutation({
     tokens: v.array(
       v.object({
         address: v.string(),
-        chainId: v.number(),
+        chainId: chainIdValidator,
         symbol: v.string(),
         name: v.string(),
         decimals: v.number(),
@@ -282,7 +398,7 @@ export const upsertBatch = mutation({
         relatedTokens: v.array(
           v.object({
             address: v.string(),
-            chainId: v.number(),
+            chainId: chainIdValidator,
             relationship: v.string(),
           })
         ),
@@ -298,7 +414,11 @@ export const upsertBatch = mutation({
     const results: string[] = [];
 
     for (const token of args.tokens) {
-      const address = token.address.toLowerCase();
+      // Normalize address (lowercase for EVM, keep original for Solana)
+      const address =
+        typeof token.chainId === "number"
+          ? token.address.toLowerCase()
+          : token.address;
 
       const existing = await ctx.db
         .query("tokenCatalog")
@@ -333,7 +453,7 @@ export const upsertBatch = mutation({
  */
 export const remove = mutation({
   args: {
-    chainId: v.number(),
+    chainId: chainIdValidator,
     address: v.string(),
   },
   handler: async (ctx, args) => {
@@ -350,6 +470,171 @@ export const remove = mutation({
     }
 
     return false;
+  },
+});
+
+// =============================================================================
+// Swap Token Mutations
+// =============================================================================
+
+/**
+ * Simplified batch upsert for swap tokens
+ * Only requires fields needed for swap functionality
+ */
+export const upsertBatchForSwaps = mutation({
+  args: {
+    tokens: v.array(
+      v.object({
+        address: v.string(),
+        chainId: chainIdValidator,
+        symbol: v.string(),
+        name: v.string(),
+        decimals: v.number(),
+        aliases: v.array(v.string()),
+        isNative: v.boolean(),
+        isEnabled: v.optional(v.boolean()),
+        coingeckoId: v.optional(v.string()),
+        logoUrl: v.optional(v.string()),
+      })
+    ),
+  },
+  handler: async (ctx, args) => {
+    const now = Date.now();
+    const results: string[] = [];
+
+    for (const token of args.tokens) {
+      // Normalize address (lowercase for EVM, keep original for Solana)
+      const address =
+        typeof token.chainId === "number"
+          ? token.address.toLowerCase()
+          : token.address;
+
+      const existing = await ctx.db
+        .query("tokenCatalog")
+        .withIndex("by_chain_address", (q) =>
+          q.eq("chainId", token.chainId).eq("address", address)
+        )
+        .first();
+
+      // Prepare minimal data for swap token
+      const swapData = {
+        address,
+        chainId: token.chainId,
+        symbol: token.symbol,
+        name: token.name,
+        decimals: token.decimals,
+        aliases: token.aliases,
+        isNative: token.isNative,
+        isEnabled: token.isEnabled ?? true,
+        coingeckoId: token.coingeckoId,
+        logoUrl: token.logoUrl,
+        lastUpdated: now,
+        // Defaults for required fields
+        categories: [],
+        isStablecoin: false,
+        isWrapped: token.symbol.startsWith("W") && !token.isNative,
+        isLpToken: false,
+        isGovernanceToken: false,
+        relatedTokens: [],
+        dataSource: "swap_registry",
+        enrichmentVersion: 1,
+        tags: [],
+      };
+
+      if (existing) {
+        // Update only swap-relevant fields, preserve existing enrichment
+        await ctx.db.patch(existing._id, {
+          aliases: token.aliases,
+          isEnabled: token.isEnabled ?? existing.isEnabled ?? true,
+          coingeckoId: token.coingeckoId ?? existing.coingeckoId,
+          logoUrl: token.logoUrl ?? existing.logoUrl,
+          lastUpdated: now,
+        });
+        results.push(existing._id);
+      } else {
+        const id = await ctx.db.insert("tokenCatalog", swapData);
+        results.push(id);
+      }
+    }
+
+    return results;
+  },
+});
+
+/**
+ * Set swap enabled status for a token
+ */
+export const setSwapEnabled = mutation({
+  args: {
+    chainId: chainIdValidator,
+    address: v.string(),
+    enabled: v.boolean(),
+  },
+  handler: async (ctx, args) => {
+    const address =
+      typeof args.chainId === "number"
+        ? args.address.toLowerCase()
+        : args.address;
+
+    const token = await ctx.db
+      .query("tokenCatalog")
+      .withIndex("by_chain_address", (q) =>
+        q.eq("chainId", args.chainId).eq("address", address)
+      )
+      .first();
+
+    if (!token) {
+      throw new Error(
+        `Token not found: ${args.address} on chain ${args.chainId}`
+      );
+    }
+
+    await ctx.db.patch(token._id, {
+      isEnabled: args.enabled,
+      lastUpdated: Date.now(),
+    });
+
+    return token._id;
+  },
+});
+
+/**
+ * Update aliases for a token
+ */
+export const updateAliases = mutation({
+  args: {
+    chainId: chainIdValidator,
+    address: v.string(),
+    aliases: v.array(v.string()),
+  },
+  handler: async (ctx, args) => {
+    const address =
+      typeof args.chainId === "number"
+        ? args.address.toLowerCase()
+        : args.address;
+
+    const token = await ctx.db
+      .query("tokenCatalog")
+      .withIndex("by_chain_address", (q) =>
+        q.eq("chainId", args.chainId).eq("address", address)
+      )
+      .first();
+
+    if (!token) {
+      throw new Error(
+        `Token not found: ${args.address} on chain ${args.chainId}`
+      );
+    }
+
+    // Normalize aliases to lowercase
+    const normalizedAliases = args.aliases.map((a) => a.toLowerCase());
+
+    await ctx.db.patch(token._id, {
+      aliases: normalizedAliases,
+      lastUpdated: Date.now(),
+    });
+
+    return token._id;
   },
 });
 

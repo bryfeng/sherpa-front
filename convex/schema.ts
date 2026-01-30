@@ -761,11 +761,15 @@ export default defineSchema({
   tokenCatalog: defineTable({
     // Identity
     address: v.string(),
-    chainId: v.number(),
+    chainId: v.union(v.number(), v.literal("solana")), // int for EVM, "solana" for Solana
     symbol: v.string(),
     name: v.string(),
     decimals: v.number(),
     logoUrl: v.optional(v.string()),
+
+    // Swap support
+    aliases: v.optional(v.array(v.string())), // ["usdc", "usd coin"] - lowercase for matching
+    isEnabled: v.optional(v.boolean()), // Swap availability (default true)
 
     // Taxonomy
     categories: v.array(v.string()), // ["defi", "lending", "governance"]
@@ -794,7 +798,7 @@ export default defineSchema({
     relatedTokens: v.array(
       v.object({
         address: v.string(),
-        chainId: v.number(),
+        chainId: v.union(v.number(), v.literal("solana")),
         relationship: v.string(), // "same_project", "competitor", "derivative", "wrapped"
       })
     ),
@@ -810,6 +814,8 @@ export default defineSchema({
   })
     .index("by_chain_address", ["chainId", "address"])
     .index("by_symbol", ["symbol"])
+    .index("by_chain_symbol", ["chainId", "symbol"])
+    .index("by_chain_enabled", ["chainId", "isEnabled"])
     .index("by_project", ["projectSlug"])
     .index("by_sector", ["sector"])
     .index("by_coingecko", ["coingeckoId"])
@@ -974,6 +980,27 @@ export default defineSchema({
   })
     .index("by_chain_id", ["chainId"])
     .index("by_enabled", ["isEnabled"]),
+
+  // ============================================
+  // Admin: System Configuration (runtime settings)
+  // ============================================
+  system_config: defineTable({
+    key: v.string(), // Unique config key
+    category: v.union(
+      v.literal("feature_flags"),
+      v.literal("rate_limits"),
+      v.literal("risk_defaults"),
+      v.literal("token_gating"),
+      v.literal("llm_settings"),
+      v.literal("agent_runtime")
+    ),
+    value: v.any(), // The config value (type depends on key)
+    description: v.string(),
+    updatedAt: v.number(),
+    updatedBy: v.optional(v.id("admin_users")),
+  })
+    .index("by_key", ["key"])
+    .index("by_category", ["category"]),
 
   // ============================================
   // Admin: System Metrics
