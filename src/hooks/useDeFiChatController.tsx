@@ -24,8 +24,8 @@ import { SettingsModal } from '../components/settings/SettingsModal'
 import type { HeaderBarProps } from '../components/header/HeaderBar'
 import type { ChatSurfaceProps } from '../components/surfaces/ChatSurface'
 import type { WorkspaceSurfaceProps } from '../components/surfaces/WorkspaceSurface'
-import { useWalletClient, usePublicClient, useSwitchChain } from 'wagmi'
-import { useAppKit } from '@reown/appkit/react'
+import { useWalletClient, usePublicClient, useSwitchChain, useDisconnect } from 'wagmi'
+import { useAppKit, useDisconnect as useAppKitDisconnect } from '@reown/appkit/react'
 import { erc20Abi } from 'viem'
 
 import type { ShellUIState, ShellUIAction } from './useShellUIReducer'
@@ -298,8 +298,23 @@ export function useDeFiChatController({ props, shellState, dispatch }: UseDeFiCh
   const { data: walletClient } = walletClientResult
   const publicClient = usePublicClient()
   const { switchChainAsync } = useSwitchChain()
+  const { disconnectAsync: wagmiDisconnect } = useDisconnect()
   const { open: openAppKit } = useAppKit()
+  const { disconnect: appKitDisconnect } = useAppKitDisconnect()
   const walletReady = Boolean(walletClient)
+
+  // Disconnect handler - clears wallet connection and auth state
+  // Uses AppKit disconnect which handles both EVM and Solana wallets
+  const handleDisconnectWallet = useCallback(async () => {
+    try {
+      // AppKit disconnect handles all wallet types (EVM + Solana)
+      await appKitDisconnect()
+      // Also try wagmi disconnect as fallback for EVM-only connections
+      await wagmiDisconnect().catch(() => {})
+    } catch (error) {
+      console.warn('Disconnect error:', error)
+    }
+  }, [appKitDisconnect, wagmiDisconnect])
 
   const exportSession = useCallback(() => {
     try {
@@ -468,14 +483,6 @@ export function useDeFiChatController({ props, shellState, dispatch }: UseDeFiCh
       setHighlight(['trending_tokens'])
     }
   }, [setHighlight, storeAddWidget])
-
-  useEffect(() => {
-    loadTrendingTokensPanel({ highlight: true }).catch(() => {})
-    const interval = window.setInterval(() => {
-      loadTrendingTokensPanel().catch(() => {})
-    }, 60_000)
-    return () => window.clearInterval(interval)
-  }, [loadTrendingTokensPanel])
 
   useEffect(() => {
     try {
@@ -1136,6 +1143,7 @@ export function useDeFiChatController({ props, shellState, dispatch }: UseDeFiCh
     onPersonaChange: setPersona,
     onNewChat: handleStartNewChat,
     onConnectWallet: () => openAppKit(),
+    onDisconnectWallet: handleDisconnectWallet,
     menuActions: [
       {
         id: 'open-settings',
