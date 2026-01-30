@@ -239,7 +239,7 @@ export function useSwigSessions({
 
       try {
         // Import Swig SDK dynamically
-        const { Swig, SwigRole: SwigRoleSDK } = await import('@swig-wallet/sdk')
+        const { Swig, SwigRole: SwigRoleSDK } = await import('@swig-wallet/lib')
         const { Connection, clusterApiUrl } = await import('@solana/web3.js')
 
         // Create connection
@@ -315,7 +315,7 @@ export function useSwigSessions({
 
       try {
         // Import Swig SDK dynamically
-        const { Swig } = await import('@swig-wallet/sdk')
+        const { Swig } = await import('@swig-wallet/lib')
         const { Connection, clusterApiUrl } = await import('@solana/web3.js')
 
         // Create connection

@@ -136,7 +136,7 @@ export function useSwigWallet({
 
     try {
       // Import Swig SDK dynamically to avoid SSR issues
-      const { Swig } = await import('@swig-wallet/sdk')
+      const { Swig } = await import('@swig-wallet/lib')
       const { Connection, clusterApiUrl } = await import('@solana/web3.js')
 
       // Create connection to Solana
