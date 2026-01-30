@@ -241,7 +241,7 @@ function SizingStep({
   return (
     <div className="space-y-4">
       <InfoBox>
-        Choose how to size your trades relative to the leader's trades.
+        Choose how to size your trades relative to the leader&apos;s trades.
       </InfoBox>
 
       <div>
