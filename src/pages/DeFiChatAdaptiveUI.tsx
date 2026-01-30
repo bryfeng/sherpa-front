@@ -96,10 +96,17 @@ export default function DeFiChatAdaptiveUI(props: DeFiChatAdaptiveUIProps) {
           activeWidgetId,
           panelWidth,
           walletAddress: walletAddress ?? undefined,
+          walletReady: workspaceSurfaceProps.walletReady,
           onTabClick: setActiveWidget,
           onTabClose: closeWidgetTab,
           onPanelResize: setPanelWidth,
           onAddWidget: () => setWidgetPickerOpen(true),
+          onSwap: workspaceSurfaceProps.onSwap,
+          onBridge: workspaceSurfaceProps.onBridge,
+          onRefreshSwapQuote: workspaceSurfaceProps.onRefreshSwapQuote,
+          onRefreshBridgeQuote: workspaceSurfaceProps.onRefreshBridgeQuote,
+          onInsertQuickPrompt: workspaceSurfaceProps.onInsertQuickPrompt,
+          onExpandWidget: workspaceSurfaceProps.onExpand,
         }}
       />
       {modals}

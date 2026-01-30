@@ -22,9 +22,9 @@ import {
 
 interface RelationshipCardProps {
   relationship: CopyRelationship
-  onPause: (id: string, reason?: string) => Promise<void>
-  onResume: (id: string) => Promise<void>
-  onDelete: (id: string) => Promise<void>
+  onPause: (id: string, reason?: string) => Promise<unknown>
+  onResume: (id: string) => Promise<unknown>
+  onDelete: (id: string) => Promise<unknown>
   onEdit: (id: string) => void
   onViewHistory: (id: string) => void
 }

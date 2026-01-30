@@ -11,7 +11,7 @@ const client = axios.create({ baseURL: BASE })
 client.interceptors.request.use((config) => {
   const token = getAccessToken()
   if (token) {
-    config.headers = { ...(config.headers || {}), Authorization: `Bearer ${token}` }
+    config.headers.set('Authorization', `Bearer ${token}`)
   }
   return config
 })

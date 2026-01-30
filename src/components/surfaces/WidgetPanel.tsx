@@ -16,12 +16,22 @@ export interface WidgetPanelProps {
   isVisible: boolean
   /** Connected wallet address */
   walletAddress?: string
+  /** Whether wallet is ready for transactions */
+  walletReady?: boolean
   /** Callbacks */
   onTabClick: (id: string) => void
   onTabClose: (id: string) => void
   onCollapse: () => void
   onPanelResize: (width: number) => void
   onAddWidget?: () => void
+  /** Swap/Bridge execution callbacks */
+  onSwap?: (widget: Widget) => Promise<string | void>
+  onBridge?: (widget: Widget) => Promise<string | void>
+  onRefreshSwapQuote?: () => Promise<void>
+  onRefreshBridgeQuote?: () => Promise<void>
+  onInsertQuickPrompt?: (prompt: string) => void
+  /** Callback to expand a widget in modal */
+  onExpandWidget?: (widgetId: string) => void
 }
 
 function WidgetPanelComponent({
@@ -30,11 +40,18 @@ function WidgetPanelComponent({
   panelWidth,
   isVisible,
   walletAddress,
+  walletReady,
   onTabClick,
   onTabClose,
   onCollapse,
   onPanelResize,
   onAddWidget,
+  onSwap,
+  onBridge,
+  onRefreshSwapQuote,
+  onRefreshBridgeQuote,
+  onInsertQuickPrompt,
+  onExpandWidget,
 }: WidgetPanelProps) {
   const activeWidget = panelWidgets.find((w) => w.id === activeWidgetId) ?? null
 
@@ -86,6 +103,13 @@ function WidgetPanelComponent({
             <WidgetContent
               widget={activeWidget}
               walletAddress={walletAddress}
+              walletReady={walletReady}
+              onSwap={onSwap}
+              onBridge={onBridge}
+              onRefreshSwapQuote={onRefreshSwapQuote}
+              onRefreshBridgeQuote={onRefreshBridgeQuote}
+              onInsertQuickPrompt={onInsertQuickPrompt}
+              onExpandWidget={onExpandWidget}
             />
           </div>
         </motion.div>

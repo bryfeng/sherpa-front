@@ -3,6 +3,7 @@ import { FileQuestion } from 'lucide-react'
 import type { Widget } from '../../../types/widgets'
 import { CardSkeleton } from '../../panels/CardSkeleton'
 import { PanelErrorBoundary } from '../../panels/PanelErrorBoundary'
+import { RelayQuoteWidget } from '../RelayQuoteWidget'
 
 // Lazy load heavy components
 const ChartPanel = React.lazy(() => import('../../panels/ChartPanel'))
@@ -50,9 +51,28 @@ interface DCAStrategiesPayload {
 export interface WidgetContentProps {
   widget: Widget | null
   walletAddress?: string
+  walletReady?: boolean
+  /** Swap/Bridge execution callbacks */
+  onSwap?: (widget: Widget) => Promise<string | void>
+  onBridge?: (widget: Widget) => Promise<string | void>
+  onRefreshSwapQuote?: () => Promise<void>
+  onRefreshBridgeQuote?: () => Promise<void>
+  onInsertQuickPrompt?: (prompt: string) => void
+  /** Callback to expand widget in modal */
+  onExpandWidget?: (widgetId: string) => void
 }
 
-export function WidgetContent({ widget, walletAddress }: WidgetContentProps) {
+export function WidgetContent({
+  widget,
+  walletAddress,
+  walletReady,
+  onSwap,
+  onBridge,
+  onRefreshSwapQuote,
+  onRefreshBridgeQuote,
+  onInsertQuickPrompt,
+  onExpandWidget,
+}: WidgetContentProps) {
   if (!widget) {
     return <WidgetEmptyState />
   }
@@ -61,7 +81,17 @@ export function WidgetContent({ widget, walletAddress }: WidgetContentProps) {
     <div className="flex-1 overflow-auto p-4">
       <PanelErrorBoundary>
         <Suspense fallback={<CardSkeleton density="full" />}>
-          <WidgetRenderer widget={widget} walletAddress={walletAddress} />
+          <WidgetRenderer
+            widget={widget}
+            walletAddress={walletAddress}
+            walletReady={walletReady}
+            onSwap={onSwap}
+            onBridge={onBridge}
+            onRefreshSwapQuote={onRefreshSwapQuote}
+            onRefreshBridgeQuote={onRefreshBridgeQuote}
+            onInsertQuickPrompt={onInsertQuickPrompt}
+            onExpandWidget={onExpandWidget}
+          />
         </Suspense>
       </PanelErrorBoundary>
     </div>
@@ -71,9 +101,23 @@ export function WidgetContent({ widget, walletAddress }: WidgetContentProps) {
 function WidgetRenderer({
   widget,
   walletAddress,
+  walletReady,
+  onSwap,
+  onBridge,
+  onRefreshSwapQuote,
+  onRefreshBridgeQuote,
+  onInsertQuickPrompt,
+  onExpandWidget,
 }: {
   widget: Widget
   walletAddress?: string
+  walletReady?: boolean
+  onSwap?: (widget: Widget) => Promise<string | void>
+  onBridge?: (widget: Widget) => Promise<string | void>
+  onRefreshSwapQuote?: () => Promise<void>
+  onRefreshBridgeQuote?: () => Promise<void>
+  onInsertQuickPrompt?: (prompt: string) => void
+  onExpandWidget?: (widgetId: string) => void
 }) {
   const payload: any = widget.payload
 
@@ -90,7 +134,7 @@ function WidgetRenderer({
           controls={{
             collapsed: false,
             onToggleCollapse: () => {},
-            onExpand: () => {},
+            onExpand: () => onExpandWidget?.(widget.id),
           }}
         />
       )
@@ -106,8 +150,28 @@ function WidgetRenderer({
     case 'history-summary':
       return <HistorySummaryPanel widget={widget as any} />
 
-    case 'card':
-      // Generic card content - render payload as JSON for now
+    case 'card': {
+      // Check if this is a swap or bridge quote
+      const quoteType = typeof payload?.quote_type === 'string' ? payload.quote_type : undefined
+      const isSwapWidget = quoteType === 'swap' || widget.id === 'relay_swap_quote'
+      const isBridgeWidget = quoteType === 'bridge' || widget.id === 'relay_bridge_quote'
+
+      if (isSwapWidget || isBridgeWidget) {
+        const executeFn = isSwapWidget ? onSwap : onBridge
+        const refreshFn = isSwapWidget ? onRefreshSwapQuote : onRefreshBridgeQuote
+        return (
+          <RelayQuoteWidget
+            panel={widget}
+            walletAddress={walletAddress}
+            walletReady={walletReady}
+            onExecuteQuote={executeFn}
+            onRefreshQuote={refreshFn}
+            onInsertQuickPrompt={onInsertQuickPrompt}
+          />
+        )
+      }
+
+      // Generic card content
       return (
         <div className="rounded-lg border p-4" style={{ borderColor: 'var(--line)' }}>
           <h3 className="mb-2 text-sm font-medium">{widget.title}</h3>
@@ -118,6 +182,7 @@ function WidgetRenderer({
           )}
         </div>
       )
+    }
 
     // Policy widgets
     case 'risk-policy':

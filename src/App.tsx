@@ -10,7 +10,7 @@
  */
 
 import { useEffect, useMemo } from 'react'
-import { useAccount, useReconnect } from 'wagmi'
+import { useAccount } from 'wagmi'
 import { useAppKitAccount } from '@reown/appkit/react'
 
 // Store
@@ -47,29 +47,27 @@ import './styles/design-system.css'
 
 function useWalletSync() {
   const { address, isConnected } = useAccount()
-  const { reconnectAsync } = useReconnect()
   const evmAppKitAccount = useAppKitAccount({ namespace: 'eip155' })
   const solanaAccount = useAppKitAccount({ namespace: 'solana' })
 
   const setWallet = useSherpaStore((s) => s.setWallet)
   const clearWallet = useSherpaStore((s) => s.clearWallet)
 
-  // Attempt to reconnect wagmi on mount
-  useEffect(() => {
-    reconnectAsync().catch(() => {})
-  }, [reconnectAsync])
+  // NOTE: Auto-reconnect removed to give users control over wallet selection.
+  // Users must explicitly click "Connect Wallet" to connect.
 
   // Resolve the active wallet from various sources
+  // Priority: EVM (wagmi) > EVM (AppKit) > Solana
+  // This prioritizes EVM wallets since most DeFi activity is on EVM chains
   const activeWallet = useMemo(() => {
-    // Priority: Solana > wagmi EVM > AppKit EVM
-    if (solanaAccount.isConnected && solanaAccount.address) {
-      return { address: solanaAccount.address, chain: 'solana' as const, isConnected: true }
-    }
     if (isConnected && address) {
       return { address, chain: 'ethereum' as const, isConnected: true }
     }
     if (evmAppKitAccount.isConnected && evmAppKitAccount.address) {
       return { address: evmAppKitAccount.address, chain: 'ethereum' as const, isConnected: true }
+    }
+    if (solanaAccount.isConnected && solanaAccount.address) {
+      return { address: solanaAccount.address, chain: 'solana' as const, isConnected: true }
     }
     return null
   }, [

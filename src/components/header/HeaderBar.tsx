@@ -420,14 +420,15 @@ function HeaderBarComponent({
           )}
           {walletConnected && authLabel && (
             <div className="inline-flex items-center gap-2">
-              <Badge
-                variant="outline"
-                className="rounded-md px-2.5 py-0.5 text-xs"
-                style={{ color: authTone, borderColor: authTone }}
-                title={authError || undefined}
-              >
-                {authLabel}
-              </Badge>
+              <span title={authError || undefined}>
+                <Badge
+                  variant="outline"
+                  className="rounded-md px-2.5 py-0.5 text-xs"
+                  style={{ color: authTone, borderColor: authTone }}
+                >
+                  {authLabel}
+                </Badge>
+              </span>
               {authStatus === 'error' && onRetryAuth && (
                 <button
                   onClick={onRetryAuth}

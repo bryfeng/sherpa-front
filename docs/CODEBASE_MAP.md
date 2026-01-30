@@ -5,6 +5,11 @@
 
 This document provides a comprehensive architectural overview of the Sherpa frontend codebase.
 
+> **⚠️ Architecture Transition (2026-01-27):** The wallet infrastructure is transitioning to Rhinestone Smart Wallets. See `planning/frontend-roadmap.md` Phase 10 for details. Key changes:
+> - **Session Keys**: Moving from off-chain (`useSessionKeys`) to on-chain (Smart Sessions via `@rhinestone/sdk`)
+> - **Wallet Type**: Adding ERC-7579 Smart Account support alongside EOA
+> - **Solana**: Will add Swig smart wallet support (later phase)
+
 ---
 
 ## Quick Navigation
@@ -81,7 +86,7 @@ convex/
 ├── executions.ts         # Trade execution records
 ├── policies.ts           # Risk policy rules
 ├── strategies.ts         # Strategy definitions
-├── session_keys.ts       # Session key management
+├── session_keys.ts       # Session key management (⚠️ legacy - see Phase 10)
 ├── notifications.ts      # User notifications
 ├── _generated/           # Auto-generated types
 └── crons.ts              # 8 scheduled jobs
@@ -98,7 +103,7 @@ convex/
 | `strategies` | Trading strategies | `name`, `status`, `conditions`, `actions` |
 | `executions` | Execution history | `strategyId`, `status`, `txHash`, `result` |
 | `policies` | Risk policies | `name`, `rules`, `priority`, `isActive` |
-| `session_keys` | Delegated keys | `publicKey`, `permissions`, `expiresAt` |
+| `session_keys` | Delegated keys (⚠️ legacy) | `publicKey`, `permissions`, `expiresAt` |
 | `notifications` | User alerts | `type`, `title`, `read`, `data` |
 | `approvals` | Pending approvals | `type`, `status`, `requestedAt` |
 
@@ -391,16 +396,20 @@ src/components/policy/
 - **Session Policies**: Per-session limits
 - **Risk Policies**: User-defined rules
 
-### Session Keys
+### Session Keys (⚠️ Being Replaced by Rhinestone Smart Sessions)
+
+> **⚠️ Architecture Transition (2026-01-27):** Off-chain session keys are being replaced by on-chain Smart Sessions via Rhinestone. See `planning/frontend-roadmap.md` Phase 10.
 
 ```
-src/hooks/useSessionKeys.ts    # Session key management
+src/hooks/useSessionKeys.ts    # Session key management (legacy)
 ```
 
-Session keys enable delegated signing:
+Session keys enable delegated signing (legacy approach):
 - Time-bounded permissions
 - Action-specific scopes
 - Revocable at any time
+
+**New approach (Phase 10):** Smart Sessions provide on-chain permission enforcement via ERC-7579 modules.
 
 ### Execution Signing
 
@@ -469,7 +478,7 @@ type ShellAction =
 | `useConversations` | Conversation CRUD | ~200 |
 | `useStrategies` | Strategy management | ~250 |
 | `useRiskPolicy` | Policy evaluation | ~150 |
-| `useSessionKeys` | Key management | ~180 |
+| `useSessionKeys` | Key management (⚠️ legacy) | ~180 |
 | `useHistorySummary` | Wallet history | ~200 |
 | `useMarketData` | Price/market data | ~150 |
 | `useExecutionSigning` | Transaction signing | 547 |

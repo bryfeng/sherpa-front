@@ -16,7 +16,7 @@ const appKitNetworks = [...wagmiNetworks, solana] as any
 const metadata = {
   name: 'Agentic Wallet',
   description: 'DeFi-focused chat interface',
-  url: 'http://localhost:5173',
+  url: typeof window !== 'undefined' ? window.location.origin : 'http://localhost:5173',
   icons: ['https://avatars.githubusercontent.com/u/37784886?s=200&v=4']
 }
 

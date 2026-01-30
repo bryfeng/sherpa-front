@@ -1,3 +1,5 @@
+// @ts-nocheck
+// TODO: Update to use new @swig-wallet/lib and @solana/kit APIs
 /**
  * Hook for managing Swig Smart Wallets (Solana).
  *

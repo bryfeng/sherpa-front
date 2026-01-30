@@ -16,8 +16,8 @@ import {
 
 interface PendingApprovalCardProps {
   execution: CopyExecution
-  onApprove: (id: string) => Promise<{ success: boolean; executionId?: string }>
-  onReject: (id: string, reason?: string) => Promise<void>
+  onApprove: (id: string) => Promise<{ success: boolean; executionId?: string } | { success: boolean }>
+  onReject: (id: string, reason?: string) => Promise<unknown>
   onSign?: (executionId: string) => Promise<void> // Called after approval to sign tx
 }
 

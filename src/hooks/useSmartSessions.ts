@@ -1,56 +1,48 @@
-// @ts-nocheck
-// TODO: Update to use new @swig-wallet/lib and @solana/kit APIs
 /**
- * Hook for managing Swig Sessions (Solana).
+ * Hook for managing Rhinestone Smart Sessions.
  *
  * Provides functionality to:
- * - Query existing Swig sessions for a wallet
- * - Grant new session permissions (role-based)
+ * - Query existing Smart Sessions for a Smart Account
+ * - Grant new on-chain session permissions (ERC-7715)
  * - Track session usage and spending
  * - Revoke sessions
  *
- * @module hooks/useSwigSessions
+ * @module hooks/useSmartSessions
  */
 
 import { useState, useCallback, useMemo } from 'react'
+import { useAccount, useWalletClient, usePublicClient } from 'wagmi'
 import { useQuery, useMutation } from 'convex/react'
 import { api } from '../../convex/_generated/api'
 
-// Swig session permission types
-export type SwigSessionAction = 'swap' | 'transfer' | 'stake' | 'unstake'
+// Smart Session permission types
+export type SmartSessionAction = 'swap' | 'bridge' | 'transfer' | 'approve' | 'stake' | 'unstake'
 
-// Swig role types
-export type SwigRole = 'agent' | 'dca' | 'copy_trading' | 'custom'
-
-export interface SwigSessionConfig {
-  /** Role name for the session */
-  role: SwigRole
+export interface SmartSessionConfig {
   /** Maximum spending limit in USD */
   spendingLimitUsd: number
-  /** Programs the session can interact with */
-  allowedPrograms: string[]
-  /** Tokens the session can spend/receive (mint addresses) */
+  /** Contracts the session can interact with */
+  allowedContracts: string[]
+  /** Tokens the session can spend/receive */
   allowedTokens: string[]
-  /** Actions permitted (swap, transfer, etc.) */
-  allowedActions: SwigSessionAction[]
+  /** Actions permitted (swap, bridge, transfer, etc.) */
+  allowedActions: SmartSessionAction[]
   /** Session validity duration in seconds */
   validityDuration: number
 }
 
-export interface SwigSessionData {
+export interface SmartSessionData {
   /** Unique session identifier */
   sessionId: string
-  /** Swig wallet this session belongs to */
-  swigWalletAddress: string
-  /** Role name */
-  role: string
+  /** Smart Account this session belongs to */
+  smartAccountAddress: string
   /** Maximum spending limit in USD */
   spendingLimitUsd: number
   /** Total amount spent in USD */
   totalSpentUsd: number
-  /** Allowed program IDs */
-  allowedPrograms: string[]
-  /** Allowed token mint addresses */
+  /** Allowed contract addresses */
+  allowedContracts: string[]
+  /** Allowed token addresses */
   allowedTokens: string[]
   /** Allowed actions */
   allowedActions: string[]
@@ -64,34 +56,32 @@ export interface SwigSessionData {
   createdAt: number
   /** Last usage timestamp */
   lastUsedAt?: number
-  /** Grant transaction signature */
-  grantTxSignature?: string
-  /** Revoke transaction signature */
-  revokeTxSignature?: string
+  /** Grant transaction hash */
+  grantTxHash?: string
+  /** Revoke transaction hash */
+  revokeTxHash?: string
 }
 
-export interface UseSwigSessionsOptions {
-  /** Swig wallet address */
-  swigWalletAddress?: string
-  /** Solana wallet address (owner) */
-  solanaAddress?: string
+export interface UseSmartSessionsOptions {
+  /** Smart Account address (uses connected account by default) */
+  smartAccountAddress?: string
   /** Include expired sessions in list */
   includeExpired?: boolean
   /** Include revoked sessions in list */
   includeRevoked?: boolean
 }
 
-export interface UseSwigSessionsReturn {
+export interface UseSmartSessionsReturn {
   // State
-  sessions: SwigSessionData[]
-  activeSession: SwigSessionData | null
+  sessions: SmartSessionData[]
+  activeSession: SmartSessionData | null
   isLoading: boolean
   isGranting: boolean
   isRevoking: boolean
   error: string | null
 
   // Actions
-  grantSession: (config: SwigSessionConfig) => Promise<string | null>
+  grantSession: (config: SmartSessionConfig) => Promise<string | null>
   revokeSession: (sessionId: string) => Promise<boolean>
   refreshSessions: () => Promise<void>
 
@@ -99,32 +89,29 @@ export interface UseSwigSessionsReturn {
   hasActiveSession: boolean
   getSpendingRemaining: () => number
   getTimeRemaining: () => number // seconds
-  canExecuteAction: (action: SwigSessionAction) => boolean
+  canExecuteAction: (action: SmartSessionAction) => boolean
 }
 
 /**
- * Hook for managing Swig Sessions on Solana.
+ * Hook for managing Rhinestone Smart Sessions.
  *
  * @example
  * ```tsx
- * function SwigSessionManager() {
- *   const { publicKey } = useWallet()
- *   const { swigWalletAddress } = useSwigWallet({ solanaAddress: publicKey?.toBase58() })
+ * function SessionManager() {
  *   const {
  *     sessions,
  *     activeSession,
  *     grantSession,
  *     hasActiveSession,
  *     getSpendingRemaining
- *   } = useSwigSessions({ swigWalletAddress })
+ *   } = useSmartSessions()
  *
  *   const handleGrant = async () => {
  *     await grantSession({
- *       role: 'agent',
  *       spendingLimitUsd: 100,
- *       allowedPrograms: ['JUP6LkbZbjS1jKKwapdHNy74zcZ3tLUZoi5QNyVTaV4'],
- *       allowedTokens: ['So11111111111111111111111111111111111111112'],
- *       allowedActions: ['swap'],
+ *       allowedContracts: ['0x...'],
+ *       allowedTokens: ['0x...'],
+ *       allowedActions: ['swap', 'bridge'],
  *       validityDuration: 7 * 24 * 60 * 60, // 7 days
  *     })
  *   }
@@ -141,53 +128,55 @@ export interface UseSwigSessionsReturn {
  * }
  * ```
  */
-export function useSwigSessions({
-  swigWalletAddress: externalSwigAddress,
-  solanaAddress,
+export function useSmartSessions({
+  smartAccountAddress: externalAddress,
   includeExpired = false,
   includeRevoked = false,
-}: UseSwigSessionsOptions = {}): UseSwigSessionsReturn {
+}: UseSmartSessionsOptions = {}): UseSmartSessionsReturn {
+  const { address: eoaAddress, chainId } = useAccount()
+  const { data: walletClient } = useWalletClient()
+  const publicClient = usePublicClient()
+
   const [isGranting, setIsGranting] = useState(false)
   const [isRevoking, setIsRevoking] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
-  // Get Swig wallet for owner if not provided
-  const swigWallet = useQuery(
-    api.swigWallets.getByOwner,
-    !externalSwigAddress && solanaAddress ? { ownerAddress: solanaAddress } : 'skip'
+  // Get Smart Account for EOA
+  const smartAccount = useQuery(
+    api.smartAccounts.getByOwner,
+    eoaAddress ? { ownerAddress: eoaAddress } : 'skip'
   )
 
-  const effectiveAddress = externalSwigAddress ?? swigWallet?.swigWalletAddress
+  const effectiveAddress = externalAddress ?? smartAccount?.smartAccountAddress
 
   // Query sessions from Convex
   const sessionsData = useQuery(
-    api.swigSessions.listBySwigWallet,
+    api.smartSessions.listBySmartAccount,
     effectiveAddress
-      ? { swigWalletAddress: effectiveAddress, includeExpired, includeRevoked }
+      ? { smartAccountAddress: effectiveAddress, includeExpired, includeRevoked }
       : 'skip'
   )
 
   // Query active session
   const activeSessionData = useQuery(
-    api.swigSessions.getActive,
-    effectiveAddress ? { swigWalletAddress: effectiveAddress } : 'skip'
+    api.smartSessions.getActive,
+    effectiveAddress ? { smartAccountAddress: effectiveAddress } : 'skip'
   )
 
   // Mutations
-  const createSessionMutation = useMutation(api.swigSessions.create)
-  const revokeSessionMutation = useMutation(api.swigSessions.revoke)
+  const createSessionMutation = useMutation(api.smartSessions.create)
+  const revokeSessionMutation = useMutation(api.smartSessions.revoke)
 
   // Transform sessions data
-  const sessions: SwigSessionData[] = useMemo(() => {
+  const sessions: SmartSessionData[] = useMemo(() => {
     if (!sessionsData) return []
 
     return sessionsData.map((s) => ({
       sessionId: s.sessionId,
-      swigWalletAddress: s.swigWalletAddress,
-      role: s.role,
+      smartAccountAddress: s.smartAccountAddress,
       spendingLimitUsd: s.spendingLimitUsd,
       totalSpentUsd: s.totalSpentUsd ?? 0,
-      allowedPrograms: s.allowedPrograms,
+      allowedContracts: s.allowedContracts,
       allowedTokens: s.allowedTokens,
       allowedActions: s.allowedActions,
       validUntil: s.validUntil,
@@ -195,22 +184,21 @@ export function useSwigSessions({
       transactionCount: s.transactionCount ?? 0,
       createdAt: s.createdAt,
       lastUsedAt: s.lastUsedAt ?? undefined,
-      grantTxSignature: s.grantTxSignature ?? undefined,
-      revokeTxSignature: s.revokeTxSignature ?? undefined,
+      grantTxHash: s.grantTxHash ?? undefined,
+      revokeTxHash: s.revokeTxHash ?? undefined,
     }))
   }, [sessionsData])
 
   // Transform active session
-  const activeSession: SwigSessionData | null = useMemo(() => {
+  const activeSession: SmartSessionData | null = useMemo(() => {
     if (!activeSessionData) return null
 
     return {
       sessionId: activeSessionData.sessionId,
-      swigWalletAddress: activeSessionData.swigWalletAddress,
-      role: activeSessionData.role,
+      smartAccountAddress: activeSessionData.smartAccountAddress,
       spendingLimitUsd: activeSessionData.spendingLimitUsd,
       totalSpentUsd: activeSessionData.totalSpentUsd ?? 0,
-      allowedPrograms: activeSessionData.allowedPrograms,
+      allowedContracts: activeSessionData.allowedContracts,
       allowedTokens: activeSessionData.allowedTokens,
       allowedActions: activeSessionData.allowedActions,
       validUntil: activeSessionData.validUntil,
@@ -218,21 +206,21 @@ export function useSwigSessions({
       transactionCount: activeSessionData.transactionCount ?? 0,
       createdAt: activeSessionData.createdAt,
       lastUsedAt: activeSessionData.lastUsedAt ?? undefined,
-      grantTxSignature: activeSessionData.grantTxSignature ?? undefined,
+      grantTxHash: activeSessionData.grantTxHash ?? undefined,
     }
   }, [activeSessionData])
 
   const isLoading =
     (sessionsData === undefined && effectiveAddress !== undefined) ||
-    (swigWallet === undefined && solanaAddress !== undefined && !externalSwigAddress)
+    (smartAccount === undefined && eoaAddress !== undefined)
 
   /**
-   * Grant a new Swig session on-chain.
+   * Grant a new Smart Session on-chain.
    */
   const grantSession = useCallback(
-    async (config: SwigSessionConfig): Promise<string | null> => {
-      if (!effectiveAddress) {
-        setError('Swig wallet not found')
+    async (config: SmartSessionConfig): Promise<string | null> => {
+      if (!effectiveAddress || !walletClient || !chainId) {
+        setError('Smart Account or wallet not connected')
         return null
       }
 
@@ -240,75 +228,93 @@ export function useSwigSessions({
       setError(null)
 
       try {
-        // Import Swig SDK dynamically
-        const { Swig, SwigRole: SwigRoleSDK } = await import('@swig-wallet/lib')
-        const { Connection, clusterApiUrl } = await import('@solana/web3.js')
+        // Import Rhinestone SDK dynamically
+        const { RhinestoneSDK } = await import('@rhinestone/sdk')
 
-        // Create connection
-        const connection = new Connection(clusterApiUrl('mainnet-beta'))
+        const rhinestone = new RhinestoneSDK()
 
-        // Get Swig wallet instance
-        const swigWallet = await Swig.load({
-          connection,
-          address: effectiveAddress,
+        // Get the smart account instance
+        const account = await rhinestone.getAccount({
+          address: effectiveAddress as `0x${string}`,
+          owners: {
+            type: 'ecdsa',
+            accounts: [walletClient],
+          },
         })
 
         // Calculate validity timestamp
         const validUntil = Date.now() + config.validityDuration * 1000
 
         // Generate session ID
-        const sessionId = `swig_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`
+        const sessionId = `ss_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`
 
-        // Build role configuration based on session config
-        const roleConfig = {
-          name: config.role,
-          permissions: {
-            spendingLimit: config.spendingLimitUsd,
-            allowedPrograms: config.allowedPrograms,
-            allowedTokens: config.allowedTokens,
-            allowedActions: config.allowedActions,
-            validUntil: Math.floor(validUntil / 1000), // Unix timestamp in seconds
-          },
+        // Build session permission parameters
+        // Note: This follows the ERC-7715 permission request format
+        const sessionParams = {
+          sessionId,
+          validUntil: Math.floor(validUntil / 1000), // Unix timestamp in seconds
+          policies: [
+            {
+              // Spending limit policy
+              type: 'spending-limit',
+              limit: config.spendingLimitUsd,
+              currency: 'USD',
+            },
+            {
+              // Contract allowlist policy
+              type: 'contract-allowlist',
+              contracts: config.allowedContracts,
+            },
+            {
+              // Token allowlist policy
+              type: 'token-allowlist',
+              tokens: config.allowedTokens,
+            },
+            {
+              // Action restriction policy
+              type: 'action-allowlist',
+              actions: config.allowedActions,
+            },
+          ],
         }
 
-        // Grant role (triggers wallet signature)
-        const grantResult = await swigWallet.grantRole(roleConfig)
+        // Request session grant from user (triggers wallet signature)
+        const grantResult = await account.grantSession(sessionParams)
 
-        // Get transaction signature if available
-        const txSignature = grantResult?.signature ?? undefined
+        // Get transaction hash if available
+        const txHash = grantResult?.txHash ?? undefined
 
         // Save session to Convex
         await createSessionMutation({
-          swigWalletAddress: effectiveAddress,
+          smartAccountAddress: effectiveAddress,
           sessionId,
-          role: config.role,
           spendingLimitUsd: config.spendingLimitUsd,
-          allowedPrograms: config.allowedPrograms,
+          allowedContracts: config.allowedContracts,
           allowedTokens: config.allowedTokens,
           allowedActions: config.allowedActions,
           validUntil,
-          grantTxSignature: txSignature,
+          grantTxHash: txHash,
         })
 
         setIsGranting(false)
         return sessionId
       } catch (err) {
-        console.error('Error granting Swig session:', err)
+        console.error('Error granting Smart Session:', err)
         setError(err instanceof Error ? err.message : 'Failed to grant session')
         setIsGranting(false)
         return null
       }
     },
-    [effectiveAddress, createSessionMutation]
+    [effectiveAddress, walletClient, chainId, createSessionMutation]
   )
 
   /**
-   * Revoke an existing Swig session.
+   * Revoke an existing Smart Session.
    */
   const revokeSession = useCallback(
     async (sessionId: string): Promise<boolean> => {
-      if (!effectiveAddress) {
-        setError('Swig wallet not found')
+      if (!effectiveAddress || !walletClient) {
+        setError('Smart Account or wallet not connected')
         return false
       }
 
@@ -316,45 +322,47 @@ export function useSwigSessions({
       setError(null)
 
       try {
-        // Import Swig SDK dynamically
-        const { Swig } = await import('@swig-wallet/lib')
-        const { Connection, clusterApiUrl } = await import('@solana/web3.js')
+        // Import Rhinestone SDK dynamically
+        const { RhinestoneSDK } = await import('@rhinestone/sdk')
 
-        // Create connection
-        const connection = new Connection(clusterApiUrl('mainnet-beta'))
+        const rhinestone = new RhinestoneSDK()
 
-        // Get Swig wallet instance
-        const swigWallet = await Swig.load({
-          connection,
-          address: effectiveAddress,
+        // Get the smart account instance
+        const account = await rhinestone.getAccount({
+          address: effectiveAddress as `0x${string}`,
+          owners: {
+            type: 'ecdsa',
+            accounts: [walletClient],
+          },
         })
 
         // Revoke session on-chain
-        const revokeResult = await swigWallet.revokeRole(sessionId)
+        const revokeResult = await account.revokeSession(sessionId)
 
         // Update Convex record
         await revokeSessionMutation({
           sessionId,
-          revokeTxSignature: revokeResult?.signature,
+          revokeTxHash: revokeResult?.txHash,
         })
 
         setIsRevoking(false)
         return true
       } catch (err) {
-        console.error('Error revoking Swig session:', err)
+        console.error('Error revoking Smart Session:', err)
         setError(err instanceof Error ? err.message : 'Failed to revoke session')
         setIsRevoking(false)
         return false
       }
     },
-    [effectiveAddress, revokeSessionMutation]
+    [effectiveAddress, walletClient, revokeSessionMutation]
   )
 
   /**
-   * Refresh sessions list (Convex handles reactively).
+   * Refresh sessions list (Convex handles reactively, but this forces check).
    */
   const refreshSessions = useCallback(async () => {
     // Convex queries are reactive, so this is mainly for forcing UI updates
+    // The actual refresh happens automatically via Convex subscriptions
   }, [])
 
   // Helper: check if there's an active session
@@ -375,7 +383,7 @@ export function useSwigSessions({
 
   // Helper: check if action is permitted
   const canExecuteAction = useCallback(
-    (action: SwigSessionAction): boolean => {
+    (action: SmartSessionAction): boolean => {
       if (!activeSession || activeSession.status !== 'active') return false
       if (activeSession.validUntil < Date.now()) return false
       if (activeSession.totalSpentUsd >= activeSession.spendingLimitUsd) return false
@@ -402,23 +410,23 @@ export function useSwigSessions({
 }
 
 /**
- * Hook to get just the active Swig session status.
+ * Hook to get just the active session status.
  */
-export function useHasActiveSwigSession(swigWalletAddress?: string): boolean {
+export function useHasActiveSession(smartAccountAddress?: string): boolean {
   const activeSession = useQuery(
-    api.swigSessions.getActive,
-    swigWalletAddress ? { swigWalletAddress } : 'skip'
+    api.smartSessions.getActive,
+    smartAccountAddress ? { smartAccountAddress } : 'skip'
   )
   return activeSession !== null && activeSession !== undefined
 }
 
 /**
- * Hook to get Swig session statistics.
+ * Hook to get session statistics.
  */
-export function useSwigSessionStats(swigWalletAddress?: string) {
+export function useSessionStats(smartAccountAddress?: string) {
   const stats = useQuery(
-    api.swigSessions.getStats,
-    swigWalletAddress ? { swigWalletAddress } : 'skip'
+    api.smartSessions.getStats,
+    smartAccountAddress ? { smartAccountAddress } : 'skip'
   )
 
   return {
@@ -426,8 +434,8 @@ export function useSwigSessionStats(swigWalletAddress?: string) {
     activeSessions: stats?.activeSessions ?? 0,
     totalSpentUsd: stats?.totalSpentUsd ?? 0,
     totalTransactions: stats?.totalTransactions ?? 0,
-    isLoading: stats === undefined && swigWalletAddress !== undefined,
+    isLoading: stats === undefined && smartAccountAddress !== undefined,
   }
 }
 
-export default useSwigSessions
+export default useSmartSessions

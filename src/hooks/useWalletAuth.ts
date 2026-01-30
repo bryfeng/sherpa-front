@@ -85,7 +85,9 @@ export function useWalletAuth(activeWallet: ActiveWallet | null) {
       return
     }
 
-    if (auth.status === 'signing') {
+    // Don't auto-retry if already signing or if previous attempt errored
+    // User can manually retry via the "Retry" button in the header
+    if (auth.status === 'signing' || auth.status === 'error') {
       return
     }
 
