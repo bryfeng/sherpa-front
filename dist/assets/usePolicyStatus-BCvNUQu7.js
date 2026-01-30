@@ -1,6 +1,0 @@
-import{d9 as l,da as s,db as n,dd as a}from"./index-Dide1ZUj.js";/**
- * @license lucide-react v0.454.0 - ISC
- *
- * This source code is licensed under the ISC license.
- * See the LICENSE file in the root directory of this source tree.
- */const y=l("CircleCheckBig",[["path",{d:"M21.801 10A10 10 0 1 1 17 3.335",key:"yps3ct"}],["path",{d:"m9 11 3 3L22 4",key:"1pflzl"}]]);function d(){const t=s(n.systemPolicy.getStatus),e=a.useMemo(()=>t?{operational:t.operational,emergencyStop:t.emergencyStop,inMaintenance:t.inMaintenance,message:t.message}:{operational:!0,emergencyStop:!1,inMaintenance:!1,message:void 0},[t]),r=t===void 0,o=e.operational,i=!e.emergencyStop&&!e.inMaintenance,c=a.useMemo(()=>e.emergencyStop?e.message||"Trading is temporarily disabled for safety":e.inMaintenance?e.message||"System maintenance in progress":null,[e]),u=a.useMemo(()=>e.emergencyStop?"error":e.inMaintenance?"warning":"ok",[e]);return{status:e,isLoading:r,isOperational:o,canTrade:i,statusMessage:c,statusLevel:u}}function p(t){return s(n.systemPolicy.isChainAllowed,{chainId:t})??!0}function g(t){return s(n.systemPolicy.isTokenBlocked,{tokenAddress:t})??!1}function f(t){return s(n.systemPolicy.isContractBlocked,{contractAddress:t})??!1}export{y as C,p as a,g as b,f as c,d as u};

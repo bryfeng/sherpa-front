@@ -61,7 +61,7 @@ export function RelationshipCard({
       ? ((relationship.successfulTrades / (relationship.successfulTrades + relationship.failedTrades)) * 100).toFixed(0)
       : '0'
 
-  const handleAction = async (action: () => Promise<void>) => {
+  const handleAction = async (action: () => Promise<unknown>) => {
     setIsLoading(true)
     setShowMenu(false)
     try {
