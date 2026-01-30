@@ -1,8 +1,9 @@
 # Ignore local environment variables
 .env
+.env.local
 
 # Ignore installed dependencies
 node_modules/
 
-
-.env.local
+# Ignore build output
+dist/
