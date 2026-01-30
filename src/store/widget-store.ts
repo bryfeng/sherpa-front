@@ -283,7 +283,7 @@ export const useWidgetStore = create<WidgetStore>()(
           // ===== WIDGET ACTIONS =====
 
           performWidgetAction: (widgetId, action) => {
-            const { updateWidget, pinWidget, unpinWidget, collapseWidget, expandWidget, removeWidget, duplicateWidget: dupWidget, openConfigModal, refreshWidget } = get()
+            const { updateWidget: _updateWidget, pinWidget, unpinWidget, collapseWidget, expandWidget, removeWidget, duplicateWidget: dupWidget, openConfigModal, refreshWidget } = get()
 
             switch (action) {
               case 'pin':

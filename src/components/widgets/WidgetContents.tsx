@@ -961,7 +961,7 @@ function StrategyCard({ strategy, onActivate, onPause, onDelete }: StrategyCardP
 export function MyStrategiesWidget({ walletAddress, statusFilter }: MyStrategiesWidgetProps) {
   const { strategies, isLoading, isEmpty } = useGenericStrategies(walletAddress || null, statusFilter)
   const { activate, pause, remove } = useGenericStrategyMutations()
-  const [deletingId, setDeletingId] = useState<string | null>(null)
+  const [_deletingId, setDeletingId] = useState<string | null>(null)
 
   const handleActivate = useCallback(async (strategy: GenericStrategy) => {
     try {
@@ -1520,7 +1520,7 @@ export function PendingApprovalsWidget({ walletAddress, onApprove }: PendingAppr
     state: executionState,
     execute,
     reset: resetExecution,
-    handleTransactionConfirmed,
+    handleTransactionConfirmed: _handleTransactionConfirmed,
   } = useStrategyExecution()
 
   // Handle approve click - opens execution modal and triggers signing

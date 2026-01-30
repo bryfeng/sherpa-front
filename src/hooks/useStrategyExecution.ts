@@ -14,11 +14,11 @@ import {
   useAccount,
   usePublicClient,
 } from 'wagmi'
-import { parseEther, parseUnits, encodeFunctionData, type Address, type Hex } from 'viem'
+import { type Address, type Hex } from 'viem'
 import { useMutation } from 'convex/react'
 import { api } from '../../convex/_generated/api'
 import type { Id } from '../../convex/_generated/dataModel'
-import { api as backendApi, type SwapQuoteResponse, type TransactionData } from '../services/api'
+import { api as backendApi, type SwapQuoteResponse } from '../services/api'
 
 // ============================================
 // TYPES
@@ -101,7 +101,7 @@ const ERC20_ABI = [
 // ============================================
 
 // Common DEX router addresses (for reference)
-const DEX_ROUTERS: Record<string, Record<number, Address>> = {
+const _DEX_ROUTERS: Record<string, Record<number, Address>> = {
   uniswapV3: {
     1: '0xE592427A0AEce92De3Edee1F18E0157C05861564', // Mainnet
     8453: '0x2626664c2603336E57B271c5C0b26F421741e481', // Base
@@ -164,7 +164,7 @@ export function useStrategyExecution() {
     reset: resetApproval,
   } = useWriteContract()
 
-  const { isLoading: isConfirming, isSuccess: isConfirmed } = useWaitForTransactionReceipt({
+  const { isLoading: isConfirming, isSuccess: _isConfirmed } = useWaitForTransactionReceipt({
     hash: txHash,
   })
 

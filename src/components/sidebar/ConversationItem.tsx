@@ -14,7 +14,7 @@ interface ConversationItemProps {
 }
 
 export function ConversationItem({
-  id,
+  id: _id,
   title,
   updatedAt,
   isActive,

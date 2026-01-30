@@ -1,12 +1,10 @@
 import React, { useState, useCallback } from 'react'
 import {
   DollarSign,
-  Calendar,
   Shield,
   ChevronDown,
   ChevronUp,
   Info,
-  AlertTriangle,
 } from 'lucide-react'
 import type { DCAFormData, DCAFrequency, TokenInfo } from '../../types/strategy'
 import { DEFAULT_DCA_FORM, FREQUENCY_LABELS } from '../../types/strategy'

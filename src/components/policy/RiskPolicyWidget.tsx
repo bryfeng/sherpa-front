@@ -34,7 +34,7 @@ function StatRow({ label, value, status }: StatRowProps) {
   )
 }
 
-export function RiskPolicyWidget({ widget, walletAddress }: RiskPolicyWidgetProps) {
+export function RiskPolicyWidget({ widget: _widget, walletAddress }: RiskPolicyWidgetProps) {
   const [showForm, setShowForm] = useState(false)
   const { config, hasPolicy, isLoading, save, reset, applyPreset } = useRiskPolicy({
     walletAddress,

@@ -4,8 +4,6 @@ import {
   TrendingDown,
   Users,
   Activity,
-  BarChart3,
-  ExternalLink,
 } from 'lucide-react'
 import type { LeaderProfile } from '../../types/copy-trading'
 

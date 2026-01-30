@@ -25,7 +25,7 @@ export default function DeFiChatAdaptiveUI(props: DeFiChatAdaptiveUIProps) {
     headerProps,
     chatSurfaceProps,
     workspaceSurfaceProps,
-    surface,
+    surface: _surface,
     modals,
   } = useDeFiChatController({ props, shellState, dispatch })
 

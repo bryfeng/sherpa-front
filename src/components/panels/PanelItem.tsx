@@ -55,8 +55,8 @@ function getWidgetIcon(kind: string): React.ReactNode {
 
 function PanelItemComponent({
   widget,
-  index,
-  totalCount,
+  index: _index,
+  totalCount: _totalCount,
   collapsed,
   isHighlighted,
   walletAddress,

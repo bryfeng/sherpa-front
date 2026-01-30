@@ -12,7 +12,7 @@
 
 import { create } from 'zustand'
 import { devtools, persist, subscribeWithSelector } from 'zustand/middleware'
-import type { AgentMessage, Panel } from '../types/defi-ui'
+import type { AgentMessage } from '../types/defi-ui'
 import type { Widget } from '../types/widgets'
 import type { EntitlementSnapshot } from '../types/entitlement'
 import type { LLMProviderInfo } from '../types/llm'

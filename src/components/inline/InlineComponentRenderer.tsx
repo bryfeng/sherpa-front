@@ -7,7 +7,6 @@
 
 import React from 'react'
 import type { InlineComponent } from '../../types/defi-ui'
-import type { PortfolioPositionViewModel } from '../../workspace/types'
 import { InlineCard } from './InlineCard'
 import { EnhancedPortfolioCard } from '../portfolio'
 import {
@@ -29,7 +28,7 @@ interface InlineComponentRendererProps {
 export function InlineComponentRenderer({
   component,
   walletAddress,
-  isPro = false,
+  isPro: _isPro = false,
 }: InlineComponentRendererProps) {
   const { kind, payload, variant = 'standard', title } = component
 
@@ -102,7 +101,7 @@ export function InlineComponentRenderer({
  */
 function ActionCardContent({
   action,
-  params,
+  params: _params,
 }: {
   action?: string
   params?: Record<string, any>

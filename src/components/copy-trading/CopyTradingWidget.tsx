@@ -3,12 +3,9 @@ import {
   Users,
   TrendingUp,
   Clock,
-  Plus,
   Search,
-  Filter,
   ChevronLeft,
   BarChart3,
-  Settings,
 } from 'lucide-react'
 import { LeaderCard } from './LeaderCard'
 import { RelationshipCard } from './RelationshipCard'
@@ -36,17 +33,17 @@ interface CopyTradingWidgetProps {
 
 export function CopyTradingWidget({
   userId,
-  walletAddress,
+  walletAddress: _walletAddress,
   onStartCopy,
 }: CopyTradingWidgetProps) {
   const [activeTab, setActiveTab] = useState<Tab>('my-copies')
   const [view, setView] = useState<View>('list')
   const [selectedLeader, setSelectedLeader] = useState<LeaderProfile | null>(null)
-  const [selectedRelationshipId, setSelectedRelationshipId] = useState<string | null>(null)
+  const [_selectedRelationshipId, setSelectedRelationshipId] = useState<string | null>(null)
   const [searchQuery, setSearchQuery] = useState('')
 
   // Data hooks
-  const { relationships, isLoading: relationshipsLoading, activeCount, pausedCount } = useCopyRelationships(userId)
+  const { relationships, isLoading: relationshipsLoading, activeCount, pausedCount: _pausedCount } = useCopyRelationships(userId)
   const { approvals, count: pendingCount, isLoading: approvalsLoading } = usePendingCopyApprovals(userId)
   const { leaders, isLoading: leadersLoading } = useLeaderboard({ limit: 20, minTrades: 10 })
   const { stats, isLoading: statsLoading } = useCopyStats(userId)

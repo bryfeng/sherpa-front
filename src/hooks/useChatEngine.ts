@@ -10,7 +10,7 @@ import { useReducedMotion } from 'framer-motion'
 import { useSherpaStore } from '../store'
 import { api } from '../services/api'
 import { transformBackendPanels } from '../services/panels'
-import type { AgentMessage, InlineComponent, InlineComponentKind, InlineComponentVariant } from '../types/defi-ui'
+import type { InlineComponent, InlineComponentKind, InlineComponentVariant } from '../types/defi-ui'
 import type { Widget } from '../types/widgets'
 
 // Map backend panel kinds to inline component kinds
@@ -104,7 +104,7 @@ export function useChatEngine(options: UseChatEngineOptions) {
   const scrollRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLTextAreaElement>(null)
   const isMountedRef = useRef(true)
-  const lastAnnouncedIdRef = useRef<string | null>(null)
+  const _lastAnnouncedIdRef = useRef<string | null>(null)
 
   // Cleanup on unmount
   useEffect(() => {

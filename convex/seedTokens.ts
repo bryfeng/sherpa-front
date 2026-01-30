@@ -6,7 +6,7 @@
  */
 
 import { v } from "convex/values";
-import { internalMutation, mutation } from "./_generated/server";
+import { mutation } from "./_generated/server";
 
 // Native token placeholder address
 const NATIVE_PLACEHOLDER = "0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE";

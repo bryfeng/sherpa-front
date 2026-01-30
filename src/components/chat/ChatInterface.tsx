@@ -9,7 +9,7 @@
  * - Contextual quick actions
  */
 
-import React, { memo, useEffect, useState, useRef } from 'react'
+import React, { memo, useEffect, useState } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
 import {
   Send,
@@ -18,7 +18,6 @@ import {
   ExternalLink,
   Sparkles,
   ChartBar,
-  Pin,
   ArrowRight,
   Zap,
   TrendingUp,

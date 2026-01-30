@@ -7,7 +7,7 @@
 
 import { useCallback, useEffect, useRef } from 'react'
 import { useSherpaStore } from '../store'
-import { getTopPrices, type TokenChartResponse } from '../services/prices'
+import { getTopPrices } from '../services/prices'
 import { getTrendingTokens, type TrendingToken } from '../services/trending'
 import type { Widget } from '../types/widgets'
 

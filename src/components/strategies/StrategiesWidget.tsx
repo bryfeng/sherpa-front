@@ -9,10 +9,9 @@ import { AnimatePresence, motion } from 'framer-motion'
 import { ArrowLeft, Play, Clock, Check, X, AlertCircle, Loader2 } from 'lucide-react'
 import { useAccount } from 'wagmi'
 import { StrategyList } from './StrategyList'
-import { StrategyForm } from './StrategyForm'
 import { useGenericStrategies, useGenericStrategyMutations, type GenericStrategy, formatNextExecution } from '../../hooks/useStrategies'
 import { useExecutionHistory, useExecutionMutations, formatWaitingTime, getUrgencyLevel } from '../../workspace/hooks/usePendingApprovals'
-import type { DCAFormData, StrategyFilters } from '../../types/strategy'
+import type { StrategyFilters } from '../../types/strategy'
 import type { Id } from '../../../convex/_generated/dataModel'
 
 interface StrategiesWidgetProps {
@@ -25,8 +24,8 @@ type View = 'list' | 'create' | 'edit' | 'details'
 
 export function StrategiesWidget({
   walletAddress,
-  userId,
-  walletId,
+  userId: _userId,
+  walletId: _walletId,
 }: StrategiesWidgetProps) {
   const [view, setView] = useState<View>('list')
   const [selectedStrategyId, setSelectedStrategyId] = useState<Id<'strategies'> | null>(null)
@@ -233,7 +232,7 @@ function StrategyDetails({
   const { address } = useAccount()
 
   // Get execution history for this strategy
-  const { executions, isLoading: executionsLoading } = useExecutionHistory(strategy._id)
+  const { executions, isLoading: _executionsLoading } = useExecutionHistory(strategy._id)
   const { approve, skip } = useExecutionMutations()
 
   // Find pending executions (awaiting_approval or executing)

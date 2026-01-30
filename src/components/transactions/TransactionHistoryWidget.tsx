@@ -15,7 +15,6 @@ import {
   CheckCircle2,
   XCircle,
   AlertCircle,
-  Filter,
   Loader2,
 } from 'lucide-react'
 import { useAccount } from 'wagmi'
@@ -32,7 +31,6 @@ import {
   getExecutionStateColor,
   type Transaction,
   type StrategyExecution,
-  type ActivityItem,
   type TransactionType,
 } from '../../hooks/useTransactionHistory'
 
@@ -54,7 +52,7 @@ const TYPE_ICONS: Record<TransactionType, React.ReactNode> = {
 export function TransactionHistoryWidget() {
   const { address } = useAccount()
   const [filter, setFilter] = useState<FilterType>('all')
-  const { items, isLoading, isEmpty } = useRecentActivity(address ?? null, 50)
+  const { items, isLoading, isEmpty: _isEmpty } = useRecentActivity(address ?? null, 50)
 
   // Filter items based on selection
   const filteredItems = items.filter((item) => {

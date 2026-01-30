@@ -4,13 +4,12 @@
 
 import React, { type ReactElement, type ReactNode } from 'react'
 import { render, type RenderOptions } from '@testing-library/react'
-import { ConvexProvider, ConvexReactClient } from 'convex/react'
-import { WagmiProvider } from 'wagmi'
+import { ConvexReactClient } from 'convex/react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { vi } from 'vitest'
 
 // Mock Convex client for testing
-const mockConvexClient = {
+const _mockConvexClient = {
   watchQuery: vi.fn(() => ({
     onUpdate: vi.fn(),
     destroy: vi.fn(),
@@ -20,7 +19,7 @@ const mockConvexClient = {
 } as unknown as ConvexReactClient
 
 // Mock wagmi config
-const mockWagmiConfig = {
+const _mockWagmiConfig = {
   chains: [],
   connectors: [],
   transports: {},

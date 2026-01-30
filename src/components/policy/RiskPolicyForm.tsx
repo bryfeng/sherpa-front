@@ -1,7 +1,7 @@
 import React, { useState, useCallback, useEffect } from 'react'
 import { Shield, RotateCcw, Save, ChevronDown, ChevronRight } from 'lucide-react'
 import type { RiskPolicyConfig, RiskPresetKey } from '../../types/policy'
-import { RISK_PRESETS, formatUsd } from '../../types/policy'
+import { RISK_PRESETS } from '../../types/policy'
 
 interface RiskPolicyFormProps {
   config: RiskPolicyConfig

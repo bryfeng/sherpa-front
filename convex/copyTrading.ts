@@ -401,7 +401,7 @@ export const updateExecutionStatus = internalMutation({
       throw new Error("Execution not found");
     }
 
-    const { id, ...updates } = args;
+    const { id: _id, ...updates } = args;
 
     // Remove undefined values
     const cleanUpdates: Record<string, unknown> = {};

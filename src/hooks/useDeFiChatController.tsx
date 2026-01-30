@@ -252,8 +252,8 @@ export function useDeFiChatController({ props, shellState, dispatch }: UseDeFiCh
     highlight,
     panelUI,
     expandedPanelId,
-    showProInfo,
-    copiedToken,
+    showProInfo: _showProInfo,
+    copiedToken: _copiedToken,
     showSim,
     showSwap,
     showBridge,
@@ -291,8 +291,8 @@ export function useDeFiChatController({ props, shellState, dispatch }: UseDeFiCh
     if (entitlement.status === 'disabled') return 'Pro gating is disabled in this environment.'
     return 'Upgrade to Sherpa Pro for deeper strategy, alerts, and fee rebates.'
   }, [entitlement.gating, entitlement.reason, entitlement.status, pro])
-  const proExplorerUrl = useMemo(() => getExplorerUrl(entitlement.chain ?? null, proTokenAddress), [entitlement.chain, proTokenAddress])
-  const proContractDisplay = useMemo(() => (proTokenAddress ? truncateAddress(proTokenAddress, 6) : null), [proTokenAddress])
+  const _proExplorerUrl = useMemo(() => getExplorerUrl(entitlement.chain ?? null, proTokenAddress), [entitlement.chain, proTokenAddress])
+  const _proContractDisplay = useMemo(() => (proTokenAddress ? truncateAddress(proTokenAddress, 6) : null), [proTokenAddress])
 
   const walletClientResult = useWalletClient()
   const { data: walletClient } = walletClientResult
@@ -617,7 +617,7 @@ export function useDeFiChatController({ props, shellState, dispatch }: UseDeFiCh
     setCopiedToken(false)
   }, [onRequestPro, setCopiedToken, setShowProInfo])
 
-  const handleCopyToken = useCallback(async () => {
+  const _handleCopyToken = useCallback(async () => {
     if (!proTokenAddress) return
     try {
       await navigator.clipboard?.writeText(proTokenAddress)
@@ -660,7 +660,7 @@ export function useDeFiChatController({ props, shellState, dispatch }: UseDeFiCh
     setFlag('ws.tip.dismissed', true)
   }, [])
 
-  const handlePinLatestPanel = useCallback(() => {
+  const _handlePinLatestPanel = useCallback(() => {
     if (!widgets.length) return
     const latest = widgets[0]
     setPanelCollapsed(latest.id, false)

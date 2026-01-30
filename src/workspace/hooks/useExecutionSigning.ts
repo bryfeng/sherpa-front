@@ -212,8 +212,8 @@ export function useExecutionSigning() {
         // 2. from_token/to_token as strings (generic strategies from AI)
         let tokenIn: string | undefined
         let tokenOut: string | undefined
-        let tokenInAddress: string | undefined
-        let tokenOutAddress: string | undefined
+        let _tokenInAddress: string | undefined
+        let _tokenOutAddress: string | undefined
 
         // Try camelCase object format first
         const fromTokenObj = config.fromToken as { symbol?: string; address?: string } | undefined
@@ -222,8 +222,8 @@ export function useExecutionSigning() {
         if (fromTokenObj?.symbol && toTokenObj?.symbol) {
           tokenIn = fromTokenObj.symbol
           tokenOut = toTokenObj.symbol
-          tokenInAddress = fromTokenObj.address
-          tokenOutAddress = toTokenObj.address
+          _tokenInAddress = fromTokenObj.address
+          _tokenOutAddress = toTokenObj.address
         } else {
           // Fall back to snake_case string format
           tokenIn = config.from_token as string | undefined

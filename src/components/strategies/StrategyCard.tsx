@@ -80,7 +80,7 @@ function formatUsd(amount: number): string {
   }).format(amount)
 }
 
-function formatTokenAmount(amount: string, symbol: string): string {
+function _formatTokenAmount(amount: string, symbol: string): string {
   const num = parseFloat(amount)
   if (num === 0) return `0 ${symbol}`
   if (num < 0.001) return `<0.001 ${symbol}`
@@ -94,7 +94,7 @@ export function StrategyCard({
   onPause,
   onResume,
   onStop,
-  onEdit,
+  onEdit: _onEdit,
   onViewDetails,
 }: StrategyCardProps) {
   const [showMenu, setShowMenu] = useState(false)

@@ -452,7 +452,7 @@ function RiskLimitsStep({
 // Step 3: Token Filters
 function TokenFiltersStep({
   formData,
-  errors,
+  errors: _errors,
   onChange,
 }: {
   formData: CopyConfigFormData

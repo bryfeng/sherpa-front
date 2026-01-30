@@ -1,5 +1,5 @@
 import React, { useState } from 'react'
-import { Key, Clock, Trash2, Plus, AlertTriangle, Check } from 'lucide-react'
+import { Key, Trash2, Plus, AlertTriangle } from 'lucide-react'
 import type { Permission } from '../../types/policy'
 import { PERMISSIONS, SUPPORTED_CHAINS, formatUsd } from '../../types/policy'
 
@@ -41,7 +41,7 @@ function getDaysRemaining(expiresAt: number): number {
   return Math.max(0, Math.ceil(remaining / (24 * 60 * 60 * 1000)))
 }
 
-function formatDate(timestamp: number): string {
+function _formatDate(timestamp: number): string {
   return new Date(timestamp).toLocaleDateString('en-US', {
     month: 'short',
     day: 'numeric',
@@ -65,7 +65,7 @@ function formatRelativeTime(timestamp: number): string {
 export function SessionKeyCard({
   sessionId,
   permissions,
-  maxValuePerTxUsd,
+  maxValuePerTxUsd: _maxValuePerTxUsd,
   maxTotalValueUsd,
   totalValueUsedUsd,
   transactionCount,
@@ -73,7 +73,7 @@ export function SessionKeyCard({
   chainAllowlist,
   status,
   expiresAt,
-  createdAt,
+  createdAt: _createdAt,
   lastUsedAt,
   onRevoke,
   onExtend,

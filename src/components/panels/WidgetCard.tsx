@@ -18,7 +18,6 @@ import {
   GripVertical,
   ExternalLink,
   RefreshCw,
-  MoreHorizontal,
   X,
 } from 'lucide-react'
 import type { Widget } from '../../types/widgets'
@@ -51,7 +50,7 @@ function WidgetHeader({
   onRefresh,
   dragHandleProps,
 }: WidgetHeaderProps) {
-  const [showMenu, setShowMenu] = useState(false)
+  const [_showMenu, _setShowMenu] = useState(false)
 
   return (
     <div

@@ -115,7 +115,7 @@ function CheckItem({ check, compact }: { check: PolicyCheck; compact?: boolean }
 }
 
 function SummaryBadge({ result }: { result: PolicyEvaluationResult }) {
-  const { canProceed, blockingCount, warningCount, checks } = result
+  const { canProceed: _canProceed, blockingCount, warningCount, checks } = result
   const passCount = checks.filter((c) => c.status === 'pass').length
 
   if (blockingCount > 0) {
@@ -160,7 +160,7 @@ function SummaryBadge({ result }: { result: PolicyEvaluationResult }) {
 }
 
 export function PolicyCheckList({ result, compact = false, isLoading = false }: PolicyCheckListProps) {
-  const { checks, canProceed, blockingCount, warningCount } = result
+  const { checks, canProceed, blockingCount: _blockingCount, warningCount: _warningCount } = result
 
   // Loading state
   if (isLoading) {

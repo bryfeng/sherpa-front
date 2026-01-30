@@ -6,7 +6,7 @@
 
 import { mutation, query, internalMutation, internalQuery } from "./_generated/server";
 import { v } from "convex/values";
-import { Id } from "./_generated/dataModel";
+import type { Id as _Id } from "./_generated/dataModel";
 
 // =============================================================================
 // Types
@@ -395,7 +395,7 @@ export const updateConfig = mutation({
       );
     }
 
-    const { strategyId, ...updates } = args;
+    const { strategyId: _strategyId, ...updates } = args;
 
     // Remove undefined values
     const cleanUpdates: Record<string, unknown> = {};

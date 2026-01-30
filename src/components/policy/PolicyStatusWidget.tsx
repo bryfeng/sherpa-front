@@ -1,7 +1,7 @@
 import React from 'react'
 import { Activity, CheckCircle, AlertTriangle, XCircle, Loader2 } from 'lucide-react'
 import { usePolicyStatus } from '../../hooks/usePolicyStatus'
-import { SUPPORTED_CHAINS, formatUsd } from '../../types/policy'
+import { SUPPORTED_CHAINS } from '../../types/policy'
 
 interface PolicyStatusWidgetProps {
   compact?: boolean

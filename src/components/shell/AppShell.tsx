@@ -19,7 +19,7 @@ import {
   Wallet,
   Plus,
 } from 'lucide-react'
-import { useSherpaStore, useTheme, usePersona } from '../../store'
+import { useTheme, usePersona } from '../../store'
 import { PersonaSelector } from '../header/PersonaSelector'
 import { WalletMenu } from '../header/WalletMenu'
 import { ResizablePanel } from '../ui/ResizablePanel'

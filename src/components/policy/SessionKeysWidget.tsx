@@ -12,7 +12,7 @@ interface SessionKeysWidgetProps {
 
 type Tab = 'list' | 'create'
 
-export function SessionKeysWidget({ widget, walletAddress }: SessionKeysWidgetProps) {
+export function SessionKeysWidget({ widget: _widget, walletAddress }: SessionKeysWidgetProps) {
   const [activeTab, setActiveTab] = useState<Tab>('list')
 
   const {
