@@ -12,7 +12,7 @@ type RelayQuoteWidgetProps = {
   walletAddress?: string
   walletReady?: boolean
   onExecuteQuote?: (panel: Widget) => Promise<string | void>
-  onRefreshQuote?: () => Promise<void>
+  onRefreshQuote?: (panel: Widget) => Promise<void>
   onInsertQuickPrompt?: (prompt: string) => void
   controls?: {
     collapsed: boolean
@@ -191,7 +191,7 @@ function RelayQuoteWidgetComponent({
     setRefreshing(true)
     setError(null)
     try {
-      await onRefreshQuote()
+      await onRefreshQuote(panel)
     } catch (err: any) {
       setError(err?.message || 'Failed to refresh quote.')
     } finally {
@@ -485,8 +485,8 @@ function RelayQuoteWidgetComponent({
         {error && (
           <ErrorView
             message={error}
-            onRetry={onRefreshQuote ? handleRefresh : undefined}
-            retryLabel={refreshing ? 'Refreshing…' : 'Retry'}
+            onRetry={canExecute ? handleExecuteClick : (onRefreshQuote ? handleRefresh : undefined)}
+            retryLabel={sending ? sendingLabel : (canExecute ? 'Retry' : (refreshing ? 'Refreshing…' : 'Refresh Quote'))}
             className={theme.section}
           />
         )}

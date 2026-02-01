@@ -27,8 +27,8 @@ export interface WidgetPanelProps {
   /** Swap/Bridge execution callbacks */
   onSwap?: (widget: Widget) => Promise<string | void>
   onBridge?: (widget: Widget) => Promise<string | void>
-  onRefreshSwapQuote?: () => Promise<void>
-  onRefreshBridgeQuote?: () => Promise<void>
+  onRefreshSwapQuote?: (widget: Widget) => Promise<void>
+  onRefreshBridgeQuote?: (widget: Widget) => Promise<void>
   onInsertQuickPrompt?: (prompt: string) => void
   /** Callback to expand a widget in modal */
   onExpandWidget?: (widgetId: string) => void

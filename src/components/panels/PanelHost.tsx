@@ -14,8 +14,8 @@ export interface PanelHostProps {
   onReorder: (activeId: string, overId: string) => void
   onBridge?: (widget: Widget) => Promise<string | void>
   onSwap?: (widget: Widget) => Promise<string | void>
-  onRefreshBridgeQuote?: () => Promise<void>
-  onRefreshSwapQuote?: () => Promise<void>
+  onRefreshBridgeQuote?: (widget: Widget) => Promise<void>
+  onRefreshSwapQuote?: (widget: Widget) => Promise<void>
   onInsertQuickPrompt?: (prompt: string) => void
 }
 

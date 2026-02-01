@@ -10,6 +10,7 @@ import { transformBackendPanels } from '../services/panels'
 import type { Widget, WidgetDensity } from '../types/widgets'
 import { TOKEN_PRICE_WIDGET_ID } from '../constants/widgets'
 import { getSwapQuote } from '../services/quotes'
+import { refreshRelayQuote } from '../services/relay'
 import { getTopPrices, type TokenChartResponse } from '../services/prices'
 import { getTrendingTokens, type TrendingToken } from '../services/trending'
 import { truncateAddress } from '../services/wallet'
@@ -210,6 +211,7 @@ export function useDeFiChatController({ props, shellState, dispatch }: UseDeFiCh
   const storeRemoveWidget = useSherpaStore((s) => s.removeWidget)
   const storeSetWidgets = useSherpaStore((s) => s.setWidgets)
   const storeReorderWidgets = useSherpaStore((s) => s.reorderWidgets)
+  const storeUpdateWidget = useSherpaStore((s) => s.updateWidget)
   const streamingEnabled = useSherpaStore((s) => s.streamingEnabled)
   const auth = useSherpaStore((s) => s.auth)
 
@@ -799,21 +801,18 @@ export function useDeFiChatController({ props, shellState, dispatch }: UseDeFiCh
     }
   }, [input, sendPrompt])
 
-  const requestBridgeQuoteRefresh = useCallback(async () => {
+  // Direct quote refresh - bypasses chat/LLM for token efficiency
+  const handleRefreshQuote = useCallback(async (widget: Widget) => {
     try {
-      await sendPrompt('refresh bridge quote')
-    } catch {
-      // ignore follow-up errors; surfaced in chat
+      const updatedPayload = await refreshRelayQuote(widget)
+      storeUpdateWidget(widget.id, {
+        payload: { ...widget.payload, ...updatedPayload },
+      })
+    } catch (err: any) {
+      // Re-throw so the widget can display the error
+      throw new Error(err?.message || 'Failed to refresh quote')
     }
-  }, [sendPrompt])
-
-  const requestSwapQuoteRefresh = useCallback(async () => {
-    try {
-      await sendPrompt('refresh swap quote')
-    } catch {
-      // ignore follow-up errors
-    }
-  }, [sendPrompt])
+  }, [storeUpdateWidget])
 
   const handleStartNewChat = useCallback(async () => {
     try {
@@ -856,7 +855,6 @@ export function useDeFiChatController({ props, shellState, dispatch }: UseDeFiCh
 
     const isSwapQuote = quoteType === 'swap'
     const actionVerb = isSwapQuote ? 'swap' : 'bridge'
-    const refreshFn = isSwapQuote ? requestSwapQuoteRefresh : requestBridgeQuoteRefresh
 
     if (!walletClient) {
       throw new Error(`Connect a wallet to ${actionVerb}.`)
@@ -893,7 +891,8 @@ export function useDeFiChatController({ props, shellState, dispatch }: UseDeFiCh
 
     const expiryMs = resolveExpiryMs(payload.quote_expiry)
     if (typeof expiryMs === 'number' && expiryMs <= Date.now()) {
-      await refreshFn()
+      // Auto-refresh expired quote (direct API call, no chat involvement)
+      await handleRefreshQuote(widget).catch(() => {})
       throw new Error(`Quote expired. Requested a fresh ${actionVerb} quote.`)
     }
 
@@ -1018,11 +1017,12 @@ export function useDeFiChatController({ props, shellState, dispatch }: UseDeFiCh
       const hash = await walletClient.sendTransaction(request)
       return hash as string
     } catch (error: any) {
-      await refreshFn()
+      // Auto-refresh quote on failure (direct API call, no chat involvement)
+      await handleRefreshQuote(widget).catch(() => {})
       const message = error?.shortMessage || error?.message || `Wallet rejected the ${actionVerb} transaction.`
       throw new Error(message)
     }
-  }, [publicClient, requestBridgeQuoteRefresh, requestSwapQuoteRefresh, switchChainAsync, walletClient])
+  }, [handleRefreshQuote, publicClient, switchChainAsync, walletClient])
 
   const toggleCollapse = useCallback((id: string) => {
     dispatch({ type: 'togglePanelCollapse', panelId: id })
@@ -1225,8 +1225,8 @@ export function useDeFiChatController({ props, shellState, dispatch }: UseDeFiCh
     onReorder: reorderWidgets,
     onBridge: handleRelayExecution,
     onSwap: handleRelayExecution,
-    onRefreshBridgeQuote: requestBridgeQuoteRefresh,
-    onRefreshSwapQuote: requestSwapQuoteRefresh,
+    onRefreshBridgeQuote: handleRefreshQuote,
+    onRefreshSwapQuote: handleRefreshQuote,
     onInsertQuickPrompt: handleInsertQuickPrompt,
     onLoadTopCoins: () => {
       loadTopCoinsPanel().catch(() => {})
@@ -1330,8 +1330,8 @@ export function useDeFiChatController({ props, shellState, dispatch }: UseDeFiCh
           walletReady={walletReady}
           onBridge={handleRelayExecution}
           onSwap={handleRelayExecution}
-          onRefreshBridgeQuote={requestBridgeQuoteRefresh}
-          onRefreshSwapQuote={requestSwapQuoteRefresh}
+          onRefreshBridgeQuote={handleRefreshQuote}
+          onRefreshSwapQuote={handleRefreshQuote}
           onInsertQuickPrompt={handleInsertQuickPrompt}
         />
       )}

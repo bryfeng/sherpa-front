@@ -55,8 +55,8 @@ export interface WidgetContentProps {
   /** Swap/Bridge execution callbacks */
   onSwap?: (widget: Widget) => Promise<string | void>
   onBridge?: (widget: Widget) => Promise<string | void>
-  onRefreshSwapQuote?: () => Promise<void>
-  onRefreshBridgeQuote?: () => Promise<void>
+  onRefreshSwapQuote?: (widget: Widget) => Promise<void>
+  onRefreshBridgeQuote?: (widget: Widget) => Promise<void>
   onInsertQuickPrompt?: (prompt: string) => void
   /** Callback to expand widget in modal */
   onExpandWidget?: (widgetId: string) => void
@@ -114,8 +114,8 @@ function WidgetRenderer({
   walletReady?: boolean
   onSwap?: (widget: Widget) => Promise<string | void>
   onBridge?: (widget: Widget) => Promise<string | void>
-  onRefreshSwapQuote?: () => Promise<void>
-  onRefreshBridgeQuote?: () => Promise<void>
+  onRefreshSwapQuote?: (widget: Widget) => Promise<void>
+  onRefreshBridgeQuote?: (widget: Widget) => Promise<void>
   onInsertQuickPrompt?: (prompt: string) => void
   onExpandWidget?: (widgetId: string) => void
 }) {

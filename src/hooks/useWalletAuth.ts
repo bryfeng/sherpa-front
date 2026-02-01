@@ -22,6 +22,8 @@ export function useWalletAuth(activeWallet: ActiveWallet | null) {
   const auth = useSherpaStore((s) => s.auth)
 
   const inFlightRef = useRef(false)
+  // Track the previous wallet to detect explicit disconnects vs initial page load
+  const prevWalletRef = useRef<ActiveWallet | null | undefined>(undefined)
 
   const attemptSignIn = useCallback(async () => {
     if (!activeWallet || inFlightRef.current) return
@@ -79,9 +81,20 @@ export function useWalletAuth(activeWallet: ActiveWallet | null) {
   }, [activeWallet, chainId, setAuth, signMessageAsync, showToast])
 
   useEffect(() => {
+    // Track previous wallet to distinguish:
+    // - Initial page load / wallet reconnecting (no previous connected wallet)
+    // - Explicit disconnect (had a connected wallet with address, now null)
+    const prevWallet = prevWalletRef.current
+    prevWalletRef.current = activeWallet
+
     if (!activeWallet) {
-      clearAuthSession()
-      clearAuth()
+      // Only clear session if user explicitly disconnected
+      // (i.e., we previously had a connected wallet with an address)
+      // This handles React StrictMode double-mounting and page refresh correctly
+      if (prevWallet?.address) {
+        clearAuthSession()
+        clearAuth()
+      }
       return
     }
 
