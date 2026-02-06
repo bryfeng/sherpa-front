@@ -1,8 +1,8 @@
 // TODO: Workstream 1 — Shell Split (Monolith → Feature Slices)
 
-import React, { useEffect, useId, useMemo, useRef, useState } from 'react'
+import React, { useEffect, useId, useMemo, useRef, useState, useCallback } from 'react'
 import { createPortal } from 'react-dom'
-import { Sparkles, Bell, Cpu } from 'lucide-react'
+import { Sparkles, Bell, Cpu, Check, Copy } from 'lucide-react'
 
 import type { PersonaId as Persona } from '../../types/persona'
 import type { AuthStatus } from '../../store'
@@ -285,6 +285,71 @@ function PersonaDropdown({ persona, onSelect }: PersonaDropdownProps) {
 }
 
 /**
+ * Copyable wallet address badge with visual feedback
+ */
+function CopyableWalletBadge({ label, fullAddress }: { label: string; fullAddress?: string }) {
+  const [copied, setCopied] = useState(false)
+  const timeoutRef = useRef<NodeJS.Timeout | null>(null)
+
+  const handleCopy = useCallback(async () => {
+    const addressToCopy = fullAddress || label
+    try {
+      await navigator.clipboard.writeText(addressToCopy)
+      setCopied(true)
+
+      // Clear any existing timeout
+      if (timeoutRef.current) {
+        clearTimeout(timeoutRef.current)
+      }
+
+      // Reset after 2 seconds
+      timeoutRef.current = setTimeout(() => {
+        setCopied(false)
+      }, 2000)
+    } catch (err) {
+      console.error('Failed to copy address:', err)
+    }
+  }, [fullAddress, label])
+
+  // Cleanup timeout on unmount
+  useEffect(() => {
+    return () => {
+      if (timeoutRef.current) {
+        clearTimeout(timeoutRef.current)
+      }
+    }
+  }, [])
+
+  return (
+    <button
+      onClick={handleCopy}
+      className="group inline-flex items-center gap-1.5 rounded-md px-2.5 py-1 text-xs font-medium transition-all duration-200 cursor-pointer"
+      style={{
+        background: copied ? 'var(--success-muted, rgba(34, 197, 94, 0.15))' : 'var(--surface-2)',
+        border: `1px solid ${copied ? 'var(--success, #22c55e)' : 'var(--line)'}`,
+        color: copied ? 'var(--success, #22c55e)' : 'var(--text)',
+      }}
+      title={copied ? 'Copied!' : `Click to copy: ${fullAddress || label}`}
+    >
+      {copied ? (
+        <>
+          <Check className="h-3 w-3" />
+          <span>Copied!</span>
+        </>
+      ) : (
+        <>
+          <span>{label}</span>
+          <Copy
+            className="h-3 w-3 opacity-0 group-hover:opacity-100 transition-opacity"
+            style={{ color: 'var(--text-muted)' }}
+          />
+        </>
+      )}
+    </button>
+  )
+}
+
+/**
  * Badge showing pending strategy executions count
  * Uses wagmi's useAccount internally for wallet address
  */
@@ -319,6 +384,7 @@ function PendingExecutionsBadge() {
 export interface HeaderBarProps {
   persona: Persona
   walletLabel: string
+  walletAddress?: string // Full address for copy functionality
   walletConnected: boolean
   proLabel: string
   authStatus?: AuthStatus
@@ -334,6 +400,7 @@ export interface HeaderBarProps {
 function HeaderBarComponent({
   persona,
   walletLabel,
+  walletAddress,
   walletConnected,
   proLabel,
   authStatus,
@@ -388,9 +455,7 @@ function HeaderBarComponent({
           <ModelIndicator />
           {walletConnected ? (
             <div className="inline-flex items-center gap-1.5">
-              <Badge variant="secondary" className="rounded-md px-2.5 py-0.5 text-xs">
-                {walletLabel}
-              </Badge>
+              <CopyableWalletBadge label={walletLabel} fullAddress={walletAddress} />
               {onDisconnectWallet && (
                 <button
                   onClick={onDisconnectWallet}

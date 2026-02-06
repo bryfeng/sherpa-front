@@ -32,7 +32,7 @@ import DeFiChatAdaptiveUI from './pages/DeFiChatAdaptiveUI'
 import { useWalletAuth } from './hooks/useWalletAuth'
 
 // Hooks
-import { usePortfolioSummary } from './workspace/hooks'
+import { useMultiChainPortfolio } from './workspace/hooks'
 
 // Phase 13.6: Execution signing modal
 import { ExecutionSigningModal } from './workspace/components/ExecutionSigningModal'
@@ -296,13 +296,12 @@ function MainApp() {
   useLLMProviders()
   const { isPro } = useEntitlementSync(wallet.address, wallet.chain)
 
-  // Portfolio data
+  // Portfolio data - fetches from all enabled chains based on user preferences
   const {
     data: portfolioSummary,
     refresh: refreshPortfolio,
-  } = usePortfolioSummary({
+  } = useMultiChainPortfolio({
     walletAddress: wallet.address ?? undefined,
-    chain: wallet.chain,
   })
 
   // Theme sync with DOM

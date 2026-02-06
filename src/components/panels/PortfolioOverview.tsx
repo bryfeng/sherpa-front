@@ -1,8 +1,15 @@
 import React from 'react'
-import { ExternalLink } from 'lucide-react'
+import { ExternalLink, Layers } from 'lucide-react'
 
 import type { PortfolioPositionViewModel, PortfolioSummaryViewModel } from '../../workspace/types'
 import { PortfolioInlineCard } from '../conversation/PortfolioInlineCard'
+
+function normalizeChainName(network: string | undefined): string {
+  if (!network) return 'Unknown'
+  const trimmed = network.trim()
+  // Capitalize first letter
+  return trimmed.charAt(0).toUpperCase() + trimmed.slice(1).toLowerCase()
+}
 
 interface PortfolioOverviewControls {
   collapsed: boolean
@@ -17,7 +24,13 @@ export interface PortfolioOverviewProps {
   controls?: PortfolioOverviewControls
 }
 
-export function PortfolioOverview({ payload, walletAddress, collapsed = false, controls }: PortfolioOverviewProps) {
+export function PortfolioOverview({
+  payload,
+  walletAddress,
+  collapsed = false,
+  controls,
+}: PortfolioOverviewProps) {
+
   const summary = React.useMemo<PortfolioSummaryViewModel | null>(() => {
     if (!payload) return null
     const total = Number(payload.totalUsd ?? payload.totalUsdFormatted ?? 0)
@@ -51,10 +64,31 @@ export function PortfolioOverview({ payload, walletAddress, collapsed = false, c
 
   const [hideDust, setHideDust] = React.useState(true)
   const [showAll, setShowAll] = React.useState(false)
+  const [selectedChain, setSelectedChain] = React.useState<string>('all')
 
   React.useEffect(() => {
     if (collapsed) setShowAll(false)
   }, [collapsed])
+
+  // Extract unique chains from positions with their totals
+  const chainStats = React.useMemo(() => {
+    const allPositions = summary?.allPositions || []
+    const stats: Record<string, { count: number; totalUsd: number }> = {}
+
+    for (const position of allPositions) {
+      const chain = normalizeChainName(position.network)
+      if (!stats[chain]) {
+        stats[chain] = { count: 0, totalUsd: 0 }
+      }
+      stats[chain].count++
+      stats[chain].totalUsd += Number(position.usd || 0)
+    }
+
+    // Sort by total USD descending
+    return Object.entries(stats)
+      .sort((a, b) => b[1].totalUsd - a[1].totalUsd)
+      .map(([chain, data]) => ({ chain, ...data }))
+  }, [summary?.allPositions])
 
   if (!summary) {
     if (!walletAddress) return <div className="text-sm text-slate-500">Connect your wallet to load portfolio data.</div>
@@ -63,9 +97,21 @@ export function PortfolioOverview({ payload, walletAddress, collapsed = false, c
 
   const dustThreshold = 1
   const allPositions = summary.allPositions || []
+
+  // Apply chain filter first, then dust filter
+  const chainFiltered = selectedChain === 'all'
+    ? allPositions
+    : allPositions.filter((position: PortfolioPositionViewModel) =>
+        normalizeChainName(position.network) === selectedChain
+      )
+
   const filtered = hideDust
-    ? allPositions.filter((position: PortfolioPositionViewModel) => Number(position.usd || 0) >= dustThreshold)
-    : allPositions
+    ? chainFiltered.filter((position: PortfolioPositionViewModel) => Number(position.usd || 0) >= dustThreshold)
+    : chainFiltered
+
+  // Calculate filtered total for display
+  const filteredTotal = chainFiltered.reduce((sum, pos) => sum + Number(pos.usd || 0), 0)
+
   const displayLimit = 8
   const displayed = showAll ? filtered : filtered.slice(0, displayLimit)
 
@@ -81,10 +127,61 @@ export function PortfolioOverview({ payload, walletAddress, collapsed = false, c
         description="Monitor top holdings and jump into expanded analysis when you need deeper allocation views."
       />
 
+      {/* Chain Filter Tabs - filter positions by chain within current data */}
+      {chainStats.length > 1 && (
+        <div className="flex flex-wrap items-center gap-2">
+          <button
+            type="button"
+            onClick={() => setSelectedChain('all')}
+            className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-medium transition ${
+              selectedChain === 'all'
+                ? 'bg-[var(--accent)] text-[var(--text-inverse)] shadow-sm'
+                : 'border border-[var(--line)] bg-[var(--surface)] text-[var(--text-muted)] hover:bg-[var(--hover)] hover:text-[var(--text)]'
+            }`}
+          >
+            <Layers className="h-3 w-3" />
+            All Chains
+            <span className={`ml-0.5 ${selectedChain === 'all' ? 'text-white/80' : 'text-[var(--text-muted)]'}`}>
+              ({allPositions.length})
+            </span>
+          </button>
+          {chainStats.map(({ chain, count, totalUsd }) => (
+            <button
+              key={chain}
+              type="button"
+              onClick={() => setSelectedChain(chain)}
+              className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-medium transition ${
+                selectedChain === chain
+                  ? 'bg-[var(--accent)] text-[var(--text-inverse)] shadow-sm'
+                  : 'border border-[var(--line)] bg-[var(--surface)] text-[var(--text-muted)] hover:bg-[var(--hover)] hover:text-[var(--text)]'
+              }`}
+              title={`$${totalUsd.toLocaleString(undefined, { maximumFractionDigits: 0 })}`}
+            >
+              {chain}
+              <span className={`ml-0.5 ${selectedChain === chain ? 'text-white/80' : 'text-[var(--text-muted)]'}`}>
+                ({count})
+              </span>
+            </button>
+          ))}
+        </div>
+      )}
+
+      {/* Selected Chain Total (when filtered) */}
+      {selectedChain !== 'all' && (
+        <div className="flex items-center justify-between rounded-xl border border-[var(--line)] bg-[var(--surface-2)] px-4 py-2">
+          <span className="text-xs text-[var(--text-muted)]">{selectedChain} Total</span>
+          <span className="text-sm font-semibold text-[var(--text)]">
+            ${filteredTotal.toLocaleString(undefined, { maximumFractionDigits: 2 })}
+          </span>
+        </div>
+      )}
+
       {filtered.length > 0 && (
         <div className="rounded-2xl border border-slate-200 bg-white/75 shadow-sm">
           <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-200 px-4 py-3">
-            <span className="text-sm font-semibold text-slate-800">Positions</span>
+            <span className="text-sm font-semibold text-slate-800">
+              {selectedChain === 'all' ? 'Positions' : `${selectedChain} Positions`}
+            </span>
             <div className="flex items-center gap-2 text-xs">
               <button
                 type="button"
@@ -116,7 +213,7 @@ export function PortfolioOverview({ payload, walletAddress, collapsed = false, c
                       <div className="text-sm font-medium text-slate-800">{position.sym || position.symbol || '—'}</div>
                       <div className="text-xs text-slate-500">
                         {position.name}
-                        {position.network ? ` · ${position.network}` : ''}
+                        {selectedChain === 'all' && position.network ? ` · ${normalizeChainName(position.network)}` : ''}
                         {position.balanceFormatted ? ` · ${position.balanceFormatted}` : ''}
                       </div>
                     </div>

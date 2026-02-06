@@ -32,7 +32,7 @@ function formatUsd(value: number): string {
   return `$${value.toLocaleString(undefined, options)}`
 }
 
-function normaliseHolding(entry: TokenHolding, totalUsd: number): PortfolioPositionViewModel {
+function normaliseHolding(entry: TokenHolding, totalUsd: number, network?: string): PortfolioPositionViewModel {
   const usd = toNumber(entry.value_usd)
   const allocationPercent = totalUsd > 0 ? (usd / totalUsd) * 100 : 0
   return {
@@ -44,14 +44,17 @@ function normaliseHolding(entry: TokenHolding, totalUsd: number): PortfolioPosit
     allocationPercent,
     balanceFormatted: entry.balance_formatted,
     address: entry.address,
+    network,
   }
 }
 
 function buildSummary(portfolio: PortfolioData, sources: PortfolioAPIResponse['sources']): PortfolioSummaryViewModel {
   const totalUsd = toNumber(portfolio.total_value_usd)
   const safeTokens = Array.isArray(portfolio.tokens) ? portfolio.tokens : []
+  // Include the chain from the portfolio data for each token
+  const network = portfolio.chain || undefined
   const sorted = safeTokens
-    .map((token) => normaliseHolding(token, totalUsd))
+    .map((token) => normaliseHolding(token, totalUsd, network))
     .sort((a, b) => b.usd - a.usd)
   const fetchedAt = new Date().toISOString()
 

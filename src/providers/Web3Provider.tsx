@@ -1,6 +1,6 @@
 import { ReactNode, useMemo } from 'react'
 import { WagmiConfig, http, createConfig } from 'wagmi'
-import { mainnet, polygon, arbitrum, optimism, base, ink } from 'wagmi/chains'
+import { mainnet, polygon, arbitrum, optimism, base, baseSepolia, ink } from 'wagmi/chains'
 import { createAppKit } from '@reown/appkit/react'
 import { WagmiAdapter } from '@reown/appkit-adapter-wagmi'
 import { SolanaAdapter } from '@reown/appkit-adapter-solana'
@@ -9,7 +9,7 @@ import { solana } from '@reown/appkit/networks'
 const projectId = (import.meta as any).env?.VITE_WALLETCONNECT_PROJECT_ID as string | undefined
 const isTestEnv = ((import.meta as any).env?.MODE || '').toLowerCase() === 'test'
 
-const wagmiChains = [mainnet, base, arbitrum, optimism, polygon, ink] as const
+const wagmiChains = [mainnet, base, baseSepolia, arbitrum, optimism, polygon, ink] as const
 const wagmiNetworks = [...wagmiChains] as any
 const appKitNetworks = [...wagmiNetworks, solana] as any
 
@@ -25,6 +25,7 @@ let wagmiConfig = createConfig({
   transports: {
     [mainnet.id]: http(),
     [base.id]: http(),
+    [baseSepolia.id]: http(),
     [arbitrum.id]: http(),
     [optimism.id]: http(),
     [polygon.id]: http(),
@@ -39,6 +40,7 @@ if (projectId && !isTestEnv) {
     transports: {
       [mainnet.id]: http(),
       [base.id]: http(),
+      [baseSepolia.id]: http(),
       [arbitrum.id]: http(),
       [optimism.id]: http(),
       [polygon.id]: http(),

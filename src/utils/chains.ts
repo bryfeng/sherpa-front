@@ -11,6 +11,8 @@ export const CHAIN_METADATA: Record<number, { name: string; nativeSymbol: string
   42161: { name: 'Arbitrum', nativeSymbol: 'ETH' },
   42220: { name: 'Celo', nativeSymbol: 'CELO' },
   43114: { name: 'Avalanche', nativeSymbol: 'AVAX' },
+  57073: { name: 'Ink', nativeSymbol: 'ETH' },
+  84532: { name: 'Base Sepolia', nativeSymbol: 'ETH' },
 }
 
 export function getChainName(chainId?: number | null): string | null {

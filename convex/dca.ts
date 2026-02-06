@@ -242,7 +242,7 @@ export const create = mutation({
 });
 
 /**
- * Activate a DCA strategy (requires session key)
+ * Activate a DCA strategy (requires session key) - Legacy
  */
 export const activate = mutation({
   args: {
@@ -265,6 +265,58 @@ export const activate = mutation({
     await ctx.db.patch(args.strategyId, {
       status: "active",
       sessionKeyId: args.sessionKeyId,
+      nextExecutionAt: args.nextExecutionAt,
+      activatedAt: now,
+      updatedAt: now,
+    });
+
+    return { success: true };
+  },
+});
+
+/**
+ * Activate a DCA strategy with Smart Session (Rhinestone)
+ * Preferred method for EVM DCA strategies.
+ */
+export const activateWithSmartSession = mutation({
+  args: {
+    strategyId: v.id("dcaStrategies"),
+    smartSessionId: v.string(),
+    nextExecutionAt: v.number(),
+  },
+  handler: async (ctx, args) => {
+    const strategy = await ctx.db.get(args.strategyId);
+    if (!strategy) {
+      throw new Error("Strategy not found");
+    }
+
+    if (strategy.status !== "draft" && strategy.status !== "pending_session") {
+      throw new Error(`Cannot activate strategy in ${strategy.status} status`);
+    }
+
+    // Verify the smart session exists and is active
+    const session = await ctx.db
+      .query("smartSessions")
+      .withIndex("by_session_id", (q) => q.eq("sessionId", args.smartSessionId))
+      .first();
+
+    if (!session) {
+      throw new Error("Smart Session not found");
+    }
+
+    if (session.status !== "active") {
+      throw new Error(`Smart Session is ${session.status}, cannot activate strategy`);
+    }
+
+    const now = Date.now();
+
+    if (session.validUntil < now) {
+      throw new Error("Smart Session has expired");
+    }
+
+    await ctx.db.patch(args.strategyId, {
+      status: "active",
+      smartSessionId: args.smartSessionId,
       nextExecutionAt: args.nextExecutionAt,
       activatedAt: now,
       updatedAt: now,

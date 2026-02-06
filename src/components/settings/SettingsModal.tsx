@@ -1,8 +1,11 @@
-import React, { useMemo } from 'react'
+import React, { useMemo, useState } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
-import { Check } from 'lucide-react'
+import { Check, Loader2 } from 'lucide-react'
+import { useQuery } from 'convex/react'
 
+import { api } from '../../../convex/_generated/api'
 import { useSherpaStore } from '../../store'
+import { useUserPreferences } from '../../hooks/useUserPreferences'
 import type { LLMProviderInfo } from '../../types/llm'
 
 export interface SettingsModalProps {
@@ -177,6 +180,17 @@ function ModelSelector({
   )
 }
 
+/** Helper to determine if a chain is Solana based on name/aliases */
+function isSolanaChain(chain: { name: string; aliases: string[] }): boolean {
+  const nameLower = chain.name.toLowerCase()
+  return nameLower === 'solana' || chain.aliases.some((a) => a.toLowerCase() === 'solana')
+}
+
+/** Get the API identifier for a chain (first alias or lowercased name) */
+function getChainApiId(chain: { name: string; aliases: string[] }): string {
+  return chain.aliases[0]?.toLowerCase() || chain.name.toLowerCase()
+}
+
 export function SettingsModal({ isOpen, onClose, onOpenRiskPolicy, onOpenSessionKeys }: SettingsModalProps) {
   const {
     llmModel,
@@ -189,6 +203,8 @@ export function SettingsModal({ isOpen, onClose, onOpenRiskPolicy, onOpenSession
     setChatDensity,
     txNotifications,
     setTxNotifications,
+    walletAddress,
+    chainId,
   } = useSherpaStore((state) => ({
     llmModel: state.llmModel,
     llmProviders: state.llmProviders,
@@ -200,7 +216,45 @@ export function SettingsModal({ isOpen, onClose, onOpenRiskPolicy, onOpenSession
     setChatDensity: state.setChatDensity,
     txNotifications: state.txNotifications,
     setTxNotifications: state.setTxNotifications,
+    walletAddress: state.wallet.address,
+    chainId: state.auth.session?.chainId,
   }))
+
+  // User preferences for chain selection
+  const { enabledChains, toggleChain, isLoading: prefsLoading } = useUserPreferences(walletAddress)
+
+  // Fetch available chains from Convex
+  const chainsData = useQuery(api.chains.listEnabled)
+
+  // Determine wallet type (EVM vs Solana)
+  const walletType: 'evm' | 'solana' = chainId === 'solana' ? 'solana' : 'evm'
+
+  // Show testnets toggle (for development)
+  const [showTestnets, setShowTestnets] = useState(false)
+
+  // Filter and transform chains based on wallet type
+  const availableChains = useMemo(() => {
+    if (!chainsData) return []
+
+    return chainsData
+      .filter((chain) => showTestnets || !chain.isTestnet)
+      .filter((chain) => {
+        const isSolana = isSolanaChain(chain)
+        return walletType === 'solana' ? isSolana : !isSolana
+      })
+      .map((chain) => ({
+        id: getChainApiId(chain),
+        name: chain.name,
+        chainId: chain.chainId,
+        isTestnet: chain.isTestnet,
+      }))
+      .sort((a, b) => {
+        // Testnets at the bottom
+        if (a.isTestnet !== b.isTestnet) return a.isTestnet ? 1 : -1
+        // Mainnet first
+        return a.chainId === 1 ? -1 : b.chainId === 1 ? 1 : a.chainId - b.chainId
+      })
+  }, [chainsData, walletType, showTestnets])
 
   return (
     <AnimatePresence>
@@ -310,6 +364,100 @@ export function SettingsModal({ isOpen, onClose, onOpenRiskPolicy, onOpenSession
                     </button>
                   </div>
                 </section>
+
+                {/* Portfolio Chains Section */}
+                {walletAddress && (
+                  <section className="space-y-3">
+                    <div className="flex items-start justify-between gap-4">
+                      <div>
+                        <div className="text-sm font-semibold">Portfolio Chains</div>
+                        <div className="text-xs" style={{ color: 'var(--text-muted)' }}>
+                          Select which chains to include in your portfolio view.
+                          {walletType === 'solana' && ' (Solana wallet detected)'}
+                        </div>
+                      </div>
+                      {/* Show Testnets Toggle */}
+                      <button
+                        type="button"
+                        onClick={() => setShowTestnets(!showTestnets)}
+                        className="flex items-center gap-2 rounded-md px-2 py-1 text-xs transition"
+                        style={{
+                          background: showTestnets ? 'var(--warning-muted, rgba(234, 179, 8, 0.15))' : 'var(--surface-2)',
+                          border: `1px solid ${showTestnets ? 'var(--warning, #eab308)' : 'var(--line)'}`,
+                          color: showTestnets ? 'var(--warning, #eab308)' : 'var(--text-muted)',
+                        }}
+                      >
+                        <span
+                          className="relative inline-flex h-4 w-7 items-center rounded-full transition-colors"
+                          style={{ background: showTestnets ? 'var(--warning, #eab308)' : 'var(--surface-3)' }}
+                        >
+                          <span
+                            className={`inline-block h-3 w-3 transform rounded-full bg-white transition ${showTestnets ? 'translate-x-3' : 'translate-x-0.5'}`}
+                          />
+                        </span>
+                        <span>Testnets</span>
+                      </button>
+                    </div>
+                    {!chainsData || prefsLoading ? (
+                      <div className="flex items-center gap-2 py-4" style={{ color: 'var(--text-muted)' }}>
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                        <span className="text-sm">Loading chains...</span>
+                      </div>
+                    ) : availableChains.length === 0 ? (
+                      <div className="text-sm py-2" style={{ color: 'var(--text-muted)' }}>
+                        No chains available for your wallet type.
+                      </div>
+                    ) : (
+                      <div className="grid gap-2 sm:grid-cols-2">
+                        {availableChains.map((chain) => {
+                          const isEnabled = enabledChains.includes(chain.id)
+                          const isOnlyEnabled = isEnabled && enabledChains.length === 1
+                          return (
+                            <button
+                              key={chain.id}
+                              type="button"
+                              onClick={() => !isOnlyEnabled && toggleChain(chain.id, !isEnabled)}
+                              disabled={isOnlyEnabled}
+                              className="flex items-center justify-between gap-3 rounded-lg border px-3 py-2 text-left transition disabled:opacity-50 disabled:cursor-not-allowed"
+                              style={{
+                                borderColor: isEnabled ? 'var(--accent)' : 'var(--line)',
+                                background: isEnabled ? 'var(--accent-muted)' : 'var(--surface-2)',
+                                color: isEnabled ? 'var(--accent)' : 'var(--text)',
+                              }}
+                              title={isOnlyEnabled ? 'At least one chain must be enabled' : undefined}
+                            >
+                              <span className="flex items-center gap-1.5">
+                                <span className="text-sm font-medium">{chain.name}</span>
+                                {chain.isTestnet && (
+                                  <span
+                                    className="text-[10px] px-1.5 py-0.5 rounded"
+                                    style={{
+                                      background: 'var(--warning-muted, rgba(234, 179, 8, 0.15))',
+                                      color: 'var(--warning, #eab308)',
+                                    }}
+                                  >
+                                    Testnet
+                                  </span>
+                                )}
+                              </span>
+                              <span
+                                className="relative inline-flex h-5 w-9 items-center rounded-full transition-colors"
+                                style={{ background: isEnabled ? 'var(--accent)' : 'var(--surface-3)' }}
+                              >
+                                <span
+                                  className={`inline-block h-4 w-4 transform rounded-full bg-white transition ${isEnabled ? 'translate-x-4' : 'translate-x-1'}`}
+                                />
+                              </span>
+                            </button>
+                          )
+                        })}
+                      </div>
+                    )}
+                    <div className="text-xs" style={{ color: 'var(--text-muted)' }}>
+                      Tip: You can also ask Sherpa to update these settings via chat.
+                    </div>
+                  </section>
+                )}
 
                 <section className="space-y-3">
                   <div>

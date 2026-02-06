@@ -1,11 +1,26 @@
 import React from 'react'
-import { ChevronDown, ChevronRight, ChevronUp, GripVertical, MessageSquarePlus, Maximize2, Repeat } from 'lucide-react'
+import { ArrowRight, ChevronDown, ChevronRight, ChevronUp, Copy, Check, ExternalLink, GripVertical, MessageSquarePlus, Maximize2, Repeat } from 'lucide-react'
 import type { Widget } from '../../types/widgets'
 import { ErrorView } from '../ErrorView'
 import { relayQuoteThemes } from './relay-quote-theme'
 import { PolicyCheckList } from '../policy/PolicyCheckList'
 import { usePolicyEvaluation } from '../../hooks/usePolicyEvaluation'
 import { extractTransactionIntent } from '../../utils/extractTransactionIntent'
+
+// Chain metadata for display
+const CHAIN_META: Record<number, { name: string; short: string; explorer: string }> = {
+  1: { name: 'Ethereum', short: 'ETH', explorer: 'https://etherscan.io' },
+  10: { name: 'Optimism', short: 'OP', explorer: 'https://optimistic.etherscan.io' },
+  137: { name: 'Polygon', short: 'MATIC', explorer: 'https://polygonscan.com' },
+  8453: { name: 'Base', short: 'BASE', explorer: 'https://basescan.org' },
+  42161: { name: 'Arbitrum', short: 'ARB', explorer: 'https://arbiscan.io' },
+  57073: { name: 'Ink', short: 'INK', explorer: 'https://explorer.inkonchain.com' },
+}
+
+function getChainMeta(chainId: number | string | undefined) {
+  const id = typeof chainId === 'string' ? parseInt(chainId, 10) : chainId
+  return id ? CHAIN_META[id] || { name: `Chain ${id}`, short: `${id}`, explorer: '' } : null
+}
 
 type RelayQuoteWidgetProps = {
   panel: Widget
@@ -47,16 +62,35 @@ function RelayQuoteWidgetComponent({
   const etaSeconds = typeof breakdown.eta_seconds === 'number' ? breakdown.eta_seconds : undefined
   const quoteWallet = typeof payload.wallet?.address === 'string' ? payload.wallet.address : undefined
 
+  // Determine if cross-chain based on actual chain IDs
+  const originChainId = payload.chain_id || payload.chainId || payload.from_chain_id
+  const destChainId = payload.destination_chain_id || payload.destinationChainId || payload.to_chain_id
+  const isCrossChain = Boolean(payload.is_cross_chain) || (originChainId && destChainId && originChainId !== destChainId)
+
+  // Get chain metadata
+  const originChain = getChainMeta(originChainId)
+  const destChain = getChainMeta(destChainId)
+
+  // Get token info
+  const inputToken = payload.tokens?.input || breakdown.input || {}
+  const outputToken = payload.tokens?.output || breakdown.output || {}
+  const inputSymbol = inputToken.symbol || payload.input?.token?.symbol || '—'
+  const outputSymbol = outputToken.symbol || output.symbol || payload.output?.token?.symbol || '—'
+  const inputAmount = payload.amounts?.input || inputToken.amount || '—'
+
+  // Determine operation type label
   const quoteType = typeof payload.quote_type === 'string'
     ? payload.quote_type.toLowerCase()
     : panel.id === 'relay_swap_quote'
       ? 'swap'
       : 'bridge'
-  const isSwap = quoteType === 'swap'
-  const actionVerb = isSwap ? 'swap' : 'bridge'
-  const actionVerbCapitalized = isSwap ? 'Swap' : 'Bridge'
-  const actionGerund = isSwap ? 'swapping' : 'bridging'
-  const sendingLabel = isSwap ? 'Swapping…' : 'Bridging…'
+  // Use cross-chain detection for better labeling
+  const isSwap = !isCrossChain && quoteType === 'swap'
+  const operationLabel = isCrossChain ? 'Bridge' : 'Swap'
+  const actionVerb = isCrossChain ? 'bridge' : 'swap'
+  const actionVerbCapitalized = isCrossChain ? 'Bridge' : 'Swap'
+  const actionGerund = isCrossChain ? 'bridging' : 'swapping'
+  const sendingLabel = isCrossChain ? 'Bridging…' : 'Swapping…'
 
   const [sending, setSending] = React.useState(false)
   const [refreshing, setRefreshing] = React.useState(false)
@@ -64,6 +98,31 @@ function RelayQuoteWidgetComponent({
   const [txHash, setTxHash] = React.useState<string | null>(null)
   const [showInstructions, setShowInstructions] = React.useState(false)
   const [showQuickPrompts, setShowQuickPrompts] = React.useState(false)
+  const [copiedField, setCopiedField] = React.useState<string | null>(null)
+
+  const copyToClipboard = async (text: string, field: string) => {
+    try {
+      await navigator.clipboard.writeText(text)
+      setCopiedField(field)
+      setTimeout(() => setCopiedField(null), 2000)
+    } catch {
+      // Fallback for older browsers
+      const textarea = document.createElement('textarea')
+      textarea.value = text
+      document.body.appendChild(textarea)
+      textarea.select()
+      document.execCommand('copy')
+      document.body.removeChild(textarea)
+      setCopiedField(field)
+      setTimeout(() => setCopiedField(null), 2000)
+    }
+  }
+
+  const getExplorerUrl = (hash: string) => {
+    const chainMeta = originChain || destChain
+    if (!chainMeta?.explorer) return null
+    return `${chainMeta.explorer}/tx/${hash}`
+  }
 
   // Policy evaluation
   const transactionIntent = React.useMemo(() => extractTransactionIntent(panel), [panel])
@@ -237,11 +296,9 @@ function RelayQuoteWidgetComponent({
   )
 
   const metaChips: Array<string> = []
-  if (isSwap) metaChips.push('Swap')
-  else metaChips.push('Bridge')
+  metaChips.push('Relay')
   if (hopCount) metaChips.push(`${hopCount} hop${hopCount > 1 ? 's' : ''}`)
-  if (payload?.chain) metaChips.push(String(payload.chain))
-  else if (payload?.network) metaChips.push(String(payload.network))
+  if (etaSeconds && etaSeconds > 0) metaChips.push(formatEta(etaSeconds))
 
   return (
     <div className={`relative overflow-hidden ${theme.container}`}>
@@ -271,30 +328,51 @@ function RelayQuoteWidgetComponent({
       )}
       {overlayElements}
       <div className="relative space-y-4 text-sm text-white/85">
-        <div className="flex flex-wrap items-start justify-between gap-4">
-          <div>
-            <div className={`text-[11px] uppercase tracking-[0.28em] ${theme.label}`}>
-              {isSwap ? 'Swap quote' : 'Bridge quote'}
+        <div className="space-y-3">
+          <div className="flex flex-wrap items-start justify-between gap-4">
+            <div>
+              <div className={`text-[11px] uppercase tracking-[0.28em] ${theme.label}`}>
+                {operationLabel} Quote
+              </div>
+              <div className="mt-2 text-xl font-semibold text-[var(--text)]">
+                {isCrossChain
+                  ? `${originChain?.name || 'Source'} → ${destChain?.name || 'Destination'}`
+                  : `${operationLabel} on ${originChain?.name || payload.chain || 'Network'}`}
+              </div>
             </div>
-            <div className="mt-2 text-2xl font-semibold text-white">
-              {payload?.title || 'Relay execution summary'}
+            {metaChips.length > 0 && (
+              <div className={`flex flex-wrap justify-end gap-2 ${collapsed ? 'opacity-80' : ''}`}>
+                {metaChips.map((chip, idx) => (
+                  <span key={idx} className={theme.metaChip}>
+                    {chip}
+                  </span>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* Visual Flow: Amount In → Amount Out */}
+          <div className="flex items-center gap-3 rounded-xl border border-[var(--line)] bg-[var(--surface-2)] p-3">
+            <div className="flex-1 min-w-0">
+              <div className={`text-[10px] uppercase tracking-wider ${theme.label}`}>You send</div>
+              <div className="mt-0.5 text-lg font-semibold text-[var(--text)] truncate">
+                {inputAmount} {inputSymbol}
+              </div>
+              {isCrossChain && originChain && (
+                <div className={`text-xs ${theme.helper}`}>on {originChain.name}</div>
+              )}
             </div>
-            <div className={`mt-1 text-xs ${theme.helper}`}>
-              {payload?.description
-                || (isSwap
-                  ? 'Sherpa tuned a best-route swap path ready for Relay.'
-                  : 'Sherpa tuned a best-route bridge path ready for Relay.')}
+            <ArrowRight className="h-5 w-5 text-[var(--text-muted)] flex-shrink-0" />
+            <div className="flex-1 min-w-0 text-right">
+              <div className={`text-[10px] uppercase tracking-wider ${theme.label}`}>You receive</div>
+              <div className="mt-0.5 text-lg font-semibold text-[var(--success)] truncate">
+                ~{outputEstimate}
+              </div>
+              {isCrossChain && destChain && (
+                <div className={`text-xs ${theme.helper}`}>on {destChain.name}</div>
+              )}
             </div>
           </div>
-          {metaChips.length > 0 && (
-            <div className={`flex flex-wrap justify-end gap-2 ${collapsed ? 'opacity-80' : ''}`}>
-              {metaChips.map((chip, idx) => (
-                <span key={idx} className={theme.metaChip}>
-                  {chip}
-                </span>
-              ))}
-            </div>
-          )}
         </div>
 
         {collapsed ? (
@@ -331,17 +409,30 @@ function RelayQuoteWidgetComponent({
 
         {collapsed ? (
           <div className={`${theme.summaryCard} ${walletMismatch ? 'border-amber-400 bg-amber-300/25 text-amber-100' : ''}`}>
-            <div className={`${theme.statLabel} text-[10px]`}>Destination Wallet</div>
+            <div className={`${theme.statLabel} text-[10px]`}>Recipient</div>
             <div className={theme.summaryValue}>{truncatedWallet}</div>
           </div>
         ) : (
           <div className={`${theme.section} ${walletMismatch ? 'border-amber-400 bg-amber-300/20 text-amber-100' : ''}`}>
-            <div className={`text-[11px] uppercase tracking-[0.2em] ${walletMismatch ? 'text-amber-100' : theme.label}`}>
-              Destination Wallet
+            <div className="flex items-center justify-between">
+              <div className={`text-[11px] uppercase tracking-[0.2em] ${walletMismatch ? 'text-amber-100' : theme.label}`}>
+                Recipient Wallet
+              </div>
+              {quoteWallet && (
+                <button
+                  type="button"
+                  onClick={() => copyToClipboard(quoteWallet, 'wallet')}
+                  className={`${theme.ghostAction} h-7 px-2 text-[10px]`}
+                  title="Copy address"
+                >
+                  {copiedField === 'wallet' ? <Check className="h-3 w-3" /> : <Copy className="h-3 w-3" />}
+                  {copiedField === 'wallet' ? 'Copied' : 'Copy'}
+                </button>
+              )}
             </div>
-            <div className="mt-2 break-all font-mono text-sm text-white">{quoteWallet || '—'}</div>
+            <div className="mt-2 font-mono text-sm text-[var(--text)]">{truncatedWallet}</div>
             {walletMismatch && (
-              <div className="mt-2 text-xs">
+              <div className="mt-2 text-xs text-amber-200">
                 Connected wallet differs from the quote wallet. Switch wallets before {actionGerund}.
               </div>
             )}
@@ -491,8 +582,35 @@ function RelayQuoteWidgetComponent({
           />
         )}
         {txHash && (
-          <div className={`${theme.section} text-xs ${theme.successText}`}>
-            Transaction submitted: <code className="font-mono">{txHash}</code>
+          <div className={`${theme.section} space-y-2`}>
+            <div className="flex items-center gap-2">
+              <div className={`h-2 w-2 rounded-full bg-[var(--success)] animate-pulse`} />
+              <span className={`text-sm font-medium ${theme.successText}`}>Transaction Submitted</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <code className="font-mono text-xs text-[var(--text)] truncate flex-1">
+                {txHash.slice(0, 10)}...{txHash.slice(-8)}
+              </code>
+              <button
+                type="button"
+                onClick={() => copyToClipboard(txHash, 'txHash')}
+                className={`${theme.ghostAction} h-7 px-2 text-[10px]`}
+                title="Copy transaction hash"
+              >
+                {copiedField === 'txHash' ? <Check className="h-3 w-3" /> : <Copy className="h-3 w-3" />}
+              </button>
+              {getExplorerUrl(txHash) && (
+                <a
+                  href={getExplorerUrl(txHash)!}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className={`${theme.ghostAction} h-7 px-2 text-[10px]`}
+                  title="View on explorer"
+                >
+                  <ExternalLink className="h-3 w-3" />
+                </a>
+              )}
+            </div>
           </div>
         )}
       </div>

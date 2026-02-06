@@ -334,7 +334,9 @@ export const checkDCAStrategies = internalAction({
         const internalKey = process.env.INTERNAL_API_KEY;
 
         if (fastapiUrl && internalKey) {
-          const response = await fetch(`${fastapiUrl}/internal/dca/execute`, {
+          // Calls: backend/app/api/dca.py:internal_execute
+          // Contract test: backend/tests/contract/test_convex_api_contracts.py
+          const response = await fetch(`${fastapiUrl}/dca/internal/execute`, {
             method: "POST",
             headers: {
               "Content-Type": "application/json",

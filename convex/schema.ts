@@ -14,6 +14,20 @@ export default defineSchema({
     .index("by_evm_wallet", ["evmWalletAddress"])
     .index("by_solana_wallet", ["solanaWalletAddress"]),
 
+  // ============================================
+  // User Preferences
+  // ============================================
+  userPreferences: defineTable({
+    walletAddress: v.string(), // Primary key - user's wallet address
+    // Portfolio chain preferences - which chains to include in portfolio view
+    // Stores chain slugs like "ethereum", "base", "polygon"
+    enabledPortfolioChains: v.array(v.string()),
+    // Future preferences can be added here
+    // e.g., defaultCurrency, theme, notifications, etc.
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  }).index("by_wallet", ["walletAddress"]),
+
   wallets: defineTable({
     userId: v.id("users"),
     address: v.string(),
@@ -225,8 +239,10 @@ export default defineSchema({
     pauseIfPriceBelowUsd: v.optional(v.number()), // Pause if token price below
     minAmountOut: v.optional(v.string()), // Minimum tokens to receive (Decimal)
 
-    // Session key reference
+    // Session key reference (legacy)
     sessionKeyId: v.optional(v.id("sessionKeys")),
+    // Smart Session reference (Rhinestone - preferred)
+    smartSessionId: v.optional(v.string()),
 
     // Status
     status: v.union(
@@ -481,6 +497,57 @@ export default defineSchema({
   })
     .index("by_owner", ["ownerAddress"])
     .index("by_smart_account", ["smartAccountAddress"]),
+
+  // ============================================
+  // Smart Session Intents (execution tracking)
+  // ============================================
+  smartSessionIntents: defineTable({
+    smartSessionId: v.string(),
+    smartAccountAddress: v.string(),
+    intentType: v.union(
+      v.literal("dca_execution"),
+      v.literal("swap"),
+      v.literal("bridge")
+    ),
+    sourceType: v.optional(
+      v.union(v.literal("dca_strategy"), v.literal("manual"))
+    ),
+    sourceId: v.optional(v.string()), // Strategy ID if from automated strategy
+    status: v.union(
+      v.literal("pending"),
+      v.literal("executing"),
+      v.literal("confirming"),
+      v.literal("completed"),
+      v.literal("failed")
+    ),
+    chainId: v.number(),
+    txHash: v.optional(v.string()),
+    estimatedValueUsd: v.optional(v.number()),
+    actualValueUsd: v.optional(v.number()),
+    gasUsd: v.optional(v.number()),
+    tokenIn: v.optional(
+      v.object({
+        symbol: v.string(),
+        address: v.string(),
+        amount: v.string(),
+      })
+    ),
+    tokenOut: v.optional(
+      v.object({
+        symbol: v.string(),
+        address: v.string(),
+        amount: v.optional(v.string()),
+      })
+    ),
+    errorMessage: v.optional(v.string()),
+    createdAt: v.number(),
+    submittedAt: v.optional(v.number()),
+    confirmedAt: v.optional(v.number()),
+  })
+    .index("by_smart_account", ["smartAccountAddress"])
+    .index("by_status", ["status"])
+    .index("by_source", ["sourceType", "sourceId"])
+    .index("by_smart_session", ["smartSessionId"]),
 
   // ============================================
   // Smart Sessions (Rhinestone on-chain permissions)

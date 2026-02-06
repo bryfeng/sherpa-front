@@ -10,6 +10,8 @@ import {
   AlertTriangle,
   Check,
   Zap,
+  Shield,
+  Key,
 } from 'lucide-react'
 import type { GenericStrategy } from '../../hooks/useStrategies'
 import {
@@ -24,6 +26,9 @@ interface StrategyCardProps {
   onStop: (id: string) => Promise<void>
   onEdit: (id: string) => void
   onViewDetails: (id: string) => void
+  onGrantSession?: (id: string) => void
+  hasSmartSession?: boolean
+  smartSessionId?: string
 }
 
 // Status display helpers
@@ -96,6 +101,9 @@ export function StrategyCard({
   onStop,
   onEdit: _onEdit,
   onViewDetails,
+  onGrantSession,
+  hasSmartSession = false,
+  smartSessionId,
 }: StrategyCardProps) {
   const [showMenu, setShowMenu] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
@@ -111,6 +119,11 @@ export function StrategyCard({
   const successfulExecutions = strategy.successfulExecutions ?? 0
   const successRate = totalExecutions > 0 ? (successfulExecutions / totalExecutions) * 100 : 0
   const requiresManualApproval = (strategy as unknown as { requiresManualApproval?: boolean }).requiresManualApproval
+
+  // Check if strategy has smart session linked
+  const strategySmartSessionId = (strategy as unknown as { smartSessionId?: string }).smartSessionId || smartSessionId
+  const hasLinkedSession = !!strategySmartSessionId || hasSmartSession
+  const needsSession = strategy.status === 'pending_session' && !hasLinkedSession
 
   const handleAction = async (action: () => Promise<void>) => {
     setIsLoading(true)
@@ -153,6 +166,15 @@ export function StrategyCard({
             {STRATEGY_TYPE_LABELS[strategy.strategyType]}
             {fromToken && toToken && ` · ${fromToken} → ${toToken}`}
           </p>
+          {/* Smart Session Indicator */}
+          {hasLinkedSession && (
+            <div className="flex items-center gap-1 mt-1">
+              <Shield className="h-3 w-3" style={{ color: 'var(--success)' }} />
+              <span className="text-xs" style={{ color: 'var(--success)' }}>
+                Smart Session Active
+              </span>
+            </div>
+          )}
         </div>
 
         {/* Menu Button */}
@@ -287,6 +309,24 @@ export function StrategyCard({
           </div>
         </div>
       </div>
+
+      {/* Grant Session Button (for pending_session status) */}
+      {needsSession && onGrantSession && (
+        <button
+          onClick={(e) => {
+            e.stopPropagation()
+            onGrantSession(strategy._id)
+          }}
+          className="w-full mt-3 px-4 py-2 rounded-lg text-sm font-medium transition-colors flex items-center justify-center gap-2"
+          style={{
+            background: 'var(--accent)',
+            color: 'white',
+          }}
+        >
+          <Key className="h-4 w-4" />
+          Grant Smart Session
+        </button>
+      )}
 
       {/* Execution Stats */}
       <div

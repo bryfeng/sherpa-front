@@ -66,8 +66,10 @@ export interface DCAStrategy {
   pauseIfPriceBelowUsd?: number
   minAmountOut?: string
 
-  // Session key
+  // Session key (legacy)
   sessionKeyId?: Id<'sessionKeys'>
+  // Smart Session (Rhinestone - preferred)
+  smartSessionId?: string
 
   // Status
   status: DCAStatus

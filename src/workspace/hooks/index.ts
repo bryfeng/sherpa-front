@@ -1,4 +1,5 @@
 export * from './usePortfolioSummary'
+export * from './useMultiChainPortfolio'
 export * from './usePriceTicker'
 export * from './useSwapQuote'
 export * from './useConversationHistory'

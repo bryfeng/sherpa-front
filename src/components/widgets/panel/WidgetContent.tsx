@@ -1,6 +1,7 @@
 import React, { Suspense } from 'react'
 import { FileQuestion } from 'lucide-react'
 import type { Widget } from '../../../types/widgets'
+import { useSherpaStore } from '../../../store'
 import { CardSkeleton } from '../../panels/CardSkeleton'
 import { PanelErrorBoundary } from '../../panels/PanelErrorBoundary'
 import { RelayQuoteWidget } from '../RelayQuoteWidget'

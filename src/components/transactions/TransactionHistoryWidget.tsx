@@ -1,10 +1,10 @@
 /**
  * Transaction History Widget
  *
- * Displays recent transactions and strategy executions for a wallet.
+ * Displays recent transactions, strategy executions, and smart session intents for a wallet.
  */
 
-import React, { useState } from 'react'
+import React, { useState, useMemo } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
   ArrowUpRight,
@@ -16,6 +16,7 @@ import {
   XCircle,
   AlertCircle,
   Loader2,
+  Zap,
 } from 'lucide-react'
 import { useAccount } from 'wagmi'
 import {
@@ -33,13 +34,17 @@ import {
   type StrategyExecution,
   type TransactionType,
 } from '../../hooks/useTransactionHistory'
+import { useSmartSessionIntents, usePendingIntentsCount } from '../../hooks/useSmartSessionIntents'
+import { IntentProgressCard } from '../intents/IntentProgressCard'
+import type { SmartSessionIntent } from '../../types/smart-session-intent'
 
-type FilterType = 'all' | 'transactions' | 'executions'
+type FilterType = 'all' | 'transactions' | 'executions' | 'intents'
 
 const FILTER_OPTIONS: Array<{ value: FilterType; label: string }> = [
   { value: 'all', label: 'All Activity' },
   { value: 'transactions', label: 'Transactions' },
   { value: 'executions', label: 'Executions' },
+  { value: 'intents', label: 'Intents' },
 ]
 
 const TYPE_ICONS: Record<TransactionType, React.ReactNode> = {
@@ -54,13 +59,53 @@ export function TransactionHistoryWidget() {
   const [filter, setFilter] = useState<FilterType>('all')
   const { items, isLoading, isEmpty: _isEmpty } = useRecentActivity(address ?? null, 50)
 
-  // Filter items based on selection
-  const filteredItems = items.filter((item) => {
-    if (filter === 'all') return true
-    if (filter === 'transactions') return item.type === 'transaction'
-    if (filter === 'executions') return item.type === 'execution'
-    return true
+  // Smart session intents (using wallet address as smart account address for now)
+  // In production, this would use the actual smart account address
+  const { intents, isLoading: intentsLoading } = useSmartSessionIntents({
+    smartAccountAddress: address ?? null,
+    limit: 50,
   })
+  const { count: pendingIntentsCount } = usePendingIntentsCount(address ?? null)
+
+  // Merge all items for "all" view
+  const allItems = useMemo(() => {
+    if (filter === 'intents') {
+      return intents.map((intent) => ({
+        id: `intent-${intent._id}`,
+        type: 'intent' as const,
+        timestamp: intent.createdAt,
+        data: intent,
+      }))
+    }
+
+    const baseItems = items.map((item) => ({
+      ...item,
+      type: item.type as 'transaction' | 'execution',
+    }))
+
+    if (filter === 'all') {
+      const intentItems = intents.map((intent) => ({
+        id: `intent-${intent._id}`,
+        type: 'intent' as const,
+        timestamp: intent.createdAt,
+        data: intent,
+      }))
+      return [...baseItems, ...intentItems].sort((a, b) => b.timestamp - a.timestamp)
+    }
+
+    return baseItems
+  }, [items, intents, filter])
+
+  // Filter items based on selection
+  const filteredItems = useMemo(() => {
+    if (filter === 'all') return allItems
+    if (filter === 'intents') return allItems
+    return allItems.filter((item) => {
+      if (filter === 'transactions') return item.type === 'transaction'
+      if (filter === 'executions') return item.type === 'execution'
+      return true
+    })
+  }, [allItems, filter])
 
   // Not connected state
   if (!address) {
@@ -85,6 +130,11 @@ export function TransactionHistoryWidget() {
             </h2>
             <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
               {filteredItems.length} {filter === 'all' ? 'items' : filter}
+              {pendingIntentsCount > 0 && filter !== 'intents' && (
+                <span className="ml-2 px-1.5 py-0.5 rounded text-xs" style={{ background: 'var(--accent-muted)', color: 'var(--accent)' }}>
+                  {pendingIntentsCount} pending
+                </span>
+              )}
             </p>
           </div>
         </div>
@@ -95,7 +145,7 @@ export function TransactionHistoryWidget() {
             <button
               key={option.value}
               onClick={() => setFilter(option.value)}
-              className="flex-1 px-3 py-1.5 rounded-md text-xs font-medium transition-colors"
+              className="flex-1 px-3 py-1.5 rounded-md text-xs font-medium transition-colors relative"
               style={{
                 background: filter === option.value ? 'var(--surface)' : 'transparent',
                 color: filter === option.value ? 'var(--text)' : 'var(--text-muted)',
@@ -103,6 +153,14 @@ export function TransactionHistoryWidget() {
               }}
             >
               {option.label}
+              {option.value === 'intents' && pendingIntentsCount > 0 && (
+                <span
+                  className="absolute -top-1 -right-1 w-4 h-4 rounded-full text-xs flex items-center justify-center"
+                  style={{ background: 'var(--accent)', color: 'white' }}
+                >
+                  {pendingIntentsCount}
+                </span>
+              )}
             </button>
           ))}
         </div>
@@ -110,7 +168,7 @@ export function TransactionHistoryWidget() {
 
       {/* Content */}
       <div className="flex-1 overflow-y-auto">
-        {isLoading ? (
+        {isLoading || intentsLoading ? (
           <div className="flex items-center justify-center h-full">
             <Loader2 className="h-6 w-6 animate-spin" style={{ color: 'var(--accent)' }} />
           </div>
@@ -129,8 +187,10 @@ export function TransactionHistoryWidget() {
                 >
                   {item.type === 'transaction' ? (
                     <TransactionRow transaction={item.data as Transaction} />
-                  ) : (
+                  ) : item.type === 'execution' ? (
                     <ExecutionRow execution={item.data as StrategyExecution} />
+                  ) : (
+                    <IntentProgressCard intent={item.data as SmartSessionIntent} compact />
                   )}
                 </motion.div>
               ))}
@@ -143,22 +203,30 @@ export function TransactionHistoryWidget() {
 }
 
 function EmptyState({ filter }: { filter: FilterType }) {
-  const messages: Record<FilterType, { title: string; description: string }> = {
+  const messages: Record<FilterType, { title: string; description: string; icon: React.ReactNode }> = {
     all: {
       title: 'No Activity Yet',
-      description: 'Your transactions and strategy executions will appear here.',
+      description: 'Your transactions, executions, and intents will appear here.',
+      icon: <Clock className="h-8 w-8" style={{ color: 'var(--text-muted)' }} />,
     },
     transactions: {
       title: 'No Transactions',
       description: 'On-chain transactions like swaps, bridges, and transfers will appear here.',
+      icon: <RefreshCw className="h-8 w-8" style={{ color: 'var(--text-muted)' }} />,
     },
     executions: {
       title: 'No Executions',
       description: 'Strategy executions from your automated strategies will appear here.',
+      icon: <Zap className="h-8 w-8" style={{ color: 'var(--text-muted)' }} />,
+    },
+    intents: {
+      title: 'No Intents',
+      description: 'Smart session intents from DCA and automated actions will appear here.',
+      icon: <Zap className="h-8 w-8" style={{ color: 'var(--text-muted)' }} />,
     },
   }
 
-  const { title, description } = messages[filter]
+  const { title, description, icon } = messages[filter]
 
   return (
     <div className="flex flex-col items-center justify-center h-full p-8 text-center">
@@ -166,7 +234,7 @@ function EmptyState({ filter }: { filter: FilterType }) {
         className="w-16 h-16 rounded-full flex items-center justify-center mb-4"
         style={{ background: 'var(--surface-2)' }}
       >
-        <Clock className="h-8 w-8" style={{ color: 'var(--text-muted)' }} />
+        {icon}
       </div>
       <h3 className="font-medium mb-1" style={{ color: 'var(--text)' }}>
         {title}

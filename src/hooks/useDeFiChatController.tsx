@@ -1136,6 +1136,7 @@ export function useDeFiChatController({ props, shellState, dispatch }: UseDeFiCh
   const headerProps: HeaderBarProps = {
     persona,
     walletLabel: walletAddress ? truncateAddress(walletAddress) : 'Guest session',
+    walletAddress: walletAddress || undefined,
     walletConnected: Boolean(walletAddress),
     proLabel: proBadgeLabel,
     authStatus: auth.status,
