@@ -207,7 +207,7 @@ function ReviewStep({
                 Smart Session Required
               </h4>
               <p className="text-sm" style={{ color: 'var(--text-muted)' }}>
-                You'll need to grant a Smart Session to allow automated execution. This is an on-chain permission
+                You&apos;ll need to grant a Smart Session to allow automated execution. This is an on-chain permission
                 with a spending limit of {formatUsd(sessionRequirements.spendingLimitUsd)} valid for{' '}
                 {sessionRequirements.validDays} days.
               </p>

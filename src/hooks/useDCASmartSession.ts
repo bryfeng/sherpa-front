@@ -248,23 +248,25 @@ function calculateNextExecution(strategy: { frequency: string; executionHourUtc:
     case 'daily':
       return next.getTime()
 
-    case 'weekly':
+    case 'weekly': {
       // Find next occurrence of target day
       const targetDay = strategy.executionDayOfWeek ?? 1 // Default Monday
       while (next.getUTCDay() !== targetDay) {
         next.setUTCDate(next.getUTCDate() + 1)
       }
       return next.getTime()
+    }
 
-    case 'biweekly':
+    case 'biweekly': {
       // Find next occurrence of target day, then add a week
       const biweeklyTargetDay = strategy.executionDayOfWeek ?? 1
       while (next.getUTCDay() !== biweeklyTargetDay) {
         next.setUTCDate(next.getUTCDate() + 1)
       }
       return next.getTime()
+    }
 
-    case 'monthly':
+    case 'monthly': {
       // Find next occurrence of target day of month
       const targetDayOfMonth = strategy.executionDayOfMonth ?? 1
       next.setUTCDate(targetDayOfMonth)
@@ -272,6 +274,7 @@ function calculateNextExecution(strategy: { frequency: string; executionHourUtc:
         next.setUTCMonth(next.getUTCMonth() + 1)
       }
       return next.getTime()
+    }
 
     default:
       return next.getTime()
