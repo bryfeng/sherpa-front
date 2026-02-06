@@ -106,7 +106,6 @@ function useLLMProviders() {
   const llmProvidersLoading = useSherpaStore((s) => s.llmProvidersLoading)
   const setLlmProviders = useSherpaStore((s) => s.setLlmProviders)
 
-  const llmModel = useSherpaStore((s) => s.llmModel)
   const setLlmModel = useSherpaStore((s) => s.setLlmModel)
 
   useEffect(() => {
@@ -142,9 +141,12 @@ function useLLMProviders() {
           (p) => p.id === res?.default_provider
         )?.default_model
 
-        // Update model if current is invalid
-        if (llmModel && (availableModels.size === 0 || availableModels.has(llmModel))) {
-          // Keep current model
+        // Read current model at resolution time (not from stale closure)
+        const currentModel = useSherpaStore.getState().llmModel
+
+        // Only override if current model is invalid (not in available set)
+        if (currentModel && (availableModels.size === 0 || availableModels.has(currentModel))) {
+          // Keep current model - user's selection is valid
         } else if (serverDefaultModel) {
           setLlmModel(serverDefaultModel)
         } else if (providerDefaultModel) {
@@ -165,7 +167,9 @@ function useLLMProviders() {
     return () => {
       cancelled = true
     }
-  }, [llmModel, setLlmModel, setLlmProviders])
+    // Only fetch providers on mount - model changes should NOT trigger re-fetch
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [setLlmModel, setLlmProviders])
 
   return { llmProviders, llmProvidersLoading }
 }
