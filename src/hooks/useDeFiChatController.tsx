@@ -683,8 +683,14 @@ export function useDeFiChatController({ props, shellState, dispatch }: UseDeFiCh
 
     setMessages((previous) => [...previous, userMessage, assistantMessage])
 
+    // Build full conversation history for backend context (exclude seed intro, streaming/typing placeholders)
+    const history = messages
+      .filter((msg) => msg.text && !msg.typing && !msg.streaming)
+      .map((msg) => ({ role: msg.role, content: msg.text }))
+    history.push({ role: 'user', content: question })
+
     const payload = {
-      messages: [{ role: 'user', content: question }],
+      messages: history,
       address: walletAddress,
       chain: 'ethereum',
       conversation_id: conversationId,

@@ -185,8 +185,14 @@ export function useChatEngine(options: UseChatEngineOptions) {
     setIsTyping(true)
 
     try {
+      // Build full conversation history for backend context
+      const history = messages
+        .filter((msg) => msg.text && !msg.typing && !msg.streaming)
+        .map((msg) => ({ role: msg.role, content: msg.text }))
+      history.push({ role: 'user', content: question })
+
       const payload = {
-        messages: [{ role: 'user', content: question }],
+        messages: history,
         address: walletAddress,
         chain: 'ethereum',
         conversation_id: conversationId ?? undefined,
@@ -302,8 +308,14 @@ export function useChatEngine(options: UseChatEngineOptions) {
     setIsTyping(true)
 
     try {
+      // Build full conversation history for backend context
+      const history = messages
+        .filter((msg) => msg.text && !msg.typing && !msg.streaming)
+        .map((msg) => ({ role: msg.role, content: msg.text }))
+      history.push({ role: 'user', content: question })
+
       const payload = {
-        messages: [{ role: 'user', content: question }],
+        messages: history,
         address: walletAddress,
         chain: 'ethereum',
         conversation_id: conversationId ?? undefined,
