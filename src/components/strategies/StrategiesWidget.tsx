@@ -16,6 +16,9 @@ import { useGenericStrategies, useGenericStrategyMutations, type GenericStrategy
 import { useSmartSessions } from '../../hooks/useDCASmartSession'
 import { useRhinestoneAccount } from '../../hooks/useRhinestoneAccount'
 import { useExecutionHistory, useExecutionMutations, formatWaitingTime, getUrgencyLevel } from '../../workspace/hooks/usePendingApprovals'
+import { useSourceIntents } from '../../hooks/useSmartSessionIntents'
+import { IntentProgressCard } from '../intents/IntentProgressCard'
+import { usePolicyStatus } from '../../hooks/usePolicyStatus'
 import type { StrategyFilters } from '../../types/strategy'
 import type { Id } from '../../../convex/_generated/dataModel'
 
@@ -349,15 +352,29 @@ function StrategyDetails({
   const { executions, isLoading: _executionsLoading } = useExecutionHistory(strategy._id)
   const { approve, skip } = useExecutionMutations()
 
+  // Get autonomous execution intents (smart session)
+  const strategySmartSessionId = (strategy as unknown as { smartSessionId?: string }).smartSessionId
+  const { intents } = useSourceIntents(
+    strategySmartSessionId ? 'dca_strategy' : null,
+    strategy._id
+  )
+
+  // Policy status for gating approvals
+  const { canTrade, statusMessage: policyMessage } = usePolicyStatus()
+
   // Find pending executions (awaiting_approval or executing)
   const pendingExecutions = executions.filter(
     (e) => e.currentState === 'awaiting_approval' || e.currentState === 'executing'
   )
 
-  // Handle approve action
+  // Handle approve action (with policy guard)
   const handleApprove = useCallback(async (executionId: string) => {
     if (!address) {
       setApprovalError('Please connect your wallet to approve')
+      return
+    }
+    if (!canTrade) {
+      setApprovalError(policyMessage || 'Trading is currently disabled by system policy')
       return
     }
     setApprovalLoading(executionId)
@@ -370,7 +387,7 @@ function StrategyDetails({
     } finally {
       setApprovalLoading(null)
     }
-  }, [approve, address])
+  }, [approve, address, canTrade, policyMessage])
 
   // Handle skip action
   const handleSkip = useCallback(async (executionId: string) => {
@@ -559,6 +576,23 @@ function StrategyDetails({
               {approvalError}
             </div>
           )}
+        </div>
+      )}
+
+      {/* Autonomous Execution History (Smart Session Intents) */}
+      {intents.length > 0 && (
+        <div>
+          <h3 className="text-sm font-medium mb-2" style={{ color: 'var(--text)' }}>
+            Recent Autonomous Executions
+          </h3>
+          <div
+            className="rounded-lg overflow-hidden divide-y"
+            style={{ background: 'var(--surface-2)', borderColor: 'var(--line)' }}
+          >
+            {intents.slice(0, 5).map((intent) => (
+              <IntentProgressCard key={intent._id} intent={intent} compact />
+            ))}
+          </div>
         </div>
       )}
 

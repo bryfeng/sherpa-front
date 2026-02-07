@@ -29,6 +29,104 @@ export const checkTriggers = internalAction({
 
     for (const strategy of readyStrategies) {
       try {
+        // Phase 2: Smart Session auto-execution bypass
+        // If strategy has a valid smart session, skip manual approval entirely
+        if (strategy.smartSessionId) {
+          const session = await ctx.runQuery(
+            internal.scheduler.validateSmartSession,
+            { smartSessionId: strategy.smartSessionId }
+          );
+
+          if (session?.valid) {
+            // Check if there's already a pending execution
+            const hasPending = await ctx.runQuery(
+              internal.scheduler.hasPendingExecution,
+              { strategyId: strategy._id }
+            );
+            if (hasPending) {
+              console.log(`Strategy ${strategy._id} already has pending execution, skipping`);
+              continue;
+            }
+
+            // Policy pre-check: call backend to evaluate before executing
+            const fastapiUrl = process.env.FASTAPI_URL;
+            const internalKey = process.env.INTERNAL_API_KEY;
+
+            if (fastapiUrl && internalKey) {
+              const config = strategy.config as Record<string, unknown>;
+              const policyResponse = await fetch(`${fastapiUrl}/policy/internal/evaluate`, {
+                method: "POST",
+                headers: {
+                  "Content-Type": "application/json",
+                  "X-Internal-Key": internalKey,
+                },
+                body: JSON.stringify({
+                  sessionId: strategy.smartSessionId,
+                  walletAddress: strategy.walletAddress,
+                  actionType: "swap",
+                  chainId: (config.chainId as number) || 1,
+                  valueUsd: (config.amount_usd as number) || 0,
+                  tokenIn: (config.from_token as string) || undefined,
+                  tokenOut: (config.to_token as string) || undefined,
+                }),
+              });
+
+              if (policyResponse.ok) {
+                const policyResult = await policyResponse.json();
+                if (!policyResult.approved) {
+                  console.log(
+                    `Strategy ${strategy._id} blocked by policy: ${policyResult.violations?.[0]?.message || "policy violation"}`
+                  );
+                  await ctx.runMutation(internal.scheduler.updateNextExecution, {
+                    strategyId: strategy._id,
+                    lastExecutedAt: now,
+                  });
+                  continue;
+                }
+              }
+              // If policy check fails (network error), proceed with execution
+              // The backend executor has its own policy checks as a fallback
+            }
+
+            // Create auto-approved execution
+            const executionId = await ctx.runMutation(
+              internal.scheduler.createAutoApprovedExecution,
+              { strategyId: strategy._id }
+            );
+
+            // Call backend to execute via intent
+            if (fastapiUrl && internalKey) {
+              // Calls: backend/app/api/strategies.py:internal_execute
+              const response = await fetch(`${fastapiUrl}/strategies/internal/execute`, {
+                method: "POST",
+                headers: {
+                  "Content-Type": "application/json",
+                  "X-Internal-Key": internalKey,
+                },
+                body: JSON.stringify({
+                  executionId,
+                  strategyId: strategy._id,
+                }),
+              });
+
+              if (!response.ok) {
+                console.error(
+                  `Failed to auto-execute strategy ${strategy._id}: ${response.status}`
+                );
+              } else {
+                console.log(`Auto-executed strategy ${strategy._id} via smart session`);
+              }
+            }
+
+            await ctx.runMutation(internal.scheduler.updateNextExecution, {
+              strategyId: strategy._id,
+              lastExecutedAt: now,
+            });
+            continue;
+          }
+          // If session invalid, fall through to manual approval
+        }
+
         // Check if this strategy requires manual approval (Phase 1)
         if (strategy.requiresManualApproval) {
           // Check if there's already a pending execution for this strategy
@@ -76,7 +174,8 @@ export const checkTriggers = internalAction({
         const internalKey = process.env.INTERNAL_API_KEY;
 
         if (fastapiUrl && internalKey) {
-          const response = await fetch(`${fastapiUrl}/internal/execute`, {
+          // Calls: backend/app/api/strategies.py:internal_execute
+          const response = await fetch(`${fastapiUrl}/strategies/internal/execute`, {
             method: "POST",
             headers: {
               "Content-Type": "application/json",
@@ -185,6 +284,69 @@ export const createPendingExecution = internalMutation({
       ],
       requiresApproval: true,
       approvalReason,
+      recoverable: true,
+      createdAt: now,
+    });
+
+    return executionId;
+  },
+});
+
+/**
+ * Validate a smart session is still active and not expired
+ */
+export const validateSmartSession = internalQuery({
+  args: { smartSessionId: v.string() },
+  handler: async (ctx, args): Promise<{ valid: boolean } | null> => {
+    const now = Date.now();
+
+    // Find session by sessionId
+    const session = await ctx.db
+      .query("smartSessions")
+      .withIndex("by_session_id", (q) => q.eq("sessionId", args.smartSessionId))
+      .first();
+
+    if (!session) return null;
+
+    const valid =
+      session.status === "active" && session.validUntil > now;
+
+    return { valid };
+  },
+});
+
+/**
+ * Create an auto-approved execution (for smart session auto-execution)
+ */
+export const createAutoApprovedExecution = internalMutation({
+  args: { strategyId: v.id("strategies") },
+  handler: async (ctx, args): Promise<string> => {
+    const strategy = await ctx.db.get(args.strategyId);
+    if (!strategy) throw new Error("Strategy not found");
+
+    const now = Date.now();
+
+    const executionId = await ctx.db.insert("strategyExecutions", {
+      strategyId: args.strategyId,
+      walletAddress: strategy.walletAddress.toLowerCase(),
+      currentState: "executing",
+      stateEnteredAt: now,
+      steps: [],
+      currentStepIndex: 0,
+      stateHistory: [
+        {
+          id: `sh_${now}`,
+          fromState: "idle",
+          toState: "executing",
+          trigger: "smart_session_auto_execute",
+          timestamp: now,
+          reason: "Auto-executed via smart session",
+        },
+      ],
+      requiresApproval: false,
+      approvedBy: "smart_session",
+      approvedAt: now,
+      startedAt: now,
       recoverable: true,
       createdAt: now,
     });

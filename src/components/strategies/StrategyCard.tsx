@@ -172,6 +172,7 @@ export function StrategyCard({
               <Shield className="h-3 w-3" style={{ color: 'var(--success)' }} />
               <span className="text-xs" style={{ color: 'var(--success)' }}>
                 Smart Session Active
+                {strategy.lastExecutedAt && ` · Last auto-execution ${formatLastExecution(strategy.lastExecutedAt)}`}
               </span>
             </div>
           )}
