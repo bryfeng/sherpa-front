@@ -183,14 +183,24 @@ export function DeFiChatShell({
               </div>
             </section>
 
-            {/* Widget Panel */}
-            <ErrorBoundary name="widget-panel" resetLabel="Reload widgets">
-              <WidgetPanel
-                {...widgetPanel}
-                isVisible={widgetPanelVisible}
-                onCollapse={onToggleWidgetPanel}
-              />
-            </ErrorBoundary>
+            {/* Widget Panel — wrapper controls layout space; WidgetPanel handles animation only */}
+            <div
+              className={
+                widgetPanelVisible
+                  ? 'hidden lg:flex flex-1 overflow-hidden border-l min-w-0'
+                  : 'hidden'
+              }
+              style={{ borderColor: 'var(--line)' }}
+              data-testid="widget-panel-slot"
+            >
+              <ErrorBoundary name="widget-panel" resetLabel="Reload widgets">
+                <WidgetPanel
+                  {...widgetPanel}
+                  isVisible={widgetPanelVisible}
+                  onCollapse={onToggleWidgetPanel}
+                />
+              </ErrorBoundary>
+            </div>
           </div>
         </Card>
     </div>

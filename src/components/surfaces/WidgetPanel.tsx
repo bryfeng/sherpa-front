@@ -74,12 +74,12 @@ function WidgetPanelComponent({
     <AnimatePresence mode="wait">
       {isVisible && (
         <motion.div
+          key="widget-panel"
           initial={{ opacity: 0, x: 20 }}
           animate={{ opacity: 1, x: 0 }}
           exit={{ opacity: 0, x: 20 }}
           transition={{ duration: 0.2, ease: [0.16, 1, 0.3, 1] }}
-          className="hidden lg:flex flex-1 overflow-hidden border-l min-w-0"
-          style={{ borderColor: 'var(--line)' }}
+          className="h-full w-full overflow-hidden"
         >
           <div
             className="flex h-full w-full flex-col"
