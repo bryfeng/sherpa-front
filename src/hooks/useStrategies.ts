@@ -90,7 +90,8 @@ export function useGenericStrategyMutations() {
 
   return {
     activate: useCallback(
-      async (strategyId: Id<'strategies'>) => activateMutation({ strategyId }),
+      async (strategyId: Id<'strategies'>, smartSessionId?: string) =>
+        activateMutation({ strategyId, smartSessionId }),
       [activateMutation]
     ),
     pause: useCallback(

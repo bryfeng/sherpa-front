@@ -6,13 +6,73 @@
 
 import React, { useState, useCallback } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
-import { ArrowLeft, Play, Clock, Check, X, AlertCircle, Loader2 } from 'lucide-react'
+import { ArrowLeft, Play, Clock, Check, X, AlertCircle, Loader2, Shield } from 'lucide-react'
 import { useAccount } from 'wagmi'
+import { useMutation } from 'convex/react'
+import { api } from '../../../convex/_generated/api'
 import { StrategyList } from './StrategyList'
+import { StrategyActivationFlow, type ReviewDetail, type SessionRequirements } from './StrategyActivationFlow'
 import { useGenericStrategies, useGenericStrategyMutations, type GenericStrategy, formatNextExecution } from '../../hooks/useStrategies'
+import { useSmartSessions } from '../../hooks/useDCASmartSession'
+import { useRhinestoneAccount } from '../../hooks/useRhinestoneAccount'
 import { useExecutionHistory, useExecutionMutations, formatWaitingTime, getUrgencyLevel } from '../../workspace/hooks/usePendingApprovals'
 import type { StrategyFilters } from '../../types/strategy'
 import type { Id } from '../../../convex/_generated/dataModel'
+
+// ============================================
+// HELPERS: Build activation flow props from generic strategy
+// ============================================
+
+function buildReviewDetails(strategy: GenericStrategy): ReviewDetail[] {
+  const config = strategy.config as Record<string, unknown>
+  const details: ReviewDetail[] = []
+
+  if (config.from_token && config.to_token) {
+    details.push({ label: 'Swap', value: `${config.from_token} → ${config.to_token}` })
+  }
+  if (config.amount_usd) {
+    details.push({ label: 'Amount per execution', value: `$${config.amount_usd}` })
+  }
+  if (config.frequency) {
+    const freq = config.frequency as string
+    details.push({ label: 'Frequency', value: freq.charAt(0).toUpperCase() + freq.slice(1) })
+  }
+  if (config.maxSlippageBps) {
+    details.push({ label: 'Max slippage', value: `${(config.maxSlippageBps as number / 100).toFixed(1)}%` })
+  }
+
+  return details
+}
+
+function buildSessionRequirements(strategy: GenericStrategy): SessionRequirements {
+  const config = strategy.config as Record<string, unknown>
+  const amountUsd = (config.amount_usd as number) || 100
+  const frequency = (config.frequency as string) || 'weekly'
+
+  // Estimate executions over 365 days
+  const executionsPerYear: Record<string, number> = {
+    hourly: 8760, daily: 365, weekly: 52, biweekly: 26, monthly: 12,
+  }
+  const estimatedExecutions = executionsPerYear[frequency] || 52
+  const spendingLimitUsd = amountUsd * estimatedExecutions
+
+  // Collect token addresses/symbols
+  const allowedTokens: string[] = []
+  if (config.from_token) allowedTokens.push(config.from_token as string)
+  if (config.to_token) allowedTokens.push(config.to_token as string)
+
+  return {
+    spendingLimitUsd,
+    allowedTokens,
+    allowedContracts: [],
+    allowedActions: ['swap'],
+    validDays: 365,
+  }
+}
+
+// ============================================
+// WIDGET
+// ============================================
 
 interface StrategiesWidgetProps {
   walletAddress: string | null
@@ -20,7 +80,7 @@ interface StrategiesWidgetProps {
   walletId?: Id<'wallets'>
 }
 
-type View = 'list' | 'create' | 'edit' | 'details'
+type View = 'list' | 'create' | 'edit' | 'details' | 'activate'
 
 export function StrategiesWidget({
   walletAddress,
@@ -37,8 +97,13 @@ export function StrategiesWidget({
   const { strategies, isLoading, isEmpty } = useGenericStrategies(walletAddress, statusFilter)
   const { activate, pause, update, remove, executeNow } = useGenericStrategyMutations()
   const [executeNowError, setExecuteNowError] = useState<string | null>(null)
+  const createSessionMutation = useMutation(api.smartSessions.create)
 
   const selectedStrategy = strategies.find((s) => s._id === selectedStrategyId)
+
+  // Smart account + session state for activation flow
+  const { smartAccountAddress } = useRhinestoneAccount()
+  const { hasActive: hasActiveSession } = useSmartSessions(smartAccountAddress)
 
   const handleCreateNew = useCallback(() => {
     setView('create')
@@ -62,6 +127,11 @@ export function StrategiesWidget({
   const handlePause = useCallback(async (id: string) => {
     await pause(id as Id<'strategies'>)
   }, [pause])
+
+  const handleActivateWithFlow = useCallback((id: string) => {
+    setSelectedStrategyId(id as Id<'strategies'>)
+    setView('activate')
+  }, [])
 
   const handleResume = useCallback(async (id: string) => {
     // Resume is just activating again
@@ -175,8 +245,50 @@ export function StrategiesWidget({
                 onStop={() => handleStop(selectedStrategy._id)}
                 onUpdate={handleConfigUpdate}
                 onExecuteNow={() => handleExecuteNow(selectedStrategy._id)}
+                onActivateWithSession={() => handleActivateWithFlow(selectedStrategy._id)}
                 isUpdating={isSubmitting}
                 executeNowError={executeNowError}
+              />
+            </div>
+          </motion.div>
+        )}
+
+        {view === 'activate' && selectedStrategy && (
+          <motion.div
+            key="activate"
+            initial={{ opacity: 0, x: 20 }}
+            animate={{ opacity: 1, x: 0 }}
+            exit={{ opacity: 0, x: -20 }}
+            className="flex-1 min-h-0 flex flex-col"
+          >
+            <FormHeader title="Activate Strategy" onBack={handleBack} />
+            <div className="flex-1 overflow-y-auto">
+              <StrategyActivationFlow
+                strategyName={selectedStrategy.name}
+                reviewDetails={buildReviewDetails(selectedStrategy)}
+                sessionRequirements={buildSessionRequirements(selectedStrategy)}
+                hasActiveSession={hasActiveSession}
+                onRecordSession={async (sessionId, txHash, validUntil) => {
+                  const config = selectedStrategy.config as Record<string, unknown>
+                  await createSessionMutation({
+                    smartAccountAddress: smartAccountAddress || '',
+                    sessionId,
+                    spendingLimitUsd: buildSessionRequirements(selectedStrategy).spendingLimitUsd,
+                    allowedContracts: [],
+                    allowedTokens: [
+                      (config.from_token as string) || '',
+                      (config.to_token as string) || '',
+                    ].filter(Boolean),
+                    allowedActions: ['swap'],
+                    validUntil,
+                    grantTxHash: txHash,
+                  })
+                }}
+                onActivateStrategy={async (smartSessionId) => {
+                  await activate(selectedStrategy._id, smartSessionId)
+                }}
+                onComplete={handleBack}
+                onCancel={handleBack}
               />
             </div>
           </motion.div>
@@ -212,6 +324,7 @@ function StrategyDetails({
   onStop,
   onUpdate,
   onExecuteNow,
+  onActivateWithSession,
   isUpdating,
   executeNowError,
 }: {
@@ -221,6 +334,7 @@ function StrategyDetails({
   onStop: () => void
   onUpdate: (config: Record<string, unknown>) => Promise<void>
   onExecuteNow: () => void
+  onActivateWithSession: () => void
   isUpdating: boolean
   executeNowError: string | null
 }) {
@@ -284,7 +398,7 @@ function StrategyDetails({
   })
 
   const canPause = strategy.status === 'active'
-  const canResume = strategy.status === 'paused' || strategy.status === 'pending_session'
+  const canActivate = strategy.status === 'draft' || strategy.status === 'paused' || strategy.status === 'pending_session'
   const canStop = strategy.status === 'active' || strategy.status === 'paused' || strategy.status === 'pending_session'
   const canEdit = strategy.status !== 'active' // Can edit when not actively running
   const canExecuteNow = strategy.status === 'active' || strategy.status === 'draft'
@@ -637,14 +751,24 @@ function StrategyDetails({
               Pause
             </button>
           )}
-          {canResume && (
-            <button
-              onClick={onResume}
-              className="px-4 py-2 rounded-lg text-sm font-medium"
-              style={{ background: 'var(--success)', color: 'white' }}
-            >
-              Activate
-            </button>
+          {canActivate && (
+            <>
+              <button
+                onClick={onActivateWithSession}
+                className="px-4 py-2 rounded-lg text-sm font-medium flex items-center gap-2"
+                style={{ background: 'var(--success)', color: 'white' }}
+              >
+                <Shield className="h-4 w-4" />
+                Activate (Autonomous)
+              </button>
+              <button
+                onClick={onResume}
+                className="px-4 py-2 rounded-lg text-sm font-medium"
+                style={{ background: 'var(--surface-2)', border: '1px solid var(--line)', color: 'var(--text)' }}
+              >
+                Activate (Manual)
+              </button>
+            </>
           )}
           {canStop && (
             <button

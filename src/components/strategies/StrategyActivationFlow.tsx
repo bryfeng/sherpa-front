@@ -1,10 +1,17 @@
 /**
  * Strategy Activation Flow
  *
- * Orchestrates the DCA strategy activation process:
+ * Orchestrates the strategy activation process:
  * 1. Review strategy configuration
- * 2. Grant Smart Session (if needed)
- * 3. Activate strategy
+ * 2. Deploy Smart Account (if needed)
+ * 3. Grant Smart Session (on-chain, via Rhinestone SDK)
+ * 4. Activate strategy
+ *
+ * Table-agnostic: works with both `strategies` (generic) and `dcaStrategies` tables.
+ * The parent component provides strategy display info, session requirements, and callbacks.
+ *
+ * Uses: useRhinestoneAccount for smart account lifecycle
+ * Uses: useSmartSessionGrant for on-chain session grant
  */
 
 import React, { useState, useCallback } from 'react'
@@ -14,29 +21,49 @@ import {
   Clock,
   ArrowRight,
   Loader2,
-  AlertTriangle,
   XCircle,
   DollarSign,
-  Repeat,
   Key,
+  Wallet,
+  Copy,
 } from 'lucide-react'
-import type { Id } from '../../../convex/_generated/dataModel'
-import { useDCASmartSession, type SessionRequirements } from '../../hooks/useDCASmartSession'
-import type { DCAStrategy } from '../../types/strategy'
-import { FREQUENCY_LABELS } from '../../types/strategy'
+import { useRhinestoneAccount } from '../../hooks/useRhinestoneAccount'
+import { useSmartSessionGrant } from '../../hooks/useSmartSessionGrant'
+import type { SessionRequirements } from '../../hooks/useDCASmartSession'
+
+// Re-export for consumers
+export type { SessionRequirements }
 
 // ============================================
 // TYPES
 // ============================================
 
-interface StrategyActivationFlowProps {
-  strategyId: Id<'dcaStrategies'>
-  smartAccountAddress: string
+/** A single row in the review step */
+export interface ReviewDetail {
+  label: string
+  value: string
+}
+
+export interface StrategyActivationFlowProps {
+  /** Strategy name for display */
+  strategyName: string
+  /** Key-value details shown in the review step */
+  reviewDetails: ReviewDetail[]
+  /** Session requirements (spending limit, valid days, etc.) */
+  sessionRequirements: SessionRequirements
+  /** Whether a smart session is already active for this account */
+  hasActiveSession: boolean
+  /** Called after on-chain session grant to record in Convex */
+  onRecordSession: (sessionId: string, txHash: string, validUntil: number) => Promise<void>
+  /** Called to activate the strategy (with smart session) */
+  onActivateStrategy: (smartSessionId?: string) => Promise<void>
+  /** Called when the flow completes */
   onComplete: () => void
+  /** Called when the user cancels */
   onCancel: () => void
 }
 
-type ActivationStep = 'review' | 'grant' | 'activate' | 'complete' | 'error'
+type ActivationStep = 'review' | 'deploy' | 'grant' | 'activate' | 'complete' | 'error'
 
 // ============================================
 // HELPERS
@@ -51,35 +78,29 @@ function formatUsd(amount: number): string {
   }).format(amount)
 }
 
-function formatDate(timestamp: number): string {
-  return new Date(timestamp).toLocaleDateString('en-US', {
-    month: 'short',
-    day: 'numeric',
-    year: 'numeric',
-  })
-}
-
 // ============================================
 // STEP INDICATOR
 // ============================================
 
 function StepIndicator({
   currentStep,
-  needsSession
+  needsDeploy,
+  needsSession,
 }: {
   currentStep: ActivationStep
+  needsDeploy: boolean
   needsSession: boolean
 }) {
-  const steps = needsSession
-    ? [
-        { key: 'review', label: 'Review' },
-        { key: 'grant', label: 'Grant Session' },
-        { key: 'activate', label: 'Activate' },
-      ]
-    : [
-        { key: 'review', label: 'Review' },
-        { key: 'activate', label: 'Activate' },
-      ]
+  const steps: { key: string; label: string }[] = [
+    { key: 'review', label: 'Review' },
+  ]
+  if (needsDeploy) {
+    steps.push({ key: 'deploy', label: 'Deploy Account' })
+  }
+  if (needsSession) {
+    steps.push({ key: 'grant', label: 'Grant Session' })
+  }
+  steps.push({ key: 'activate', label: 'Activate' })
 
   const getStepIndex = (step: ActivationStep) => {
     if (step === 'complete' || step === 'error') {
@@ -138,13 +159,17 @@ function StepIndicator({
 // ============================================
 
 function ReviewStep({
-  strategy,
+  strategyName,
+  reviewDetails,
   sessionRequirements,
+  needsSession,
   onContinue,
   onCancel,
 }: {
-  strategy: DCAStrategy
-  sessionRequirements: SessionRequirements | null
+  strategyName: string
+  reviewDetails: ReviewDetail[]
+  sessionRequirements: SessionRequirements
+  needsSession: boolean
   onContinue: () => void
   onCancel: () => void
 }) {
@@ -156,49 +181,25 @@ function ReviewStep({
 
       {/* Strategy Details */}
       <div className="space-y-3 mb-6">
-        <div className="flex items-center justify-between p-3 rounded-lg" style={{ background: 'var(--surface-2)' }}>
-          <div className="flex items-center gap-2">
-            <DollarSign className="h-4 w-4" style={{ color: 'var(--accent)' }} />
-            <span style={{ color: 'var(--text-muted)' }}>Amount per execution</span>
+        {reviewDetails.map((detail) => (
+          <div
+            key={detail.label}
+            className="flex items-center justify-between p-3 rounded-lg"
+            style={{ background: 'var(--surface-2)' }}
+          >
+            <div className="flex items-center gap-2">
+              <DollarSign className="h-4 w-4" style={{ color: 'var(--accent)' }} />
+              <span style={{ color: 'var(--text-muted)' }}>{detail.label}</span>
+            </div>
+            <span className="font-medium" style={{ color: 'var(--text)' }}>
+              {detail.value}
+            </span>
           </div>
-          <span className="font-medium" style={{ color: 'var(--text)' }}>
-            {formatUsd(strategy.amountPerExecutionUsd)}
-          </span>
-        </div>
-
-        <div className="flex items-center justify-between p-3 rounded-lg" style={{ background: 'var(--surface-2)' }}>
-          <div className="flex items-center gap-2">
-            <Repeat className="h-4 w-4" style={{ color: 'var(--accent)' }} />
-            <span style={{ color: 'var(--text-muted)' }}>Frequency</span>
-          </div>
-          <span className="font-medium" style={{ color: 'var(--text)' }}>
-            {FREQUENCY_LABELS[strategy.frequency]}
-          </span>
-        </div>
-
-        <div className="flex items-center justify-between p-3 rounded-lg" style={{ background: 'var(--surface-2)' }}>
-          <div className="flex items-center gap-2">
-            <ArrowRight className="h-4 w-4" style={{ color: 'var(--accent)' }} />
-            <span style={{ color: 'var(--text-muted)' }}>Swap</span>
-          </div>
-          <span className="font-medium" style={{ color: 'var(--text)' }}>
-            {strategy.fromToken.symbol} → {strategy.toToken.symbol}
-          </span>
-        </div>
-
-        <div className="flex items-center justify-between p-3 rounded-lg" style={{ background: 'var(--surface-2)' }}>
-          <div className="flex items-center gap-2">
-            <Clock className="h-4 w-4" style={{ color: 'var(--accent)' }} />
-            <span style={{ color: 'var(--text-muted)' }}>Max slippage</span>
-          </div>
-          <span className="font-medium" style={{ color: 'var(--text)' }}>
-            {(strategy.maxSlippageBps / 100).toFixed(1)}%
-          </span>
-        </div>
+        ))}
       </div>
 
       {/* Session Requirements */}
-      {sessionRequirements && (
+      {needsSession && (
         <div className="mb-6 p-4 rounded-lg" style={{ background: 'var(--warning-muted)', border: '1px solid var(--warning)' }}>
           <div className="flex items-start gap-3">
             <Shield className="h-5 w-5 shrink-0 mt-0.5" style={{ color: 'var(--warning)' }} />
@@ -232,6 +233,116 @@ function ReviewStep({
         >
           Continue
           <ArrowRight className="h-4 w-4" />
+        </button>
+      </div>
+    </div>
+  )
+}
+
+// ============================================
+// DEPLOY ACCOUNT STEP
+// ============================================
+
+function DeployAccountStep({
+  smartAccountAddress,
+  onDeploy,
+  onCancel,
+  isLoading,
+}: {
+  smartAccountAddress: string | null
+  onDeploy: () => Promise<void>
+  onCancel: () => void
+  isLoading: boolean
+}) {
+  const [copied, setCopied] = useState(false)
+
+  const handleCopy = useCallback(() => {
+    if (smartAccountAddress) {
+      navigator.clipboard.writeText(smartAccountAddress)
+      setCopied(true)
+      setTimeout(() => setCopied(false), 2000)
+    }
+  }, [smartAccountAddress])
+
+  return (
+    <div>
+      <h3 className="text-lg font-semibold mb-4" style={{ color: 'var(--text)' }}>
+        Deploy Smart Account
+      </h3>
+
+      <p className="text-sm mb-6" style={{ color: 'var(--text-muted)' }}>
+        A smart account is required for autonomous execution. This deploys an ERC-7579 account
+        that you fully own and control.
+      </p>
+
+      {/* Smart Account Address */}
+      {smartAccountAddress && (
+        <div className="mb-6 p-4 rounded-lg" style={{ background: 'var(--surface-2)' }}>
+          <div className="flex items-center justify-between mb-2">
+            <span className="text-xs font-medium" style={{ color: 'var(--text-muted)' }}>
+              Smart Account Address
+            </span>
+            <button
+              onClick={handleCopy}
+              className="flex items-center gap-1 text-xs transition-colors"
+              style={{ color: 'var(--accent)' }}
+            >
+              <Copy className="h-3 w-3" />
+              {copied ? 'Copied!' : 'Copy'}
+            </button>
+          </div>
+          <p className="text-sm font-mono break-all" style={{ color: 'var(--text)' }}>
+            {smartAccountAddress}
+          </p>
+          <p className="text-xs mt-2" style={{ color: 'var(--text-muted)' }}>
+            This address is deterministic and can receive funds before deployment.
+          </p>
+        </div>
+      )}
+
+      {/* Security Note */}
+      <div className="mb-6 p-4 rounded-lg" style={{ background: 'var(--surface-2)' }}>
+        <div className="flex items-start gap-3">
+          <Shield className="h-5 w-5 shrink-0 mt-0.5" style={{ color: 'var(--success)' }} />
+          <div>
+            <h4 className="font-medium mb-1" style={{ color: 'var(--text)' }}>
+              Non-custodial
+            </h4>
+            <p className="text-sm" style={{ color: 'var(--text-muted)' }}>
+              Your EOA wallet is the sole owner. The Smart Sessions module is installed at
+              deployment for scoped permission grants.
+            </p>
+          </div>
+        </div>
+      </div>
+
+      {/* Actions */}
+      <div className="flex gap-3">
+        <button
+          onClick={onCancel}
+          disabled={isLoading}
+          className="flex-1 px-4 py-2 rounded-lg text-sm font-medium transition-colors disabled:opacity-50"
+          style={{ background: 'var(--surface-2)', color: 'var(--text)' }}
+        >
+          Cancel
+        </button>
+        <button
+          onClick={onDeploy}
+          disabled={isLoading}
+          className="flex-1 px-4 py-2 rounded-lg text-sm font-medium transition-colors flex items-center justify-center gap-2 disabled:opacity-50"
+          style={{ background: 'var(--accent)', color: 'white' }}
+        >
+          {isLoading ? (
+            <>
+              <Loader2 className="h-4 w-4 animate-spin" />
+              Deploying...
+            </>
+          ) : (
+            <>
+              <Wallet className="h-4 w-4" />
+              Deploy Smart Account
+            </>
+          )}
         </button>
       </div>
     </div>
@@ -348,12 +459,14 @@ function GrantSessionStep({
 // ============================================
 
 function ActivateStep({
-  strategy,
+  strategyName,
+  reviewDetails,
   onActivate,
   onCancel,
   isLoading,
 }: {
-  strategy: DCAStrategy
+  strategyName: string
+  reviewDetails: ReviewDetail[]
   onActivate: () => Promise<void>
   onCancel: () => void
   isLoading: boolean
@@ -371,23 +484,15 @@ function ActivateStep({
       {/* Strategy Summary */}
       <div className="p-4 rounded-lg mb-6" style={{ background: 'var(--surface-2)' }}>
         <h4 className="font-medium mb-3" style={{ color: 'var(--text)' }}>
-          {strategy.name}
+          {strategyName}
         </h4>
         <div className="space-y-2 text-sm">
-          <div className="flex justify-between">
-            <span style={{ color: 'var(--text-muted)' }}>Amount</span>
-            <span style={{ color: 'var(--text)' }}>{formatUsd(strategy.amountPerExecutionUsd)}</span>
-          </div>
-          <div className="flex justify-between">
-            <span style={{ color: 'var(--text-muted)' }}>Frequency</span>
-            <span style={{ color: 'var(--text)' }}>{FREQUENCY_LABELS[strategy.frequency]}</span>
-          </div>
-          <div className="flex justify-between">
-            <span style={{ color: 'var(--text-muted)' }}>Swap</span>
-            <span style={{ color: 'var(--text)' }}>
-              {strategy.fromToken.symbol} → {strategy.toToken.symbol}
-            </span>
-          </div>
+          {reviewDetails.slice(0, 3).map((detail) => (
+            <div key={detail.label} className="flex justify-between">
+              <span style={{ color: 'var(--text-muted)' }}>{detail.label}</span>
+              <span style={{ color: 'var(--text)' }}>{detail.value}</span>
+            </div>
+          ))}
         </div>
       </div>
 
@@ -443,7 +548,7 @@ function CompleteStep({ onClose }: { onClose: () => void }) {
       </h3>
 
       <p className="text-sm mb-6" style={{ color: 'var(--text-muted)' }}>
-        Your DCA strategy is now active and will execute automatically according to your schedule.
+        Your strategy is now active and will execute automatically according to your schedule.
       </p>
 
       <button
@@ -504,66 +609,106 @@ function ErrorStep({ error, onRetry, onCancel }: { error: string; onRetry: () =>
 // ============================================
 
 export function StrategyActivationFlow({
-  strategyId,
-  smartAccountAddress,
+  strategyName,
+  reviewDetails,
+  sessionRequirements,
+  hasActiveSession,
+  onRecordSession,
+  onActivateStrategy,
   onComplete,
   onCancel,
 }: StrategyActivationFlowProps) {
   const [step, setStep] = useState<ActivationStep>('review')
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [grantedSessionId, setGrantedSessionId] = useState<string | null>(null)
 
+  // Rhinestone smart account lifecycle
   const {
-    strategy,
-    activeSession,
-    sessionRequirements,
-    needsSession,
-    activateWithSession,
-    recordSessionGrant,
-    isLoading: hookLoading,
-  } = useDCASmartSession({
-    strategyId,
-    smartAccountAddress,
-  })
+    smartAccountAddress: rhinestoneAddress,
+    isDeployed,
+    isDeploying,
+    account: rhinestoneAccount,
+    initialize: initializeAccount,
+    deploy: deployAccount,
+  } = useRhinestoneAccount()
+
+  // On-chain session grant
+  const {
+    grantSession,
+    isGranting,
+  } = useSmartSessionGrant()
+
+  // Derived state
+  const needsSession = !hasActiveSession
+  const needsDeploy = needsSession && !isDeployed
 
   // Handle continue from review
-  const handleReviewContinue = useCallback(() => {
-    if (needsSession) {
+  const handleReviewContinue = useCallback(async () => {
+    if (needsDeploy) {
+      try {
+        await initializeAccount()
+      } catch {
+        // Non-fatal: deploy step will retry
+      }
+      setStep('deploy')
+    } else if (needsSession) {
+      if (!rhinestoneAccount) {
+        try {
+          await initializeAccount()
+        } catch {
+          // Non-fatal: grant step will handle
+        }
+      }
       setStep('grant')
     } else {
       setStep('activate')
     }
-  }, [needsSession])
+  }, [needsDeploy, needsSession, rhinestoneAccount, initializeAccount])
 
-  // Handle grant session
-  const handleGrantSession = useCallback(async () => {
-    if (!sessionRequirements) return
-
+  // Handle deploy smart account
+  const handleDeploy = useCallback(async () => {
     setIsLoading(true)
     setError(null)
 
     try {
-      // In production, this would:
-      // 1. Build the session grant transaction
-      // 2. Prompt user to sign via their wallet
-      // 3. Submit the transaction on-chain
-      // 4. Wait for confirmation
-      // 5. Record the session in Convex
+      const success = await deployAccount()
+      if (!success) {
+        throw new Error('Smart account deployment failed')
+      }
+      setStep('grant')
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to deploy smart account')
+      setStep('error')
+    } finally {
+      setIsLoading(false)
+    }
+  }, [deployAccount])
 
-      // For now, simulate the grant with a mock session
-      const sessionId = `ss_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`
-      const validUntil = Date.now() + sessionRequirements.validDays * 24 * 60 * 60 * 1000
+  // Handle grant session (real on-chain SDK flow)
+  const handleGrantSession = useCallback(async () => {
+    setIsLoading(true)
+    setError(null)
 
-      await recordSessionGrant({
-        sessionId,
-        spendingLimitUsd: sessionRequirements.spendingLimitUsd,
-        allowedContracts: sessionRequirements.allowedContracts,
-        allowedTokens: sessionRequirements.allowedTokens,
-        allowedActions: sessionRequirements.allowedActions,
-        validUntil,
-        grantTxHash: `0x${Math.random().toString(16).slice(2)}`,
+    try {
+      // Ensure account is initialized
+      let account = rhinestoneAccount
+      if (!account) {
+        account = await initializeAccount()
+      }
+
+      // 1. On-chain session grant via Rhinestone SDK
+      const { sessionId, txHash } = await grantSession({
+        account,
+        requirements: sessionRequirements,
       })
 
+      // 2. Record the session in Convex
+      const validUntil = Date.now() + sessionRequirements.validDays * 24 * 60 * 60 * 1000
+      await onRecordSession(sessionId, txHash, validUntil)
+
+      // Store for activation step
+      setGrantedSessionId(sessionId)
       setStep('activate')
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to grant session')
@@ -571,7 +716,7 @@ export function StrategyActivationFlow({
     } finally {
       setIsLoading(false)
     }
-  }, [sessionRequirements, recordSessionGrant])
+  }, [sessionRequirements, rhinestoneAccount, initializeAccount, grantSession, onRecordSession])
 
   // Handle activate
   const handleActivate = useCallback(async () => {
@@ -579,7 +724,7 @@ export function StrategyActivationFlow({
     setError(null)
 
     try {
-      await activateWithSession()
+      await onActivateStrategy(grantedSessionId ?? undefined)
       setStep('complete')
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to activate strategy')
@@ -587,7 +732,7 @@ export function StrategyActivationFlow({
     } finally {
       setIsLoading(false)
     }
-  }, [activateWithSession])
+  }, [onActivateStrategy, grantedSessionId])
 
   // Handle retry
   const handleRetry = useCallback(() => {
@@ -595,47 +740,47 @@ export function StrategyActivationFlow({
     setStep('review')
   }, [])
 
-  // Loading state
-  if (hookLoading || !strategy) {
-    return (
-      <div className="flex flex-col items-center justify-center p-8">
-        <Loader2 className="h-8 w-8 animate-spin mb-4" style={{ color: 'var(--accent)' }} />
-        <p className="text-sm" style={{ color: 'var(--text-muted)' }}>
-          Loading strategy...
-        </p>
-      </div>
-    )
-  }
-
   return (
     <div className="p-6">
       {/* Step Indicator */}
       {step !== 'complete' && step !== 'error' && (
-        <StepIndicator currentStep={step} needsSession={needsSession} />
+        <StepIndicator currentStep={step} needsDeploy={needsDeploy} needsSession={needsSession} />
       )}
 
       {/* Step Content */}
       {step === 'review' && (
         <ReviewStep
-          strategy={strategy as DCAStrategy}
-          sessionRequirements={needsSession ? sessionRequirements : null}
+          strategyName={strategyName}
+          reviewDetails={reviewDetails}
+          sessionRequirements={sessionRequirements}
+          needsSession={needsSession}
           onContinue={handleReviewContinue}
           onCancel={onCancel}
         />
       )}
 
-      {step === 'grant' && sessionRequirements && (
+      {step === 'deploy' && (
+        <DeployAccountStep
+          smartAccountAddress={rhinestoneAddress}
+          onDeploy={handleDeploy}
+          onCancel={onCancel}
+          isLoading={isLoading || isDeploying}
+        />
+      )}
+
+      {step === 'grant' && (
         <GrantSessionStep
           sessionRequirements={sessionRequirements}
           onGrant={handleGrantSession}
           onCancel={onCancel}
-          isLoading={isLoading}
+          isLoading={isLoading || isGranting}
         />
       )}
 
       {step === 'activate' && (
         <ActivateStep
-          strategy={strategy as DCAStrategy}
+          strategyName={strategyName}
+          reviewDetails={reviewDetails}
           onActivate={handleActivate}
           onCancel={onCancel}
           isLoading={isLoading}

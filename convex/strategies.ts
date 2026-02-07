@@ -213,6 +213,7 @@ export const activate = mutation({
   args: {
     strategyId: v.id("strategies"),
     sessionKeyId: v.optional(v.id("sessionKeys")),
+    smartSessionId: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
     const strategy = await ctx.db.get(args.strategyId);
@@ -220,7 +221,36 @@ export const activate = mutation({
 
     const now = Date.now();
 
-    // Check if session key is provided and valid
+    // Check if smart session (Rhinestone) is provided
+    if (args.smartSessionId) {
+      // Validate smart session is active
+      const sessions = await ctx.db
+        .query("smartSessions")
+        .withIndex("by_session_id", (q) => q.eq("sessionId", args.smartSessionId!))
+        .collect();
+      const session = sessions[0];
+      if (!session || session.status !== "active") {
+        throw new Error("Smart session not found or not active");
+      }
+
+      // Calculate next execution time
+      const config = strategy.config as Record<string, unknown>;
+      const frequency = config.frequency as string | undefined;
+      let nextExecutionAt: number | undefined;
+      if (frequency) {
+        nextExecutionAt = now + 60000;
+      }
+
+      await ctx.db.patch(args.strategyId, {
+        status: "active",
+        requiresManualApproval: false,
+        updatedAt: now,
+        nextExecutionAt,
+      });
+      return;
+    }
+
+    // Check if legacy session key is provided and valid
     let validSessionKey = false;
     if (args.sessionKeyId) {
       const sessionKey = await ctx.db.get(args.sessionKeyId);
