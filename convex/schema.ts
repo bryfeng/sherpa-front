@@ -95,6 +95,8 @@ export default defineSchema({
     ),
     // Session key for automated execution
     sessionKeyId: v.optional(v.id("sessionKeys")),
+    // Smart Session reference (Rhinestone - preferred for autonomous execution)
+    smartSessionId: v.optional(v.string()),
     // Manual approval mode (Phase 1 - no session keys)
     requiresManualApproval: v.optional(v.boolean()),
     // Scheduling

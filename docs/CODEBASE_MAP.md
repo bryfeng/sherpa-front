@@ -1,14 +1,13 @@
+---
+last_mapped: 2026-02-06T00:00:00Z
+total_files: 295
+total_tokens: ~461000
+---
+
 # Frontend Codebase Map
 
-> **Generated**: 2025-01-14 | **Framework**: React 18 + TypeScript 5 + Vite
-> **Lines of Code**: ~43,000 | **Files**: ~233
-
-This document provides a comprehensive architectural overview of the Sherpa frontend codebase.
-
-> **⚠️ Architecture Transition (2026-01-27):** The wallet infrastructure is transitioning to Rhinestone Smart Wallets. See `planning/frontend-roadmap.md` Phase 10 for details. Key changes:
-> - **Session Keys**: Moving from off-chain (`useSessionKeys`) to on-chain (Smart Sessions via `@rhinestone/sdk`)
-> - **Wallet Type**: Adding ERC-7579 Smart Account support alongside EOA
-> - **Solana**: Will add Swig smart wallet support (later phase)
+> **Generated**: 2026-02-06 | **Framework**: React 18 + TypeScript 5 + Vite
+> **Files**: ~295 | **Tokens**: ~461k
 
 ---
 
@@ -16,725 +15,437 @@ This document provides a comprehensive architectural overview of the Sherpa fron
 
 | Section | Description |
 |---------|-------------|
-| [Architecture Overview](#architecture-overview) | High-level system design |
-| [Convex Backend](#convex-serverless-backend) | Real-time database & functions |
-| [Core UI Components](#core-ui-components) | Shell, chat, header, sidebar |
-| [Widget System](#widget-system) | Dynamic workspace widgets |
-| [Domain Components](#domain-components) | Strategies, policies, execution |
-| [State Management](#state-management) | Hooks, stores, services |
+| [Architecture Overview](#architecture-overview) | System design & provider hierarchy |
+| [Convex Backend](#convex-serverless-backend) | 40+ tables, 9 crons, cross-boundary calls |
+| [Core UI Components](#core-ui-components) | Shell, chat, widgets, header, sidebar |
+| [State Management](#state-management) | Zustand, controller hooks, services |
+| [Smart Session Infrastructure](#smart-session-infrastructure) | Rhinestone, Swig, execution signing |
 | [Type System](#type-system) | Core TypeScript definitions |
 
 ---
 
 ## Architecture Overview
 
+### Provider Hierarchy
+
+```
+React.StrictMode
+  ConvexProvider (real-time backend, VITE_CONVEX_URL)
+    QueryClientProvider (React Query, 60s stale time)
+      Web3Provider (wagmi + Reown AppKit)
+        App
+          EntitlementsProvider
+            ToastProvider
+              DeFiChatAdaptiveUI (page controller)
+                DeFiChatShell (layout shell)
+```
+
+### Architecture Diagram
+
 ```mermaid
 graph TB
-    subgraph "Entry Points"
-        App[App.tsx]
-        Main[main.tsx]
+    subgraph Entry
+        Main[main.tsx] --> App[App.tsx]
+        App --> Page[DeFiChatAdaptiveUI]
     end
 
-    subgraph "Shell Layer"
-        DeFiChatShell[DeFiChatShell.tsx]
-        Controller[useDeFiChatController]
+    subgraph Shell["Shell Layer"]
+        Page --> Shell_[DeFiChatShell]
+        Controller[useDeFiChatController<br/>1368 lines]
+        Shell_ --> Controller
     end
 
-    subgraph "Surfaces"
-        Chat[ChatSurface]
-        Workspace[WorkspaceSurface]
+    subgraph Surfaces
+        Controller --> Chat[ChatSurface]
+        Controller --> WP[WidgetPanel]
+        Controller --> Sidebar[ConversationSidebar]
     end
 
-    subgraph "Core Systems"
-        Widgets[Widget System]
-        Convex[Convex Backend]
+    subgraph State["State Layer"]
+        Store[Zustand Store<br/>829 lines]
+        ChatEngine[useChatEngine<br/>480 lines]
+        WalletAuth[useWalletAuth]
+    end
+
+    subgraph Data
+        Convex[(Convex<br/>40+ tables)]
+        Backend[FastAPI<br/>SSE streaming]
         Services[API Services]
     end
 
-    Main --> App
-    App --> DeFiChatShell
-    DeFiChatShell --> Controller
-    Controller --> Chat
-    Controller --> Workspace
+    Controller --> Store
+    Controller --> ChatEngine
+    ChatEngine --> Backend
     Chat --> Convex
-    Workspace --> Widgets
-    Widgets --> Services
+    WP --> Services
 ```
 
-### Key Architectural Patterns
+### Key Patterns
 
-1. **Shell-Surface Architecture**: Single shell component orchestrates multiple surfaces (Chat/Workspace)
-2. **Controller Hook Pattern**: `useDeFiChatController` (1304 lines) manages all UI state
-3. **Widget Contract System**: Standardized widget interface for dynamic rendering
-4. **Real-time Sync**: Convex provides reactive database queries
-5. **SSE Streaming**: Chat responses stream via Server-Sent Events
+1. **Shell-Surface**: Single shell orchestrates Chat + Widget Panel + Sidebar
+2. **Controller Hook**: `useDeFiChatController` (1368 lines) manages all UI state
+3. **Widget Tabs**: Panel widgets shown in tabbed interface, lazy-loaded with Suspense
+4. **Real-time Sync**: Convex reactive queries for strategies, sessions, executions
+5. **SSE Streaming**: Chat responses via `useChatEngine` with `requestAnimationFrame` batching
+6. **Layout rule**: Widget panel wrapper controls layout (flex/hidden), `motion.div` only handles animation
 
 ---
 
 ## Convex Serverless Backend
 
-The Convex layer provides real-time database operations and serverless functions.
-
-### Directory Structure
-
-```
-convex/
-├── schema.ts              # Database schema (40+ tables)
-├── conversations.ts       # Conversation CRUD
-├── messages.ts           # Message operations
-├── wallets.ts            # Wallet management
-├── executions.ts         # Trade execution records
-├── policies.ts           # Risk policy rules
-├── strategies.ts         # Strategy definitions
-├── session_keys.ts       # Session key management (⚠️ legacy - see Phase 10)
-├── notifications.ts      # User notifications
-├── _generated/           # Auto-generated types
-└── crons.ts              # 8 scheduled jobs
-```
-
 ### Schema Overview (40+ Tables)
 
-| Table | Purpose | Key Fields |
-|-------|---------|------------|
-| `users` | User accounts | `address`, `email`, `createdAt` |
-| `conversations` | Chat sessions | `userId`, `title`, `lastMessageAt` |
-| `messages` | Chat messages | `conversationId`, `role`, `content`, `widgets` |
-| `wallets` | Connected wallets | `userId`, `address`, `chain`, `isPrimary` |
-| `strategies` | Trading strategies | `name`, `status`, `conditions`, `actions` |
-| `executions` | Execution history | `strategyId`, `status`, `txHash`, `result` |
-| `policies` | Risk policies | `name`, `rules`, `priority`, `isActive` |
-| `session_keys` | Delegated keys (⚠️ legacy) | `publicKey`, `permissions`, `expiresAt` |
-| `notifications` | User alerts | `type`, `title`, `read`, `data` |
-| `approvals` | Pending approvals | `type`, `status`, `requestedAt` |
+**Users & Auth:**
+| Table | Purpose |
+|-------|---------|
+| `users` | Core user records (EVM/Solana addresses) |
+| `wallets` | Multi-wallet per user (address, chain, label, isPrimary) |
+| `nonces` | SIWE sign-in challenges (10 min TTL) |
+| `sessions` | JWT session tracking (scopes, expiry) |
+| `userPreferences` | Portfolio chain preferences |
 
-### Cron Jobs (8 Scheduled Tasks)
+**Conversations:**
+| Table | Purpose |
+|-------|---------|
+| `conversations` | Chat metadata (walletId, title, archived) |
+| `messages` | Chat messages (role: user/assistant/system) |
 
-```typescript
-// convex/crons.ts
-crons.interval("cleanupExpiredSessions", { hours: 1 }, ...)
-crons.interval("processStrategyTriggers", { minutes: 5 }, ...)
-crons.interval("updateMarketData", { minutes: 1 }, ...)
-crons.interval("sendPendingNotifications", { minutes: 1 }, ...)
-crons.interval("cleanupOldMessages", { days: 1 }, ...)
-crons.interval("refreshTokenPrices", { minutes: 5 }, ...)
-crons.interval("checkStrategyConditions", { minutes: 1 }, ...)
-crons.interval("expireOldApprovals", { hours: 1 }, ...)
-```
+**Strategies & Execution:**
+| Table | Purpose |
+|-------|---------|
+| `strategies` | Generic strategy framework (6 types, 8 statuses) |
+| `strategyExecutions` | State machine tracking (10 states) |
+| `dcaStrategies` | DCA-specific config (tokens, frequency, limits) |
+| `dcaExecutions` | Individual DCA execution records |
+| `agentDecisions` | AI agent audit trail |
+| `transactions` | On-chain TX tracking (pending→confirmed→failed) |
+
+**Smart Sessions (Rhinestone ERC-7579):**
+| Table | Purpose |
+|-------|---------|
+| `smartAccounts` | Smart Account deployments (owner, address, chains) |
+| `smartSessions` | On-chain session permissions (spending, tokens, actions) |
+| `smartSessionIntents` | Intent execution tracking (DCA/swap/bridge) |
+
+**Solana Smart Accounts (Swig):**
+| Table | Purpose |
+|-------|---------|
+| `swigWallets` | Solana smart wallet records |
+| `swigSessions` | Role-based Solana permissions |
+
+**Risk & Policy:**
+| Table | Purpose |
+|-------|---------|
+| `riskPolicies` | Per-wallet risk limits (position, slippage, daily) |
+| `systemPolicy` | SINGLETON platform controls (emergency stop, blocklists) |
+| `feeConfigs` | Paymaster fee asset configuration |
+
+**Token & Chain Data:**
+| Table | Purpose |
+|-------|---------|
+| `tokenCatalog` | Enriched token metadata (sector, stablecoin flags, aliases) |
+| `chains` | Dynamic chain registry (14 chains, Alchemy slugs) |
+| `portfolioProfiles` | Cached portfolio analysis |
+
+**News & Copy Trading:**
+| Table | Purpose |
+|-------|---------|
+| `newsItems` | Aggregated news with LLM enrichment |
+| `newsSources` | RSS/API source config |
+| `watchedWallets` | Leader wallet profiles |
+| `copyRelationships` | Follower↔Leader config |
+| `copyExecutions` | Copy trade execution records |
+| `walletActivity` | Parsed wallet events |
+
+**Admin:**
+| Table | Purpose |
+|-------|---------|
+| `admin_users` | Admin accounts (bcrypt, 5 role levels) |
+| `admin_sessions` | Admin session tracking |
+| `system_config` | Runtime feature flags & settings |
+| `system_metrics` | Platform metrics |
+
+### Cron Jobs (9 Scheduled Tasks)
+
+| Job | Frequency | Purpose |
+|-----|-----------|---------|
+| `checkDCAStrategies` | 1 min | Execute due DCA strategies via FastAPI |
+| `checkTriggers` | 1 min | Check generic strategy triggers |
+| `fetchNews` | 15 min | Fetch RSS/API news via FastAPI |
+| `processNews` | 5 min | LLM news enrichment via FastAPI |
+| `cleanupSessions` | 1 hour | Delete expired auth sessions |
+| `cleanupNonces` | 15 min | Delete expired sign-in nonces |
+| `cleanupSessionKeys` | 1 hour | Mark/delete expired session keys |
+| `cleanupRateLimits` | 1 hour | Purge old rate limit records |
+| `resetCopyTradingDailyLimits` | Daily 00:00 UTC | Reset daily trade/volume counters |
+
+### Cross-Boundary Calls (Convex → FastAPI)
+
+| Caller | Endpoint | Auth |
+|--------|----------|------|
+| `scheduler.checkDCAStrategies` | `POST /dca/internal/execute` | `X-Internal-Key` |
+| `scheduler.fetchNews` | `POST /news/internal/fetch` | `X-Internal-Key` |
+| `scheduler.processNews` | `POST /news/internal/process` | `X-Internal-Key` |
+| `scheduler.checkTriggers` | `POST /internal/execute` | `X-Internal-Key` |
+
+### HTTP Routes (FastAPI → Convex)
+
+`http.ts` exposes 6 endpoints for backend to call: `/trigger-execution`, `/update-execution`, `/record-decision`, `/record-transaction`, `/update-transaction`, `/health`
 
 ---
 
 ## Core UI Components
 
-### Shell & Layout
-
-```
-src/components/shell/
-├── DeFiChatShell.tsx      # Main shell orchestrator
-├── ShellLayout.tsx        # Layout container
-└── index.ts
-```
-
-**DeFiChatShell.tsx** - Primary application shell that:
-- Manages surface switching (Chat ↔ Workspace)
-- Provides layout chrome (header, sidebar, footer)
-- Handles responsive breakpoints
-- Orchestrates keyboard shortcuts
-
-### Chat System
-
-```
-src/components/chat/
-├── ChatInterface.tsx      # Main chat component (705 lines)
-├── MessageBubble.tsx      # Individual messages
-├── MessageList.tsx        # Scrollable message container
-├── ChatInput.tsx          # Input with suggestions
-├── StreamingMessage.tsx   # SSE streaming display
-├── QuickActions.tsx       # Suggested prompts
-└── TypingIndicator.tsx
-```
-
-**ChatInterface.tsx** - Core chat implementation:
-- SSE streaming via `useChatEngine` hook
-- Message history via Convex
-- Widget rendering inline with messages
-- Persona-aware styling
-- Auto-scroll management
-
-### Header Components
-
-```
-src/components/header/
-├── Header.tsx             # Main header bar
-├── PersonaSelector.tsx    # AI persona dropdown
-├── ChainSelector.tsx      # Network switcher
-├── WalletButton.tsx       # Connect/disconnect wallet
-├── SettingsMenu.tsx       # User preferences
-└── SearchBar.tsx          # Global search
-```
-
-### Sidebar Components
-
-```
-src/components/sidebar/
-├── Sidebar.tsx            # Collapsible sidebar
-├── ConversationList.tsx   # Chat history list
-├── ConversationItem.tsx   # Individual conversation
-├── NewChatButton.tsx      # Start new conversation
-└── index.ts
-```
-
-### Modal System
-
-```
-src/components/modals/
-├── ModalProvider.tsx      # Global modal context
-├── ConfirmModal.tsx       # Confirmation dialogs
-├── TransactionModal.tsx   # Transaction preview
-├── SettingsModal.tsx      # User settings
-└── ApprovalModal.tsx      # Execution approvals
-```
-
-### UI Primitives
-
-```
-src/components/ui/
-├── primitives.tsx         # Base components
-├── Button.tsx
-├── Card.tsx
-├── Badge.tsx
-├── Input.tsx
-├── Select.tsx
-├── Spinner.tsx
-├── Skeleton.tsx
-├── Tooltip.tsx
-└── Toast.tsx
-```
-
----
-
-## Widget System
-
-The widget system provides a dynamic, extensible panel architecture.
-
-### Architecture
-
-```mermaid
-graph LR
-    subgraph "Widget Flow"
-        Backend[Backend Response] --> Parser[Widget Parser]
-        Parser --> Registry[Widget Registry]
-        Registry --> Renderer[WidgetContents]
-        Renderer --> Grid[12-Column Grid]
-    end
-
-    subgraph "State"
-        Store[Zustand Store]
-        DnD[@dnd-kit]
-    end
-
-    Grid --> Store
-    Grid --> DnD
-```
-
 ### Directory Structure
 
 ```
-src/components/widgets/
-├── WidgetContents.tsx     # Main renderer (1753 lines)
-├── WidgetCard.tsx         # Container wrapper
-├── WidgetGrid.tsx         # Grid layout
-├── WidgetToolbar.tsx      # Widget actions
-├── index.ts               # Barrel export
-│
-├── portfolio/             # Portfolio widgets
-│   ├── PortfolioWidget.tsx
-│   ├── PortfolioChart.tsx
-│   └── TokenList.tsx
-│
-├── market/                # Market data widgets
-│   ├── PriceTickerWidget.tsx
-│   ├── TrendingWidget.tsx
-│   └── ChartWidget.tsx
-│
-├── trading/               # Trading widgets
-│   ├── SwapWidget.tsx
-│   ├── RelayQuoteWidget.tsx
-│   └── BridgeWidget.tsx
-│
-├── history/               # History widgets
-│   ├── HistorySummaryPanel.tsx
-│   ├── HistoryTrendCard.tsx
-│   └── HistoryComparisonTable.tsx
-│
-└── defi/                  # DeFi-specific widgets
-    ├── YieldWidget.tsx
-    ├── LiquidityWidget.tsx
-    └── ProtocolWidget.tsx
+src/components/
+├── shell/          # DeFiChatShell (209 lines) - main layout orchestrator
+├── chat/           # ChatSurface (402 lines), ChatInterface (722 lines)
+├── widgets/        # WidgetPanel, WidgetContent, WidgetContents (1754 lines)
+├── strategies/     # StrategyActivationFlow (800 lines) - multi-step wizard
+├── header/         # HeaderBar (529 lines) - persona, wallet, model indicator
+├── sidebar/        # ConversationSidebar (143 lines)
+├── panels/         # PanelHost, PanelCard, CardSkeleton (21 files)
+├── inline/         # InlineComponentRenderer - Perplexity-style in-chat widgets
+├── modals/         # Settings, simulation, swap, bridge modals
+├── charts/         # TokenPriceChart
+├── ui/             # Primitives (Button, Card, Badge, ResizablePanel)
+└── __tests__/      # Render stability tests
 ```
 
-### Widget Types (33 Total)
+### Shell & Layout
 
-| Category | Widget Types |
-|----------|-------------|
-| **Portfolio** | `portfolio`, `token-balance`, `nft-gallery`, `portfolio-chart` |
-| **Market** | `price-ticker`, `trending`, `market-chart`, `price-alert` |
-| **Trading** | `swap-quote`, `bridge-quote`, `relay-quote`, `limit-order` |
-| **DeFi** | `yield-farm`, `liquidity-pool`, `lending`, `staking` |
-| **History** | `history-summary`, `history-trend`, `history-comparison`, `tx-list` |
-| **Strategy** | `strategy-card`, `strategy-builder`, `backtest-result` |
-| **Analysis** | `whale-tracker`, `gas-tracker`, `sentiment`, `news-feed` |
-| **Utility** | `calculator`, `converter`, `address-lookup`, `contract-reader` |
+**`DeFiChatShell.tsx`** (209 lines) - Fully controlled component:
+- Desktop: Resizable chat panel (350-600px) + Widget panel (flex-1)
+- Mobile: Full-width chat, widgets below
+- **Critical**: Widget panel wrapper controls layout via `hidden`/`flex` className; inner `motion.div` only handles opacity/transform animation (prevents AnimatePresence bugs)
+- Test: `DeFiChatShell.layout.test.tsx` asserts panel slot is `hidden` when closed
 
-### Widget Contract
+### Chat System
 
-```typescript
-// src/types/widgets.ts
-interface Widget {
-  id: string;
-  type: WidgetType;
-  title?: string;
-  data: Record<string, unknown>;
-  layout?: {
-    x: number;
-    y: number;
-    w: number;  // 1-12 columns
-    h: number;  // rows
-  };
-  actions?: WidgetAction[];
-}
+**`ChatSurface.tsx`** (402 lines):
+- Markdown rendering with DOMPurify XSS protection
+- Source badges with external link indicators
+- Action buttons for agent suggestions
+- Rotating placeholder examples (6 variations, 4s rotation)
+- ARIA live regions, keyboard navigation
 
-interface WidgetAction {
-  label: string;
-  action: string;
-  params?: Record<string, unknown>;
-}
+**`ChatInterface.tsx`** (722 lines) - Alternative implementation:
+- Persona-aware styling (4 persona configs)
+- Rich markdown: headers, lists, bold, inline code
+- Quick action pills (Portfolio, Trending, Top Coins)
+
+### Widget System
+
+**33 widget types** across 6 categories:
+
+| Category | Widgets |
+|----------|---------|
+| **Data** (5) | portfolio-summary, token-balance, price-ticker, watchlist, wallet-overview |
+| **Chart** (5) | price-chart, portfolio-chart, allocation-pie, pnl-chart, volume-chart |
+| **Action** (6) | swap, bridge, send, stake, perps-trade, pending-approvals |
+| **Insight** (5) | ai-summary, market-prediction, risk-analysis, opportunity-alert, news-feed |
+| **History** (3) | transaction-history, chat-history, activity-log |
+| **Utility** (9) | gas-tracker, calculator, notes, quick-links, risk-policy, session-keys, policy-status, dca-strategies, my-strategies |
+
+**Widget Registry** (`src/lib/widget-registry.ts`, 885 lines):
+- Metadata: name, description, icon, category, sizes, refresh config
+- Factory: `createWidget()`, `duplicateWidget()`, `searchWidgets()`
+- Staleness: `isWidgetStale()`, `needsAutoRefresh()`
+
+**Widget Panel Flow:**
+```
+WidgetPanel → WidgetPanelHeader + WidgetTabs + WidgetContent
+  → React.lazy() → Suspense → PanelErrorBoundary → Widget component
 ```
 
-### Widget Store (Zustand)
+### Strategy Activation Flow
 
-```typescript
-// src/store/widget-store.ts (751 lines)
-interface WidgetStore {
-  // State
-  widgets: Widget[];
-  layout: GridLayout;
-  activeWidget: string | null;
+**`StrategyActivationFlow.tsx`** (800 lines) - 5-step wizard:
+1. **Review** - Strategy config + session requirements
+2. **Deploy** - Deploy ERC-7579 smart account (if needed)
+3. **Grant** - On-chain session grant via Rhinestone SDK
+4. **Activate** - Finalize strategy activation
+5. **Complete/Error** - Success or retry
 
-  // Actions
-  addWidget: (widget: Widget) => void;
-  removeWidget: (id: string) => void;
-  updateWidget: (id: string, data: Partial<Widget>) => void;
-  reorderWidgets: (sourceId: string, targetId: string) => void;
+### Design System
 
-  // Layout
-  setLayout: (layout: GridLayout) => void;
-  applyPreset: (preset: WorkspacePreset) => void;
-
-  // Persistence
-  saveWorkspace: () => void;
-  loadWorkspace: () => void;
-}
-```
-
-### Panel System
-
-```
-src/components/panels/
-├── PanelHost.tsx          # Panel container
-├── PanelCard.tsx          # Individual panel wrapper
-├── PanelSkeleton.tsx      # Loading state
-├── ExpandedPanelModal.tsx # Full-screen view
-└── useQuickActions.ts     # Panel action hooks
-```
-
----
-
-## Domain Components
-
-### Strategies
-
-```
-src/components/strategies/
-├── StrategiesWidget.tsx       # Main widget (679 lines)
-├── StrategyCard.tsx           # Strategy display
-├── StrategyBuilder.tsx        # Creation wizard
-├── StrategyConditions.tsx     # Trigger configuration
-├── StrategyActions.tsx        # Action configuration
-├── BacktestResults.tsx        # Historical simulation
-└── index.ts
-```
-
-**Strategy Data Flow:**
-```mermaid
-sequenceDiagram
-    participant User
-    participant Builder as StrategyBuilder
-    participant Convex
-    participant Backend
-
-    User->>Builder: Configure strategy
-    Builder->>Convex: Save draft
-    User->>Builder: Activate
-    Builder->>Backend: Validate & deploy
-    Backend->>Convex: Update status
-    Convex-->>User: Real-time update
-```
-
-### Risk Policies
-
-```
-src/components/policy/
-├── PolicyWidget.tsx           # Policy management
-├── PolicyEditor.tsx           # Rule editor
-├── PolicyRuleCard.tsx         # Individual rule
-├── PolicyEvaluator.tsx        # Evaluation display
-└── index.ts
-```
-
-**Policy Types:**
-- **System Policies**: Platform-level guardrails (immutable)
-- **Session Policies**: Per-session limits
-- **Risk Policies**: User-defined rules
-
-### Session Keys (⚠️ Being Replaced by Rhinestone Smart Sessions)
-
-> **⚠️ Architecture Transition (2026-01-27):** Off-chain session keys are being replaced by on-chain Smart Sessions via Rhinestone. See `planning/frontend-roadmap.md` Phase 10.
-
-```
-src/hooks/useSessionKeys.ts    # Session key management (legacy)
-```
-
-Session keys enable delegated signing (legacy approach):
-- Time-bounded permissions
-- Action-specific scopes
-- Revocable at any time
-
-**New approach (Phase 10):** Smart Sessions provide on-chain permission enforcement via ERC-7579 modules.
-
-### Execution Signing
-
-```
-src/workspace/hooks/useExecutionSigning.ts  # 547 lines
-```
-
-**Signing Flow:**
-```mermaid
-sequenceDiagram
-    participant User
-    participant Hook as useExecutionSigning
-    participant Policy as PolicyEngine
-    participant Wallet
-    participant Backend
-
-    Hook->>Policy: Evaluate transaction
-    Policy-->>Hook: Approval required?
-    alt Auto-approve
-        Hook->>Wallet: Sign transaction
-    else Requires approval
-        Hook->>User: Show approval modal
-        User->>Hook: Approve/Reject
-        Hook->>Wallet: Sign if approved
-    end
-    Wallet-->>Backend: Submit signed tx
-```
+**`design-system.css`** (818 lines) - "Alpine Precision" theme:
+- Typography: Outfit (headings), DM Sans (body), JetBrains Mono (code)
+- Dark: `#0a0c10` bg, `#f5a623` accent (electric amber), `#4da6ff` secondary
+- Light: `#ffffff` bg, `#d4880f` accent
+- Persona themes via `[data-persona="..."]` CSS attribute
+- Animations: shimmer, pulse-soft, slide-up/down, typing-dot
 
 ---
 
 ## State Management
 
-### Controller Hook
+### Zustand Store (`src/store/index.ts`, 829 lines)
 
-```typescript
-// src/hooks/useDeFiChatController.tsx (1304 lines)
+8 modular slices:
+
+| Slice | State |
+|-------|-------|
+| **App** | theme, persona, llmModel, llmProviders, healthStatus |
+| **Wallet** | address, chain, isConnected, auth session, entitlement |
+| **Chat** | conversationId, messages, isTyping, inputValue |
+| **Workspace** | isVisible, widgets, widgetTabs, activeWidgetId, panelWidth |
+| **Sidebar** | conversation sidebar state |
+| **Settings** | user preferences |
+| **UI** | modals, ariaAnnouncement, coachMarkDismissed |
+| **Portfolio** | portfolioSummary, collapsedPanels, highlightedWidgets |
+
+Persists to localStorage: theme, persona, chat density, panel layout.
+
+### Key Controller Hooks
+
+| Hook | Lines | Purpose |
+|------|-------|---------|
+| `useDeFiChatController` | 1368 | Master orchestrator (chat, widgets, signing, modals) |
+| `useChatEngine` | 480 | SSE streaming, message management, inline components |
+| `useExecutionSigning` | 548 | Strategy execution → quote → sign → confirm |
+| `useStrategies` | 410 | DCA strategies CRUD, filters, sorting |
+| `useDCASmartSession` | 322 | Bridge between strategies and smart sessions |
+| `useSmartSessionGrant` | 253 | On-chain Rhinestone session grant flow |
+| `useWalletAuth` | 212 | SIWE/Solana sign-in with deduplication |
+| `useRhinestoneAccount` | 206 | Smart account initialize/deploy lifecycle |
+| `usePendingApprovals` | 234 | Pending execution approval queue |
+| `useShellUIReducer` | 105 | Transient panel UI state (collapse, modals) |
+
+### Services (`src/services/`)
+
+| Service | Purpose |
+|---------|---------|
+| `api.ts` (277 lines) | Axios client + SSE streaming (`chatStream`) |
+| `auth.ts` | SIWE/Solana message builders + verification |
+| `rhinestone.ts` | Rhinestone SDK initialization (`kernel` v3.3) |
+| `wallet.ts` | Wallet connection, Solana provider detection |
+| `prices.ts` | CoinGecko top coins |
+| `quotes.ts` | Backend swap quotes |
+| `relay.ts` | Relay quote refresh |
+| `trending.ts` | CoinGecko trending tokens |
+
+---
+
+## Smart Session Infrastructure
+
+### Wallet State Flow
+
+```
+wagmi/AppKit → useWalletSync → Zustand store → useWalletAuth → JWT session
 ```
 
-The main controller orchestrates:
-- Surface state (chat/workspace toggle)
-- Message handling
-- Widget state
-- Wallet connection
-- Conversation management
-- SSE streaming
-- Error handling
-
-### Shell Reducer
-
-```typescript
-// src/hooks/useShellUIReducer.ts
-type ShellAction =
-  | { type: 'SET_SURFACE'; surface: 'chat' | 'workspace' }
-  | { type: 'SET_SIDEBAR_OPEN'; open: boolean }
-  | { type: 'SET_MODAL'; modal: ModalType | null }
-  | { type: 'SET_LOADING'; loading: boolean }
-  | { type: 'SET_ERROR'; error: string | null };
-```
-
-### Custom Hooks
-
-| Hook | Purpose | Lines |
-|------|---------|-------|
-| `useDeFiChatController` | Main controller | 1304 |
-| `useChatEngine` | SSE streaming | ~300 |
-| `useConversations` | Conversation CRUD | ~200 |
-| `useStrategies` | Strategy management | ~250 |
-| `useRiskPolicy` | Policy evaluation | ~150 |
-| `useSessionKeys` | Key management (⚠️ legacy) | ~180 |
-| `useHistorySummary` | Wallet history | ~200 |
-| `useMarketData` | Price/market data | ~150 |
-| `useExecutionSigning` | Transaction signing | 547 |
-
-### Zustand Stores
+### Strategy Activation Flow
 
 ```
-src/store/
-├── widget-store.ts        # Widget state (751 lines)
-└── index.ts               # Store exports
+StrategyActivationFlow
+  → useRhinestoneAccount.initialize()     // Deterministic address (no tx)
+  → useRhinestoneAccount.deploy(base)     // User signs deploy tx
+  → useSmartSessionGrant.grantSession()   // User signs EIP-712 + enable tx
+  → useDCASmartSession.recordSessionGrant() // Record in Convex
+  → useDCASmartSession.activateWithSession() // Link session → strategy
 ```
 
-### API Services
+### Execution Signing (Phase 1 Manual Approval)
 
 ```
-src/services/
-├── api.ts                 # Base API client
-├── wallet.ts              # Wallet operations
-├── prices.ts              # Price fetching
-├── trending.ts            # Trending tokens
-├── quotes.ts              # Swap/bridge quotes
-├── relay.ts               # Relay integration
-├── predictions.ts         # Market predictions
-├── defi.ts                # DeFi protocols
-└── panels.ts              # Panel data
+Backend cron creates execution (state: awaiting_approval)
+  → User clicks Approve → state: executing
+  → useExecutionSigning detects → fetches quote
+  → User clicks Sign → checks allowance → sends tx
+  → Waits for receipt → marks completed in Convex
 ```
 
 ---
 
 ## Type System
 
-### Core Types
+### Key Type Files
 
-```
-src/types/
-├── widgets.ts             # Widget definitions
-├── widget-system.ts       # System types (716 lines)
-├── chat.ts                # Chat/message types
-├── strategy.ts            # Strategy types
-├── policy.ts              # Policy types
-├── portfolio.ts           # Portfolio types
-├── history.ts             # History types
-├── persona.ts             # AI persona types
-├── entitlement.ts         # Pro/free tier
-├── defi-ui.ts             # DeFi UI types
-└── llm.ts                 # LLM response types
-```
-
-### Key Type Definitions
-
-```typescript
-// Widget System Types
-interface WidgetType =
-  | 'portfolio' | 'swap-quote' | 'bridge-quote'
-  | 'price-ticker' | 'trending' | 'history-summary'
-  | /* ... 27 more */;
-
-// Chat Types
-interface Message {
-  id: string;
-  role: 'user' | 'assistant' | 'system';
-  content: string;
-  widgets?: Widget[];
-  createdAt: number;
-}
-
-// Strategy Types
-interface Strategy {
-  id: string;
-  name: string;
-  status: 'draft' | 'active' | 'paused' | 'completed';
-  conditions: TriggerCondition[];
-  actions: StrategyAction[];
-}
-
-// Policy Types
-interface Policy {
-  id: string;
-  name: string;
-  rules: PolicyRule[];
-  priority: number;
-  isActive: boolean;
-}
-```
+| File | Purpose |
+|------|---------|
+| `widget-system.ts` (716 lines) | WidgetCategory, WidgetKind (33 types), WidgetSize, WidgetLifecycleState, WidgetDisplayState, WidgetRefreshConfig, BaseWidgetConfig |
+| `widgets.ts` | Simple `Widget<T>` type for panel system (id, kind, title, payload, density) |
+| `defi-ui.ts` | AgentMessage, AgentAction, InlineComponent, Panel, PanelSource |
+| `chat.ts` | ChatMessage, ChatRequest, ChatResponse |
+| `persona.ts` | PersonaId type |
+| `portfolio.ts` | PortfolioData structures |
+| `entitlement.ts` | Pro gating types |
 
 ---
 
-## Workspace System
-
-### Workspace Hooks
-
-```
-src/workspace/hooks/
-├── usePortfolioSummary.ts     # Portfolio data
-├── usePriceTicker.ts          # Live prices
-├── useSwapQuote.ts            # Swap quotes
-├── useConversationHistory.ts  # Chat history
-├── usePendingApprovals.ts     # Approval queue
-├── useExecutionSigning.ts     # Signing flow
-└── index.ts
-```
-
-### Workspace Types
-
-```typescript
-// src/workspace/types.ts
-interface Workspace {
-  id: string;
-  name: string;
-  layout: GridLayout;
-  widgets: Widget[];
-  preset?: WorkspacePreset;
-}
-
-type WorkspacePreset =
-  | 'trading'
-  | 'portfolio'
-  | 'research'
-  | 'minimal';
-```
-
----
-
-## Styling System
-
-### Design Tokens
-
-```
-src/styles/
-├── tokens.css             # CSS custom properties
-├── globals.css            # Global styles
-├── components/
-│   ├── button.css
-│   ├── card.css
-│   ├── skeleton.css
-│   └── ...
-└── themes/
-    ├── light.css
-    └── dark.css
-```
-
-### Token Categories
-
-| Category | Example Tokens |
-|----------|---------------|
-| Colors | `--color-primary`, `--color-surface`, `--color-text` |
-| Spacing | `--space-1` through `--space-12` |
-| Typography | `--font-size-sm`, `--font-weight-bold` |
-| Borders | `--radius-sm`, `--border-width` |
-| Shadows | `--shadow-sm`, `--shadow-lg` |
-| Animation | `--duration-fast`, `--ease-out` |
-
----
-
-## Testing
-
-### Test Structure
-
-```
-src/test/
-├── setup.ts               # Vitest configuration
-├── events.test.ts         # Event system tests
-└── history-summary.spec.tsx  # Playwright E2E
-
-src/components/*/__tests__/
-├── HistorySummaryPanel.test.tsx
-├── HistoryTrendCard.test.tsx
-└── ...
-
-src/workspace/hooks/__tests__/
-├── usePendingApprovals.test.ts
-├── useExecutionSigning.test.ts
-└── ...
-```
-
-### Testing Stack
-
-- **Unit Tests**: Vitest + React Testing Library
-- **E2E Tests**: Playwright
-- **Snapshot Tests**: Vitest snapshots for widgets
-
----
-
-## Build & Development
+## Build & Configuration
 
 ### Scripts
 
 ```bash
-npm run dev          # Start Vite dev server
-npm run build        # Production build
-npm run preview      # Preview production build
-npm run lint         # ESLint
-npm run typecheck    # TypeScript check
-npm run test         # Run Vitest
+npm run dev          # Vite dev server (port 5173)
+npm run build        # prebuild (lint+typecheck) + vite build
+npm run test         # Vitest
+npm run typecheck    # tsc --noEmit
+npm run workspace:status  # Registry linter
+npm run convex:dev   # Convex dev
+npm run convex:deploy # Convex deploy
 ```
 
-### Environment Variables
+### Key Dependencies
 
-```
-VITE_API_BASE_URL           # Backend API URL
-VITE_WALLETCONNECT_PROJECT_ID  # WalletConnect ID
-VITE_CONVEX_URL             # Convex deployment URL
-```
+- **UI**: React 18, framer-motion, lucide-react, recharts, lightweight-charts
+- **State**: zustand, @tanstack/react-query
+- **Web3**: wagmi 2.12, viem 2.21, @reown/appkit, @rhinestone/sdk
+- **Backend**: convex 1.31, axios
+- **DnD**: @dnd-kit/core, @dnd-kit/sortable
+- **Security**: isomorphic-dompurify, bcryptjs
+
+### Chains Supported
+
+EVM: Ethereum, Base, Base Sepolia, Arbitrum, Optimism, Polygon, Ink
+Non-EVM: Solana
 
 ---
 
-## Data Flow Summary
+## Navigation Guide
 
-```mermaid
-sequenceDiagram
-    participant User
-    participant Shell as DeFiChatShell
-    participant Controller as useDeFiChatController
-    participant Chat as ChatSurface
-    participant Backend as FastAPI
-    participant Convex
+**To add a new widget**:
+1. Add kind to `WidgetKind` union in `src/types/widget-system.ts`
+2. Add metadata to `WIDGET_REGISTRY` in `src/lib/widget-registry.ts`
+3. Implement component in `src/components/widgets/`
+4. Add lazy import + case to `WidgetContent.tsx`
 
-    User->>Shell: Interaction
-    Shell->>Controller: Dispatch action
+**To add a Convex table**:
+1. Add table definition in `convex/schema.ts`
+2. Create query/mutation file in `convex/`
+3. Run `npx convex dev` to regenerate types
 
-    alt Chat Message
-        Controller->>Backend: POST /chat (SSE)
-        Backend-->>Controller: Stream response
-        Controller->>Convex: Store message
-        Convex-->>Chat: Real-time update
-    end
+**To add a new hook**:
+1. Create in `src/hooks/` or `src/workspace/hooks/`
+2. Follow pattern: Convex queries + local state + exported actions
 
-    alt Widget Action
-        Controller->>Backend: API call
-        Backend-->>Controller: Widget data
-        Controller->>Convex: Update state
-    end
-```
+**To modify auth flow**:
+1. Read `docs/WALLET_AUTH_STATE_MACHINE.md` first
+2. Modify `src/hooks/useWalletAuth.ts`
+3. Update `src/services/auth.ts` for message format changes
 
----
-
-## Quick Reference
-
-### Important File Locations
-
-| Component | Path |
-|-----------|------|
-| Main Controller | `src/hooks/useDeFiChatController.tsx` |
-| Widget Renderer | `src/components/widgets/WidgetContents.tsx` |
-| Widget Store | `src/store/widget-store.ts` |
-| Chat Interface | `src/components/chat/ChatInterface.tsx` |
-| Convex Schema | `convex/schema.ts` |
-| Type Definitions | `src/types/widget-system.ts` |
-
-### Common Patterns
-
-1. **Adding a new widget**: Define type → Add to registry → Implement component → Add to WidgetContents switch
-2. **Adding a Convex table**: Update schema → Generate types → Create query/mutation files
-3. **Adding a new hook**: Create in `hooks/` → Export from index → Use in components
-4. **Adding a new service**: Create in `services/` → Add types → Integrate with hooks
+**To add a new service**:
+1. Create in `src/services/`
+2. Add types to `src/types/`
+3. Wire into hooks that need it
 
 ---
 
-*Last updated: 2025-01-14*
+## Gotchas
+
+1. **Layout rule**: Never put `flex-1` on a `motion.div` — AnimatePresence exit leaves element in DOM taking space
+2. **Two widget systems**: Widget Panel (store/index.ts, used in prod) vs Widget Store (widget-store.ts, unused grid system)
+3. **Signing deduplication**: `useWalletAuth` uses module-level `globalSignInPromise` to prevent duplicate sign-in across HMR remounts
+4. **WETH wrapping**: `useDeFiChatController` auto-wraps ETH→WETH if Relay quote requires it
+5. **Streaming batching**: `requestAnimationFrame` prevents excessive re-renders during fast SSE streaming
+6. **Convex ↔ Backend mismatch**: No shared types — contract tests in `backend/tests/contract/` catch payload format issues
+7. **Auto-reconnect disabled**: Users must click "Connect Wallet" — no auto-reconnect on page load
+8. **Entitlement**: Only works for EVM wallets (disabled for Solana)
+
+---
+
+*Last updated: 2026-02-06*

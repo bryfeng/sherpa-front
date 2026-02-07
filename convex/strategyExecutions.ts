@@ -44,6 +44,7 @@ export const getPendingApprovals = query({
                 name: strategy.name,
                 strategyType: strategy.strategyType,
                 config: strategy.config,
+                smartSessionId: strategy.smartSessionId,
               }
             : null,
         };
@@ -83,6 +84,7 @@ export const getReadyToSign = query({
                 name: strategy.name,
                 strategyType: strategy.strategyType,
                 config: strategy.config,
+                smartSessionId: strategy.smartSessionId,
               }
             : null,
         };

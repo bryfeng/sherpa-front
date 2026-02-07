@@ -9,6 +9,8 @@ import React from 'react'
 import { ModalBase } from '../../components/modals/ModalBase'
 import { useExecutionSigning, type SigningStatus } from '../hooks/useExecutionSigning'
 import { formatStrategyType } from '../hooks/usePendingApprovals'
+import { useSourceIntents } from '../../hooks/useSmartSessionIntents'
+import { IntentProgressCard } from '../../components/intents/IntentProgressCard'
 
 // ============================================
 // TYPES
@@ -60,6 +62,12 @@ function StatusIndicator({ status }: { status: SigningStatus }) {
           color: 'bg-red-500',
           text: 'Failed',
           animate: false,
+        }
+      case 'intent_tracking':
+        return {
+          color: 'bg-blue-500',
+          text: 'Autonomous',
+          animate: true,
         }
       default:
         return {
@@ -129,17 +137,26 @@ export function ExecutionSigningModal({ onClose }: ExecutionSigningModalProps) {
   const {
     state,
     isActive,
+    isIntentBacked,
     statusMessage,
     isLoading: _isLoading,
     isSuccess: _isSuccess,
     txHash,
     quote,
     execution,
+    smartSessionId: _smartSessionId,
     error,
     signTransaction,
     dismiss,
     reset,
   } = useExecutionSigning()
+
+  // Query intents for this strategy when intent-backed
+  const strategyId = execution?.strategyId
+  const { intents } = useSourceIntents(
+    isIntentBacked ? 'dca_strategy' : null,
+    isIntentBacked && strategyId ? String(strategyId) : null,
+  )
 
   // Don't render if no active signing
   if (!isActive && state.status !== 'completed' && state.status !== 'failed') {
@@ -157,6 +174,56 @@ export function ExecutionSigningModal({ onClose }: ExecutionSigningModalProps) {
       dismiss()
     }
     onClose?.()
+  }
+
+  // Intent-backed execution: show intent progress instead of signing UI
+  if (isIntentBacked) {
+    const latestIntent = intents[0]
+
+    return (
+      <ModalBase
+        title="Autonomous Execution"
+        onClose={handleClose}
+        footer={
+          <div className="flex gap-2">
+            <button
+              onClick={handleClose}
+              className="flex-1 py-2.5 px-4 border border-slate-300 text-slate-700 font-medium rounded-xl hover:bg-slate-50 transition-colors"
+            >
+              Close
+            </button>
+          </div>
+        }
+      >
+        {/* Header */}
+        <div className="flex items-center justify-between mb-4">
+          <div>
+            <h3 className="font-semibold text-slate-900">{strategyName}</h3>
+            <p className="text-sm text-slate-500">{strategyType}</p>
+          </div>
+          <div className="flex items-center gap-2">
+            <div className="h-2 w-2 rounded-full bg-blue-500 animate-pulse" />
+            <span className="text-sm text-slate-600">Smart Session</span>
+          </div>
+        </div>
+
+        {/* Status */}
+        <div className="text-center py-2 mb-4">
+          <p className="text-slate-600">{statusMessage}</p>
+          <p className="text-xs text-slate-400 mt-1">No wallet signature required</p>
+        </div>
+
+        {/* Intent Progress */}
+        {latestIntent ? (
+          <IntentProgressCard intent={latestIntent} />
+        ) : (
+          <div className="flex items-center justify-center py-6">
+            <div className="h-5 w-5 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
+            <span className="ml-2 text-sm text-slate-500">Waiting for intent...</span>
+          </div>
+        )}
+      </ModalBase>
+    )
   }
 
   const getActionButton = () => {

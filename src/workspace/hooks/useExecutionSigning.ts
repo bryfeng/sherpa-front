@@ -44,6 +44,7 @@ export interface ExecutionReadyToSign {
     name: string
     strategyType: 'dca' | 'rebalance' | 'limit_order' | 'stop_loss' | 'take_profit' | 'custom'
     config: Record<string, unknown>
+    smartSessionId?: string
   } | null
 }
 
@@ -56,6 +57,7 @@ export type SigningStatus =
   | 'completed'
   | 'failed'
   | 'dismissed'
+  | 'intent_tracking' // Backend is executing via Rhinestone intent — no wallet needed
 
 export interface SigningState {
   status: SigningStatus
@@ -164,6 +166,8 @@ export function useExecutionSigning() {
   // ============================================
 
   // When a new execution appears in "executing" state, prepare it for signing
+  // If the strategy has a smartSessionId, the backend handles execution via intent —
+  // skip the wallet signing flow and show intent progress instead.
   useEffect(() => {
     if (!readyToSignExecutions || readyToSignExecutions.length === 0) return
     if (state.status !== 'idle' && state.status !== 'dismissed') return
@@ -174,11 +178,20 @@ export function useExecutionSigning() {
     ) as ExecutionReadyToSign | undefined
 
     if (newExecution) {
-      setState({
-        status: 'fetching_quote',
-        execution: newExecution,
-        quote: null,
-      })
+      // Check if this execution's strategy has a Smart Session (autonomous mode)
+      if (newExecution.strategy?.smartSessionId) {
+        setState({
+          status: 'intent_tracking',
+          execution: newExecution,
+          quote: null,
+        })
+      } else {
+        setState({
+          status: 'fetching_quote',
+          execution: newExecution,
+          quote: null,
+        })
+      }
     }
   }, [readyToSignExecutions, state.status, processedExecutionIds])
 
@@ -272,6 +285,7 @@ export function useExecutionSigning() {
     }
 
     fetchQuote()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [state.status, state.execution, walletAddress, chainId])
 
   // ============================================
@@ -333,6 +347,7 @@ export function useExecutionSigning() {
     }
 
     recordCompletion()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isConfirmed, txHash, state.execution, state.transactionId, completeMutation, markTransactionConfirmed])
 
   // ============================================
@@ -514,15 +529,21 @@ export function useExecutionSigning() {
         return 'Transaction confirmed!'
       case 'failed':
         return state.error || 'Transaction failed'
+      case 'intent_tracking':
+        return 'Executing via Smart Session...'
       default:
         return ''
     }
   }, [state.status, state.error])
 
+  // Whether this execution is handled by a Smart Session (no wallet needed)
+  const isIntentBacked = state.status === 'intent_tracking'
+
   return {
     // State
     state,
     isActive,
+    isIntentBacked,
     pendingCount,
     statusMessage,
 
@@ -535,6 +556,9 @@ export function useExecutionSigning() {
     approvalTxHash,
     quote: state.quote,
     execution: state.execution,
+
+    // Smart Session info
+    smartSessionId: state.execution?.strategy?.smartSessionId,
 
     // Errors
     error: state.error || sendError?.message || approvalError?.message,

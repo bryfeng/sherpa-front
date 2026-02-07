@@ -20,6 +20,18 @@ vi.mock('../../hooks/usePendingApprovals', () => ({
   },
 }))
 
+// Mock useSmartSessionIntents (used by ExecutionSigningModal for intent tracking)
+vi.mock('../../../hooks/useSmartSessionIntents', () => ({
+  useSourceIntents: () => ({ intents: [], isLoading: false }),
+}))
+
+// Mock IntentProgressCard
+vi.mock('../../../components/intents/IntentProgressCard', () => ({
+  IntentProgressCard: ({ intent }: any) => (
+    <div data-testid="intent-progress-card">{intent?.status}</div>
+  ),
+}))
+
 // Mock ModalBase component
 vi.mock('../../../components/modals/ModalBase', () => ({
   ModalBase: ({ children, title, footer, onClose }: any) => (
@@ -59,6 +71,7 @@ describe('ExecutionSigningModal', () => {
   const defaultMockState = {
     state: { status: 'idle', execution: null, quote: null },
     isActive: false,
+    isIntentBacked: false,
     statusMessage: '',
     isLoading: false,
     isSuccess: false,
@@ -66,6 +79,7 @@ describe('ExecutionSigningModal', () => {
     approvalTxHash: undefined,
     quote: null,
     execution: null,
+    smartSessionId: undefined,
     error: undefined,
     signTransaction: vi.fn(),
     dismiss: vi.fn(),
