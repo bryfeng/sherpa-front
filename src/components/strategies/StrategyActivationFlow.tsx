@@ -4,21 +4,22 @@
  * Orchestrates the strategy activation process:
  * 1. Review strategy configuration
  * 2. Deploy Smart Account (if needed)
- * 3. Grant Smart Session (on-chain, via Rhinestone SDK)
- * 4. Activate strategy
+ * 3. Fund Smart Wallet (transfer tokens from EOA)
+ * 4. Grant Smart Session (on-chain, via Rhinestone SDK)
+ * 5. Activate strategy
  *
  * Table-agnostic: works with both `strategies` (generic) and `dcaStrategies` tables.
  * The parent component provides strategy display info, session requirements, and callbacks.
  *
  * Uses: useRhinestoneAccount for smart account lifecycle
  * Uses: useSmartSessionGrant for on-chain session grant
+ * Uses: FundSmartWalletCard for token transfers to smart wallet
  */
 
 import React, { useState, useCallback } from 'react'
 import {
   CheckCircle2,
   Shield,
-  Clock,
   ArrowRight,
   Loader2,
   XCircle,
@@ -29,6 +30,7 @@ import {
 } from 'lucide-react'
 import { useRhinestoneAccount } from '../../hooks/useRhinestoneAccount'
 import { useSmartSessionGrant } from '../../hooks/useSmartSessionGrant'
+import { FundSmartWalletCard } from '../smart-wallet/FundSmartWalletCard'
 import type { SessionRequirements } from '../../hooks/useDCASmartSession'
 
 // Re-export for consumers
@@ -63,7 +65,7 @@ export interface StrategyActivationFlowProps {
   onCancel: () => void
 }
 
-type ActivationStep = 'review' | 'deploy' | 'grant' | 'activate' | 'complete' | 'error'
+type ActivationStep = 'review' | 'deploy' | 'fund' | 'grant' | 'activate' | 'complete' | 'error'
 
 // ============================================
 // HELPERS
@@ -96,6 +98,10 @@ function StepIndicator({
   ]
   if (needsDeploy) {
     steps.push({ key: 'deploy', label: 'Deploy Account' })
+  }
+  // Fund step is shown when deploy is needed (new account needs funding)
+  if (needsDeploy) {
+    steps.push({ key: 'fund', label: 'Fund' })
   }
   if (needsSession) {
     steps.push({ key: 'grant', label: 'Grant Session' })
@@ -159,7 +165,7 @@ function StepIndicator({
 // ============================================
 
 function ReviewStep({
-  strategyName,
+  strategyName: _strategyName,
   reviewDetails,
   sessionRequirements,
   needsSession,
@@ -629,6 +635,7 @@ export function StrategyActivationFlow({
     isDeployed,
     isDeploying,
     account: rhinestoneAccount,
+    error: _deployError,
     initialize: initializeAccount,
     deploy: deployAccount,
   } = useRhinestoneAccount()
@@ -672,11 +679,9 @@ export function StrategyActivationFlow({
     setError(null)
 
     try {
-      const success = await deployAccount()
-      if (!success) {
-        throw new Error('Smart account deployment failed')
-      }
-      setStep('grant')
+      await deployAccount()
+      // After deploy, go to fund step so user can transfer tokens
+      setStep('fund')
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to deploy smart account')
       setStep('error')
@@ -684,6 +689,15 @@ export function StrategyActivationFlow({
       setIsLoading(false)
     }
   }, [deployAccount])
+
+  // Handle fund step continue / skip
+  const handleFundContinue = useCallback(() => {
+    if (needsSession) {
+      setStep('grant')
+    } else {
+      setStep('activate')
+    }
+  }, [needsSession])
 
   // Handle grant session (real on-chain SDK flow)
   const handleGrantSession = useCallback(async () => {
@@ -765,6 +779,15 @@ export function StrategyActivationFlow({
           onDeploy={handleDeploy}
           onCancel={onCancel}
           isLoading={isLoading || isDeploying}
+        />
+      )}
+
+      {step === 'fund' && rhinestoneAddress && (
+        <FundSmartWalletCard
+          smartWalletAddress={rhinestoneAddress}
+          onContinue={handleFundContinue}
+          onCancel={onCancel}
+          onSkip={handleFundContinue}
         />
       )}
 
