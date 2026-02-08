@@ -7,6 +7,7 @@
 
 import React from 'react'
 import type { InlineComponent } from '../../types/defi-ui'
+import type { Widget } from '../../types/widgets'
 import { InlineCard } from './InlineCard'
 import { EnhancedPortfolioCard } from '../portfolio'
 import {
@@ -14,6 +15,7 @@ import {
   PriceChartWidget,
   SwapWidget,
 } from '../widgets/WidgetContents'
+import { RelayQuoteWidget } from '../widgets/RelayQuoteWidget'
 
 interface InlineComponentRendererProps {
   component: InlineComponent
@@ -80,6 +82,31 @@ export function InlineComponentRenderer({
           <ActionCardContent action={payload?.action} params={payload?.params} />
         </InlineCard>
       )
+
+    case 'relay-quote': {
+      // Render the Relay quote widget inline in chat with self-contained execution.
+      // No onExecuteQuote callback — QuoteExecuteButton handles tx via wagmi hooks.
+      const quoteType = typeof payload?.quote_type === 'string'
+        ? payload.quote_type.toLowerCase()
+        : 'swap'
+      const quoteTitle = title || (quoteType === 'bridge' ? 'Bridge Quote' : 'Swap Quote')
+      const widget: Widget = {
+        id: component.id || `relay_${quoteType}_quote`,
+        kind: 'card',
+        title: quoteTitle,
+        payload: payload || {},
+        density: 'full',
+      }
+      return (
+        <InlineCard variant="expanded" title={quoteTitle}>
+          <RelayQuoteWidget
+            panel={widget}
+            walletAddress={walletAddress}
+            walletReady={Boolean(walletAddress)}
+          />
+        </InlineCard>
+      )
+    }
 
     default:
       // Unknown component type - render a placeholder
