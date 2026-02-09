@@ -37,14 +37,23 @@ function getVariantForKind(kind: string): InlineComponentVariant {
 
 // Convert backend panels to inline components
 function panelsToInlineComponents(panels: any[]): InlineComponent[] {
-  return panels.map((panel) => ({
-    id: `comp_${panel.id || Math.random().toString(36).slice(2, 9)}`,
-    kind: panelKindToComponentKind(panel.kind),
-    payload: panel.payload ?? {},
-    variant: getVariantForKind(panel.kind),
-    title: panel.title,
-    createdAt: Date.now(),
-  }))
+  return panels.map((panel) => {
+    // Relay quote panels get special rendering with QuoteExecuteButton
+    const isRelayQuote =
+      panel.id === 'relay_swap_quote' ||
+      panel.id === 'relay_bridge_quote' ||
+      panel.payload?.provider === 'relay'
+    const kind = isRelayQuote ? 'relay-quote' as InlineComponentKind : panelKindToComponentKind(panel.kind)
+    const variant = isRelayQuote ? 'expanded' as InlineComponentVariant : getVariantForKind(panel.kind)
+    return {
+      id: `comp_${panel.id || Math.random().toString(36).slice(2, 9)}`,
+      kind,
+      payload: panel.payload ?? {},
+      variant,
+      title: panel.title,
+      createdAt: Date.now(),
+    }
+  })
 }
 
 // Generate unique IDs
@@ -275,6 +284,7 @@ export function useChatEngine(options: UseChatEngineOptions) {
     walletAddress,
     llmModel,
     conversationId,
+    messages,
     addMessage,
     updateMessage,
     setIsTyping,
@@ -396,6 +406,7 @@ export function useChatEngine(options: UseChatEngineOptions) {
     walletAddress,
     llmModel,
     conversationId,
+    messages,
     addMessage,
     removeMessage,
     setIsTyping,
