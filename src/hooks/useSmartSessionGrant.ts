@@ -210,9 +210,12 @@ export function useSmartSessionGrant(): UseSmartSessionGrantReturn {
         )
 
         // 6. Submit transaction (user signs deployment tx)
+        // sponsored: true lets the Rhinestone orchestrator pay gas,
+        // so the smart account doesn't need pre-funded ETH.
         const txResult = await account.sendTransaction({
           chain,
           calls: [enableCall],
+          sponsored: true,
         })
 
         // 7. Wait for execution confirmation

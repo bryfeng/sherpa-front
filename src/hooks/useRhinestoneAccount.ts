@@ -158,7 +158,8 @@ export function useRhinestoneAccount(): UseRhinestoneAccountReturn {
         }
 
         // Deploy on-chain (user signs transaction)
-        const success = await acc.deploy(chain)
+        // sponsored: true lets the Rhinestone orchestrator pay gas.
+        const success = await acc.deploy(chain, { sponsored: true })
 
         if (success && walletAddress) {
           const address = acc.getAddress()
