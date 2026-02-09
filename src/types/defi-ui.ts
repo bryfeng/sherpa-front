@@ -10,6 +10,7 @@ export type InlineComponentKind =
   | 'price-chart'
   | 'token-list'
   | 'action-card'
+  | 'relay-quote'
 
 export type InlineComponentVariant = 'compact' | 'standard' | 'expanded'
 

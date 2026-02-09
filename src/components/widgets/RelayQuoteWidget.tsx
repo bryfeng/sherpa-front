@@ -6,6 +6,7 @@ import { relayQuoteThemes } from './relay-quote-theme'
 import { PolicyCheckList } from '../policy/PolicyCheckList'
 import { usePolicyEvaluation } from '../../hooks/usePolicyEvaluation'
 import { extractTransactionIntent } from '../../utils/extractTransactionIntent'
+import { QuoteExecuteButton } from './QuoteExecuteButton'
 
 // Chain metadata for display
 const CHAIN_META: Record<number, { name: string; short: string; explorer: string }> = {
@@ -75,7 +76,7 @@ function RelayQuoteWidgetComponent({
   const inputToken = payload.tokens?.input || breakdown.input || {}
   const outputToken = payload.tokens?.output || breakdown.output || {}
   const inputSymbol = inputToken.symbol || payload.input?.token?.symbol || '—'
-  const outputSymbol = outputToken.symbol || output.symbol || payload.output?.token?.symbol || '—'
+  const _outputSymbol = outputToken.symbol || output.symbol || payload.output?.token?.symbol || '—'
   const inputAmount = payload.amounts?.input || inputToken.amount || '—'
 
   // Determine operation type label
@@ -541,7 +542,7 @@ function RelayQuoteWidgetComponent({
           />
         )}
 
-        {!collapsed && (
+        {!collapsed && onExecuteQuote && (
           <div className="flex flex-wrap items-center gap-3">
             <button
               type="button"
@@ -569,6 +570,34 @@ function RelayQuoteWidgetComponent({
             {disableReason && <span className={`text-xs ${theme.helper}`}>{disableReason}</span>}
           </div>
         )}
+
+        {/* Self-contained execute button (wagmi hooks) when no callback provided */}
+        {!collapsed && !onExecuteQuote && (
+          <div className="flex flex-wrap items-center gap-3">
+            <QuoteExecuteButton
+              payload={payload}
+              label={actionVerbCapitalized}
+              walletReady={walletReady}
+              disableReason={disableReason}
+            />
+            {onRefreshQuote && (
+              <button
+                type="button"
+                className={theme.actionSecondary}
+                onClick={handleRefresh}
+                disabled={refreshing}
+              >
+                {refreshing ? 'Refreshing…' : (
+                  <>
+                    <Repeat className="h-4 w-4" />
+                    Refresh Quote
+                  </>
+                )}
+              </button>
+            )}
+          </div>
+        )}
+
         {collapsed && disableReason && (
           <div className={`text-xs ${theme.helper}`}>{disableReason}</div>
         )}
