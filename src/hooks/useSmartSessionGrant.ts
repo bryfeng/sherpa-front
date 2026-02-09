@@ -115,15 +115,11 @@ function buildPolicies(
     limits: [{ token: usdcAddress, amount: usdcAmount }],
   })
 
-  // Time frame
-  const now = Math.floor(Date.now() / 1000)
-  const validUntil = now + requirements.validDays * 86400
-
-  policies.push({
-    type: 'time-frame',
-    validAfter: now,
-    validUntil,
-  })
+  // NOTE: time-frame policy removed — the contract at
+  // 0x8177451511de0577b911c254e9551d981c26dc72 on Base does not support
+  // initializeWithMultiplexer (selector 0x989c9e46), causing immediate
+  // revert with empty data. Spending-limits + usage-limit provide
+  // adequate constraints (total cap + execution count).
 
   // Usage limit: give 2x buffer over expected executions
   const estimatedExecutions = Math.ceil(
@@ -196,12 +192,15 @@ export function useSmartSessionGrant(): UseSmartSessionGrantReturn {
         }
 
         // 3. Get session details (computes EIP-712 digests)
+        console.log('[SmartSessionGrant] Step 3: Getting session details...')
         const details = await account.experimental_getSessionDetails([session])
 
         // 4. User signs EIP-712 typed data (wallet popup)
+        console.log('[SmartSessionGrant] Step 4: Requesting EIP-712 signature...')
         const enableSignature = await account.experimental_signEnableSession(details)
 
         // 5. Build the enable session call using the SDK action
+        console.log('[SmartSessionGrant] Step 5: Building enable session call...')
         const enableCall = experimental_enableSession(
           session,                       // Session to enable
           enableSignature,               // User's EIP-712 signature
@@ -212,6 +211,7 @@ export function useSmartSessionGrant(): UseSmartSessionGrantReturn {
         // 6. Submit transaction (user signs deployment tx)
         // sponsored: true lets the Rhinestone orchestrator pay gas,
         // so the smart account doesn't need pre-funded ETH.
+        console.log('[SmartSessionGrant] Step 6: Submitting transaction (sponsored)...')
         const txResult = await account.sendTransaction({
           chain,
           calls: [enableCall],
@@ -219,6 +219,7 @@ export function useSmartSessionGrant(): UseSmartSessionGrantReturn {
         })
 
         // 7. Wait for execution confirmation
+        console.log('[SmartSessionGrant] Step 7: Waiting for execution...', txResult)
         const status = await account.waitForExecution(txResult)
 
         // 8. Generate session ID and extract tx hash
@@ -236,6 +237,7 @@ export function useSmartSessionGrant(): UseSmartSessionGrantReturn {
           txHash: txHash as string,
         }
       } catch (err) {
+        console.error('[SmartSessionGrant] Error:', err)
         const message =
           err instanceof Error ? err.message : 'Failed to grant smart session'
         setError(message)
