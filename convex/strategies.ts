@@ -244,6 +244,7 @@ export const activate = mutation({
       await ctx.db.patch(args.strategyId, {
         status: "active",
         requiresManualApproval: false,
+        smartSessionId: args.smartSessionId,
         updatedAt: now,
         nextExecutionAt,
       });
