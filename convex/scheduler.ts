@@ -4,6 +4,40 @@ import { v } from "convex/values";
 import { Doc } from "./_generated/dataModel";
 
 /**
+ * Extract a config field trying camelCase first, then snake_case.
+ * Handles both nested token objects and flat string values.
+ */
+function extractConfigField(
+  config: Record<string, unknown>,
+  ...keys: string[]
+): unknown {
+  for (const key of keys) {
+    const val = config[key];
+    if (val !== undefined && val !== null) return val;
+  }
+  return undefined;
+}
+
+/**
+ * Extract a token symbol from config, handling both nested and flat formats.
+ * e.g. config.fromToken.symbol OR config.from_token
+ */
+function extractTokenSymbol(
+  config: Record<string, unknown>,
+  camelKey: string,
+  snakeKey: string
+): string | undefined {
+  const nested = config[camelKey];
+  if (nested && typeof nested === "object" && "symbol" in (nested as Record<string, unknown>)) {
+    return (nested as Record<string, unknown>).symbol as string;
+  }
+  if (typeof nested === "string") return nested;
+  const flat = config[snakeKey];
+  if (typeof flat === "string") return flat;
+  return undefined;
+}
+
+/**
  * Check for strategies that need execution and trigger them
  *
  * Phase 1 (Manual Approval): If requiresManualApproval is true, creates a pending
@@ -64,10 +98,10 @@ export const checkTriggers = internalAction({
                   sessionId: strategy.smartSessionId,
                   walletAddress: strategy.walletAddress,
                   actionType: "swap",
-                  chainId: (config.chainId as number) || 1,
-                  valueUsd: (config.amount_usd as number) || 0,
-                  tokenIn: (config.from_token as string) || undefined,
-                  tokenOut: (config.to_token as string) || undefined,
+                  chainId: (extractConfigField(config, "chainId", "chain_id") as number) || 1,
+                  valueUsd: (extractConfigField(config, "amountPerExecution", "amount_usd", "amountUsd") as number) || 0,
+                  tokenIn: extractTokenSymbol(config, "fromToken", "from_token") || undefined,
+                  tokenOut: extractTokenSymbol(config, "toToken", "to_token") || undefined,
                 }),
               });
 
@@ -258,9 +292,9 @@ export const createPendingExecution = internalMutation({
     let approvalReason = `Execute ${strategy.name}`;
 
     if (strategy.strategyType === "dca") {
-      const amount = config.amountPerExecution || config.amount || "?";
-      const fromToken = (config.fromToken as { symbol?: string })?.symbol || "tokens";
-      const toToken = (config.toToken as { symbol?: string })?.symbol || "tokens";
+      const amount = extractConfigField(config, "amountPerExecution", "amount_usd", "amountUsd", "amount") || "?";
+      const fromToken = extractTokenSymbol(config, "fromToken", "from_token") || "tokens";
+      const toToken = extractTokenSymbol(config, "toToken", "to_token") || "tokens";
       approvalReason = `Buy ${toToken} with ${amount} ${fromToken}`;
     }
 
