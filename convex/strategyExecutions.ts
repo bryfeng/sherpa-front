@@ -550,7 +550,7 @@ export const checkDueStrategies = mutation({
       .collect();
 
     const dueStrategies = activeStrategies.filter(
-      (s) => s.nextExecutionAt && s.nextExecutionAt <= now
+      (s) => s.nextExecutionAt && s.nextExecutionAt <= now && !s.smartSessionId
     );
 
     const results: { strategyId: string; executionId?: string; error?: string }[] = [];
