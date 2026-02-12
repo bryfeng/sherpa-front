@@ -53,6 +53,26 @@ export const get = query({
 });
 
 /**
+ * Find a dcaStrategies entry matching a strategies table entry.
+ * Used by triggerSmartSessionExecution to resolve strategies._id → dcaStrategies._id
+ * since the backend DCA service expects a dcaStrategies ID.
+ */
+export const findByWalletAndName = internalQuery({
+  args: {
+    walletAddress: v.string(),
+    name: v.string(),
+  },
+  handler: async (ctx, args) => {
+    const results = await ctx.db
+      .query("dcaStrategies")
+      .withIndex("by_wallet_address", (q) => q.eq("walletAddress", args.walletAddress))
+      .filter((q) => q.eq(q.field("name"), args.name))
+      .first();
+    return results;
+  },
+});
+
+/**
  * List all DCA strategies for a user
  */
 export const listByUser = query({
