@@ -668,7 +668,20 @@ export const triggerSmartSessionExecution = internalAction({
         console.error(`Smart session execution failed for ${args.strategyId}: ${msg}`);
         await failExecution(msg);
       } else {
-        console.log(`Smart session execution triggered for ${args.strategyId}`);
+        const result = await response.json().catch(() => ({}));
+        console.log(`Smart session execution succeeded for ${args.strategyId}:`, result);
+
+        // Mark execution as completed
+        if (args.executionId) {
+          try {
+            await ctx.runMutation(internal.scheduler.completeExecutionById, {
+              executionId: args.executionId,
+              txHash: result.txHash || undefined,
+            });
+          } catch (e) {
+            console.error("Failed to mark execution as completed:", e);
+          }
+        }
       }
     } catch (error: any) {
       const msg = error?.message || "Network error contacting backend";
@@ -724,6 +737,54 @@ export const failExecutionById = internalMutation({
       await ctx.db.patch(execution.strategyId, {
         failedExecutions: ((strategy as any).failedExecutions || 0) + 1,
         lastError: args.errorMessage,
+        updatedAt: now,
+      });
+    }
+  },
+});
+
+/**
+ * Mark a strategyExecution as completed after successful backend execution.
+ * Used by triggerSmartSessionExecution when backend returns success.
+ */
+export const completeExecutionById = internalMutation({
+  args: {
+    executionId: v.string(),
+    txHash: v.optional(v.string()),
+  },
+  handler: async (ctx, args) => {
+    const id = ctx.db.normalizeId("strategyExecutions", args.executionId);
+    if (!id) {
+      console.error(`Invalid execution ID: ${args.executionId}`);
+      return;
+    }
+    const execution = await ctx.db.get(id);
+    if (!execution || execution.currentState !== "executing") return;
+
+    const now = Date.now();
+    await ctx.db.patch(id, {
+      currentState: "completed",
+      stateEnteredAt: now,
+      completedAt: now,
+      stateHistory: [
+        ...execution.stateHistory,
+        {
+          id: `sh_${now}`,
+          fromState: execution.currentState,
+          toState: "completed",
+          trigger: "backend_success",
+          timestamp: now,
+        },
+      ],
+    });
+
+    // Update strategy stats
+    const strategy = await ctx.db.get(execution.strategyId);
+    if (strategy) {
+      await ctx.db.patch(execution.strategyId, {
+        successfulExecutions: ((strategy as any).successfulExecutions || 0) + 1,
+        totalExecutions: ((strategy as any).totalExecutions || 0) + 1,
+        lastExecutedAt: now,
         updatedAt: now,
       });
     }
