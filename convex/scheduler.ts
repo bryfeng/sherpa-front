@@ -626,6 +626,30 @@ export const triggerSmartSessionExecution = internalAction({
     }
 
     try {
+      // Resolve strategies table ID → dcaStrategies table ID if possible.
+      // The backend now handles both ID types, but resolution helps with
+      // caching and avoids the backend fallback path.
+      let resolvedStrategyId: string = args.strategyId;
+      try {
+        const strategyDoc = await ctx.runQuery(
+          internal.strategies.getById,
+          { strategyId: args.strategyId as any }
+        );
+        if (strategyDoc && strategyDoc.strategyType === "dca") {
+          const dcaDoc = await ctx.runQuery(
+            internal.dca.findByWalletAndName,
+            { walletAddress: strategyDoc.walletAddress, name: strategyDoc.name }
+          );
+          if (dcaDoc) {
+            resolvedStrategyId = dcaDoc._id;
+            console.log(`Resolved strategies/${args.strategyId} → dcaStrategies/${resolvedStrategyId}`);
+          }
+        }
+      } catch (e) {
+        // If resolution fails, continue with original ID — backend handles both
+        console.warn("Strategy ID resolution skipped:", e);
+      }
+
       // Calls: backend/app/api/dca.py:internal_execute
       const response = await fetch(`${fastapiUrl}/dca/internal/execute`, {
         method: "POST",
@@ -634,7 +658,7 @@ export const triggerSmartSessionExecution = internalAction({
           "X-Internal-Key": internalKey,
         },
         body: JSON.stringify({
-          strategyId: args.strategyId,
+          strategyId: resolvedStrategyId,
         }),
       });
 

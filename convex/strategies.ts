@@ -1,4 +1,4 @@
-import { mutation, query } from "./_generated/server";
+import { mutation, query, internalQuery } from "./_generated/server";
 import { v } from "convex/values";
 
 /**
@@ -87,6 +87,17 @@ export const listByWallet = query({
  * Get a strategy by ID
  */
 export const get = query({
+  args: { strategyId: v.id("strategies") },
+  handler: async (ctx, args) => {
+    return await ctx.db.get(args.strategyId);
+  },
+});
+
+/**
+ * Internal: get a strategy by ID (for use from internalActions).
+ * Called by: scheduler.ts:triggerSmartSessionExecution
+ */
+export const getById = internalQuery({
   args: { strategyId: v.id("strategies") },
   handler: async (ctx, args) => {
     return await ctx.db.get(args.strategyId);
