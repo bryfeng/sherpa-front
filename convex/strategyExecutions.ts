@@ -1,4 +1,5 @@
 import { mutation, query } from "./_generated/server";
+import { internal } from "./_generated/api";
 import { v } from "convex/values";
 
 /**
@@ -236,6 +237,17 @@ export const approve = mutation({
         },
       ],
     });
+
+    // If strategy has a Smart Session, trigger the backend immediately
+    // instead of waiting for the cron to pick it up.
+    const strategy = await ctx.db.get(execution.strategyId);
+    if (strategy?.smartSessionId) {
+      await ctx.scheduler.runAfter(
+        0,
+        internal.scheduler.triggerSmartSessionExecution,
+        { strategyId: execution.strategyId, executionId: args.executionId }
+      );
+    }
 
     return { success: true };
   },
