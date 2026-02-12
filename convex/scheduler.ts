@@ -595,6 +595,118 @@ export const getDueDCAStrategies = internalQuery({
 });
 
 /**
+ * Trigger a single DCA strategy execution via the backend.
+ * Called immediately when a smart-session execution is approved,
+ * so the user doesn't have to wait for the next cron tick.
+ */
+export const triggerSmartSessionExecution = internalAction({
+  args: { strategyId: v.string(), executionId: v.optional(v.string()) },
+  handler: async (ctx, args): Promise<void> => {
+    const fastapiUrl = process.env.FASTAPI_URL;
+    const internalKey = process.env.INTERNAL_API_KEY;
+
+    const failExecution = async (errorMessage: string) => {
+      if (args.executionId) {
+        try {
+          await ctx.runMutation(internal.scheduler.failExecutionById, {
+            executionId: args.executionId,
+            errorMessage,
+          });
+        } catch (e) {
+          console.error("Failed to mark execution as failed:", e);
+        }
+      }
+    };
+
+    if (!fastapiUrl || !internalKey) {
+      const msg = "FASTAPI_URL or INTERNAL_API_KEY not configured";
+      console.error(msg);
+      await failExecution(msg);
+      return;
+    }
+
+    try {
+      // Calls: backend/app/api/dca.py:internal_execute
+      const response = await fetch(`${fastapiUrl}/dca/internal/execute`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "X-Internal-Key": internalKey,
+        },
+        body: JSON.stringify({
+          strategyId: args.strategyId,
+        }),
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        const msg = `Backend error ${response.status}: ${errorText}`;
+        console.error(`Smart session execution failed for ${args.strategyId}: ${msg}`);
+        await failExecution(msg);
+      } else {
+        console.log(`Smart session execution triggered for ${args.strategyId}`);
+      }
+    } catch (error: any) {
+      const msg = error?.message || "Network error contacting backend";
+      console.error(`Error triggering smart session execution for ${args.strategyId}:`, error);
+      await failExecution(msg);
+    }
+  },
+});
+
+/**
+ * Mark a strategyExecution as failed by its ID.
+ * Used by triggerSmartSessionExecution to propagate backend errors.
+ */
+export const failExecutionById = internalMutation({
+  args: {
+    executionId: v.string(),
+    errorMessage: v.string(),
+  },
+  handler: async (ctx, args) => {
+    const id = ctx.db.normalizeId("strategyExecutions", args.executionId);
+    if (!id) {
+      console.error(`Invalid execution ID: ${args.executionId}`);
+      return;
+    }
+    const execution = await ctx.db.get(id);
+    if (!execution || execution.currentState !== "executing") return;
+
+    const now = Date.now();
+    await ctx.db.patch(id, {
+      currentState: "failed",
+      stateEnteredAt: now,
+      completedAt: now,
+      errorMessage: args.errorMessage,
+      errorCode: "BACKEND_ERROR",
+      recoverable: true,
+      stateHistory: [
+        ...execution.stateHistory,
+        {
+          id: `sh_${now}`,
+          fromState: execution.currentState,
+          toState: "failed",
+          trigger: "backend_error",
+          timestamp: now,
+          errorMessage: args.errorMessage,
+          errorCode: "BACKEND_ERROR",
+        },
+      ],
+    });
+
+    // Update strategy stats
+    const strategy = await ctx.db.get(execution.strategyId);
+    if (strategy) {
+      await ctx.db.patch(execution.strategyId, {
+        failedExecutions: ((strategy as any).failedExecutions || 0) + 1,
+        lastError: args.errorMessage,
+        updatedAt: now,
+      });
+    }
+  },
+});
+
+/**
  * Record DCA execution error (without stopping the strategy)
  */
 export const recordDCAError = internalMutation({

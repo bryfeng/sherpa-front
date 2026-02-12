@@ -72,6 +72,8 @@ export interface SigningState {
 // CONSTANTS
 // ============================================
 
+const INTENT_TIMEOUT_MS = 60_000 // 60 seconds
+
 const CHAIN_ID_TO_NAME: Record<number, string> = {
   1: 'ethereum',
   8453: 'base',
@@ -194,6 +196,62 @@ export function useExecutionSigning() {
       }
     }
   }, [readyToSignExecutions, state.status, processedExecutionIds])
+
+  // ============================================
+  // INTENT TRACKING: WATCH EXECUTION STATE + TIMEOUT
+  // ============================================
+
+  // Query the tracked execution's current state from Convex (reactive)
+  const trackedExecutionId = state.status === 'intent_tracking' ? state.execution?._id : undefined
+  const trackedExecution = useQuery(
+    api.strategyExecutions.get,
+    trackedExecutionId ? { executionId: trackedExecutionId } : 'skip'
+  )
+
+  // React to execution state changes (backend marks it completed/failed)
+  useEffect(() => {
+    if (state.status !== 'intent_tracking' || !trackedExecution) return
+
+    if (trackedExecution.currentState === 'completed') {
+      setProcessedExecutionIds((prev) => new Set([...prev, state.execution!._id]))
+      setState((s) => ({
+        ...s,
+        status: 'completed',
+        txHash: (trackedExecution as any).txHash,
+      }))
+    } else if (trackedExecution.currentState === 'failed' || trackedExecution.currentState === 'cancelled') {
+      setProcessedExecutionIds((prev) => new Set([...prev, state.execution!._id]))
+      setState((s) => ({
+        ...s,
+        status: 'failed',
+        error: (trackedExecution as any).errorMessage || 'Execution failed',
+      }))
+    }
+  }, [trackedExecution, state.status, state.execution])
+
+  // Timeout: if intent_tracking for too long, fail
+  useEffect(() => {
+    if (state.status !== 'intent_tracking') return
+
+    const timeoutId = setTimeout(() => {
+      if (state.execution) {
+        failMutation({
+          executionId: state.execution._id,
+          errorMessage: 'Execution timed out waiting for backend response',
+          errorCode: 'INTENT_TIMEOUT',
+          recoverable: true,
+        }).catch(console.error)
+      }
+      setProcessedExecutionIds((prev) => new Set([...prev, state.execution!._id]))
+      setState((s) => ({
+        ...s,
+        status: 'failed',
+        error: 'Execution timed out. The backend may be unavailable.',
+      }))
+    }, INTENT_TIMEOUT_MS)
+
+    return () => clearTimeout(timeoutId)
+  }, [state.status, state.execution, failMutation])
 
   // ============================================
   // FETCH QUOTE
