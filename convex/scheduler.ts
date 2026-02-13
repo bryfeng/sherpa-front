@@ -128,29 +128,15 @@ export const checkTriggers = internalAction({
               { strategyId: strategy._id }
             );
 
-            // Call backend to execute via intent
-            if (fastapiUrl && internalKey) {
-              // Calls: backend/app/api/strategies.py:internal_execute
-              const response = await fetch(`${fastapiUrl}/strategies/internal/execute`, {
-                method: "POST",
-                headers: {
-                  "Content-Type": "application/json",
-                  "X-Internal-Key": internalKey,
-                },
-                body: JSON.stringify({
-                  executionId,
-                  strategyId: strategy._id,
-                }),
-              });
-
-              if (!response.ok) {
-                console.error(
-                  `Failed to auto-execute strategy ${strategy._id}: ${response.status}`
-                );
-              } else {
-                console.log(`Auto-executed strategy ${strategy._id} via smart session`);
-              }
-            }
+            // Delegate to triggerSmartSessionExecution which calls the
+            // DCA-specific /dca/internal/execute endpoint (handles token
+            // resolution and proper intent record creation).
+            await ctx.scheduler.runAfter(
+              0,
+              internal.scheduler.triggerSmartSessionExecution,
+              { strategyId: strategy._id, executionId }
+            );
+            console.log(`Scheduled smart session execution for ${strategy._id}`);
 
             await ctx.runMutation(internal.scheduler.updateNextExecution, {
               strategyId: strategy._id,
