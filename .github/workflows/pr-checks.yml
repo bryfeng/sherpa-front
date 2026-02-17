@@ -1,0 +1,107 @@
+name: PR Checks
+
+on:
+  pull_request:
+    branches: [main]
+
+# Cancel in-progress runs for the same PR
+concurrency:
+  group: pr-checks-${{ github.head_ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: write
+  pull-requests: read
+
+jobs:
+  checks:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.head_ref }}
+          fetch-depth: 10
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Count autofix attempts
+        id: autofix-count
+        run: |
+          count=$(git log --oneline -10 | grep -c '\[autofix\]' || true)
+          echo "count=$count" >> "$GITHUB_OUTPUT"
+          echo "Autofix attempts so far: $count"
+
+      - name: Run ESLint
+        id: lint
+        continue-on-error: true
+        run: npm run lint 2>&1 | tee lint-output.txt
+
+      - name: Run TypeScript check
+        id: typecheck
+        continue-on-error: true
+        run: npm run typecheck 2>&1 | tee typecheck-output.txt
+
+      - name: Collect errors
+        if: steps.lint.outcome == 'failure' || steps.typecheck.outcome == 'failure'
+        id: errors
+        run: |
+          {
+            echo 'error_output<<ERRORS_EOF'
+            if [ "${{ steps.lint.outcome }}" == "failure" ]; then
+              echo "=== ESLint Errors ==="
+              cat lint-output.txt
+              echo ""
+            fi
+            if [ "${{ steps.typecheck.outcome }}" == "failure" ]; then
+              echo "=== TypeScript Errors ==="
+              cat typecheck-output.txt
+              echo ""
+            fi
+            echo 'ERRORS_EOF'
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Claude Code Autofix
+        if: |
+          (steps.lint.outcome == 'failure' || steps.typecheck.outcome == 'failure') &&
+          steps.autofix-count.outputs.count < 3
+        uses: anthropics/claude-code-action@v1
+        with:
+          anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+          direct_prompt: |
+            The following CI checks failed on this PR. Fix the errors and push.
+
+            ${{ steps.errors.outputs.error_output }}
+
+            Rules:
+            - Only modify files in `src/` — do NOT touch config files (eslint, tsconfig, vite, etc.)
+            - Do NOT add eslint-disable comments or @ts-ignore
+            - Do NOT install new packages or modify package.json
+            - Fix the root cause of each error
+            - Commit with message prefix "[autofix] " followed by a short description
+          allowed_tools: |
+            Bash(git status)
+            Bash(git diff)
+            Bash(git add)
+            Bash(git commit)
+            Bash(git push)
+            Bash(npm run lint)
+            Bash(npm run typecheck)
+            Read
+            Edit
+            Glob
+            Grep
+
+      - name: Fail if checks did not pass
+        if: steps.lint.outcome == 'failure' || steps.typecheck.outcome == 'failure'
+        run: |
+          echo "CI checks failed."
+          if [ "${{ steps.autofix-count.outputs.count }}" -ge 3 ]; then
+            echo "Max autofix attempts (3) reached. Manual fix required."
+          fi
+          exit 1
