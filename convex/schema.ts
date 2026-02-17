@@ -99,6 +99,8 @@ export default defineSchema({
     smartSessionId: v.optional(v.string()),
     // Manual approval mode (Phase 1 - no session keys)
     requiresManualApproval: v.optional(v.boolean()),
+    // User override: always require approval even with smart session
+    alwaysRequireApproval: v.optional(v.boolean()),
     // Scheduling
     cronExpression: v.optional(v.string()), // e.g., "0 */4 * * *"
     lastExecutedAt: v.optional(v.number()),
