@@ -16,7 +16,7 @@ import { useGenericStrategies, useGenericStrategyMutations, type GenericStrategy
 import { useSmartSessions } from '../../hooks/useDCASmartSession'
 import { useRhinestoneAccount } from '../../hooks/useRhinestoneAccount'
 import { useExecutionHistory, useExecutionMutations, formatWaitingTime, getUrgencyLevel } from '../../workspace/hooks/usePendingApprovals'
-import { useSourceIntents } from '../../hooks/useSmartSessionIntents'
+import { useSessionIntents } from '../../hooks/useSmartSessionIntents'
 import { IntentProgressCard } from '../intents/IntentProgressCard'
 import { usePolicyStatus } from '../../hooks/usePolicyStatus'
 import type { StrategyFilters } from '../../types/strategy'
@@ -239,7 +239,19 @@ export function StrategiesWidget({
             exit={{ opacity: 0, x: -20 }}
             className="flex-1 min-h-0 flex flex-col"
           >
-            <FormHeader title={selectedStrategy.name} onBack={handleBack} />
+            <FormHeader
+              title={selectedStrategy.name}
+              onBack={handleBack}
+              badge={selectedStrategy.smartSessionId ? (
+                <span
+                  className="flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium"
+                  style={{ background: 'var(--success-muted, rgba(34,197,94,0.1))', color: 'var(--success)' }}
+                >
+                  <Shield className="h-3 w-3" />
+                  Autonomous
+                </span>
+              ) : undefined}
+            />
             <div className="flex-1 overflow-y-auto p-4">
               <StrategyDetails
                 strategy={selectedStrategy}
@@ -249,6 +261,9 @@ export function StrategiesWidget({
                 onUpdate={handleConfigUpdate}
                 onExecuteNow={() => handleExecuteNow(selectedStrategy._id)}
                 onActivateWithSession={() => handleActivateWithFlow(selectedStrategy._id)}
+                onToggleAlwaysRequireApproval={async (value) => {
+                  await update(selectedStrategy._id, { alwaysRequireApproval: value })
+                }}
                 isUpdating={isSubmitting}
                 executeNowError={executeNowError}
               />
@@ -301,7 +316,7 @@ export function StrategiesWidget({
   )
 }
 
-function FormHeader({ title, onBack }: { title: string; onBack: () => void }) {
+function FormHeader({ title, onBack, badge }: { title: string; onBack: () => void; badge?: React.ReactNode }) {
   return (
     <div
       className="shrink-0 flex items-center gap-3 px-4 py-3"
@@ -316,6 +331,7 @@ function FormHeader({ title, onBack }: { title: string; onBack: () => void }) {
       <h2 className="font-medium" style={{ color: 'var(--text)' }}>
         {title}
       </h2>
+      {badge}
     </div>
   )
 }
@@ -328,6 +344,7 @@ function StrategyDetails({
   onUpdate,
   onExecuteNow,
   onActivateWithSession,
+  onToggleAlwaysRequireApproval,
   isUpdating,
   executeNowError,
 }: {
@@ -338,6 +355,7 @@ function StrategyDetails({
   onUpdate: (config: Record<string, unknown>) => Promise<void>
   onExecuteNow: () => void
   onActivateWithSession: () => void
+  onToggleAlwaysRequireApproval: (value: boolean) => Promise<void>
   isUpdating: boolean
   executeNowError: string | null
 }) {
@@ -353,11 +371,7 @@ function StrategyDetails({
   const { approve, skip } = useExecutionMutations()
 
   // Get autonomous execution intents (smart session)
-  const strategySmartSessionId = (strategy as unknown as { smartSessionId?: string }).smartSessionId
-  const { intents } = useSourceIntents(
-    strategySmartSessionId ? 'dca_strategy' : null,
-    strategy._id
-  )
+  const { intents } = useSessionIntents(strategy.smartSessionId ?? null)
 
   // Policy status for gating approvals
   const { canTrade, statusMessage: policyMessage } = usePolicyStatus()
@@ -465,7 +479,7 @@ function StrategyDetails({
         <StatCard
           label="Status"
           value={
-            strategy.status === 'active' && (strategy as unknown as { requiresManualApproval?: boolean }).requiresManualApproval
+            strategy.status === 'active' && strategy.requiresManualApproval
               ? 'Active (Manual Approval)'
               : strategy.status.replace('_', ' ')
           }
@@ -479,7 +493,7 @@ function StrategyDetails({
       </div>
 
       {/* Manual Approval Info */}
-      {strategy.status === 'active' && (strategy as unknown as { requiresManualApproval?: boolean }).requiresManualApproval && (
+      {strategy.status === 'active' && strategy.requiresManualApproval && (
         <div
           className="rounded-lg p-3 text-sm"
           style={{ background: 'var(--accent-muted)', border: '1px solid var(--accent)' }}
@@ -487,6 +501,38 @@ function StrategyDetails({
           <p style={{ color: 'var(--accent)' }}>
             <strong>Manual Approval Mode:</strong> Each execution will require your approval in the chat before transactions are signed.
           </p>
+        </div>
+      )}
+
+      {/* Approval Override Toggle — only show for session-backed strategies */}
+      {strategy.smartSessionId && strategy.status === 'active' && (
+        <div
+          className="rounded-lg p-3 flex items-center justify-between"
+          style={{ background: 'var(--surface-2)' }}
+        >
+          <div className="flex-1 min-w-0 mr-3">
+            <p className="text-sm font-medium" style={{ color: 'var(--text)' }}>
+              Require approval for every execution
+            </p>
+            <p className="text-xs mt-0.5" style={{ color: 'var(--text-muted)' }}>
+              When enabled, each scheduled execution needs your manual approval
+            </p>
+          </div>
+          <button
+            onClick={() => onToggleAlwaysRequireApproval(!strategy.alwaysRequireApproval)}
+            className="shrink-0 relative inline-flex h-6 w-11 items-center rounded-full transition-colors"
+            style={{
+              background: strategy.alwaysRequireApproval ? 'var(--accent)' : 'var(--line)',
+            }}
+            aria-label="Toggle always require approval"
+          >
+            <span
+              className="inline-block h-4 w-4 rounded-full bg-white transition-transform"
+              style={{
+                transform: strategy.alwaysRequireApproval ? 'translateX(22px)' : 'translateX(4px)',
+              }}
+            />
+          </button>
         </div>
       )}
 

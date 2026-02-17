@@ -82,6 +82,34 @@ export const checkTriggers = internalAction({
               continue;
             }
 
+            // Gate 1: User override — always require approval
+            if (strategy.alwaysRequireApproval) {
+              await ctx.runMutation(internal.scheduler.createPendingExecutionWithReason, {
+                strategyId: strategy._id,
+                reason: "User preference: approval required for every execution",
+              });
+              console.log(`Strategy ${strategy._id}: user override requires approval`);
+              await ctx.runMutation(internal.scheduler.updateNextExecution, {
+                strategyId: strategy._id,
+                lastExecutedAt: now,
+              });
+              continue;
+            }
+
+            // Gate 2: First-execution approval gate
+            if (!strategy.totalExecutions || strategy.totalExecutions === 0) {
+              await ctx.runMutation(internal.scheduler.createPendingExecutionWithReason, {
+                strategyId: strategy._id,
+                reason: "First execution — please review before enabling autonomous mode",
+              });
+              console.log(`Strategy ${strategy._id}: first execution requires approval`);
+              await ctx.runMutation(internal.scheduler.updateNextExecution, {
+                strategyId: strategy._id,
+                lastExecutedAt: now,
+              });
+              continue;
+            }
+
             // Policy pre-check: call backend to evaluate before executing
             const fastapiUrl = process.env.FASTAPI_URL;
             const internalKey = process.env.INTERNAL_API_KEY;
@@ -108,8 +136,14 @@ export const checkTriggers = internalAction({
               if (policyResponse.ok) {
                 const policyResult = await policyResponse.json();
                 if (!policyResult.approved) {
+                  // Gate 3: Policy block creates visible pending approval
+                  const violationMessage = policyResult.violations?.[0]?.message || "policy violation";
+                  await ctx.runMutation(internal.scheduler.createPendingExecutionWithReason, {
+                    strategyId: strategy._id,
+                    reason: `Policy check: ${violationMessage}. Review and approve to proceed.`,
+                  });
                   console.log(
-                    `Strategy ${strategy._id} blocked by policy: ${policyResult.violations?.[0]?.message || "policy violation"}`
+                    `Strategy ${strategy._id} blocked by policy, created pending approval: ${violationMessage}`
                   );
                   await ctx.runMutation(internal.scheduler.updateNextExecution, {
                     strategyId: strategy._id,
@@ -304,6 +338,48 @@ export const createPendingExecution = internalMutation({
       ],
       requiresApproval: true,
       approvalReason,
+      recoverable: true,
+      createdAt: now,
+    });
+
+    return executionId;
+  },
+});
+
+/**
+ * Create a pending execution with a custom approval reason
+ * Used by guardrail gates (first-execution, policy-block, user override)
+ */
+export const createPendingExecutionWithReason = internalMutation({
+  args: {
+    strategyId: v.id("strategies"),
+    reason: v.string(),
+  },
+  handler: async (ctx, args): Promise<string> => {
+    const strategy = await ctx.db.get(args.strategyId);
+    if (!strategy) throw new Error("Strategy not found");
+
+    const now = Date.now();
+
+    const executionId = await ctx.db.insert("strategyExecutions", {
+      strategyId: args.strategyId,
+      walletAddress: strategy.walletAddress.toLowerCase(),
+      currentState: "awaiting_approval",
+      stateEnteredAt: now,
+      steps: [],
+      currentStepIndex: 0,
+      stateHistory: [
+        {
+          id: `sh_${now}`,
+          fromState: "idle",
+          toState: "awaiting_approval",
+          trigger: "scheduled_execution",
+          timestamp: now,
+          reason: args.reason,
+        },
+      ],
+      requiresApproval: true,
+      approvalReason: args.reason,
       recoverable: true,
       createdAt: now,
     });

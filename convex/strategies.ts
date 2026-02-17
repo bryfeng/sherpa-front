@@ -176,6 +176,7 @@ export const update = mutation({
     description: v.optional(v.string()),
     config: v.optional(v.any()),
     cronExpression: v.optional(v.string()),
+    alwaysRequireApproval: v.optional(v.boolean()),
   },
   handler: async (ctx, args) => {
     const { strategyId, ...updates } = args;

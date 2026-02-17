@@ -34,7 +34,9 @@ export interface GenericStrategy {
   config: Record<string, unknown>
   status: 'draft' | 'pending_session' | 'active' | 'paused' | 'completed' | 'failed' | 'expired' | 'archived'
   sessionKeyId?: Id<'sessionKeys'>
+  smartSessionId?: string
   requiresManualApproval?: boolean // Phase 1: true means each execution needs user approval
+  alwaysRequireApproval?: boolean // User override: always require approval even with smart session
   cronExpression?: string
   lastExecutedAt?: number
   nextExecutionAt?: number
@@ -99,7 +101,7 @@ export function useGenericStrategyMutations() {
       [pauseMutation]
     ),
     update: useCallback(
-      async (strategyId: Id<'strategies'>, updates: { name?: string; description?: string; config?: unknown }) =>
+      async (strategyId: Id<'strategies'>, updates: { name?: string; description?: string; config?: unknown; alwaysRequireApproval?: boolean }) =>
         updateMutation({ strategyId, ...updates }),
       [updateMutation]
     ),
