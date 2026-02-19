@@ -34,6 +34,7 @@ export interface GenericStrategy {
   config: Record<string, unknown>
   status: 'draft' | 'pending_session' | 'active' | 'paused' | 'completed' | 'failed' | 'expired' | 'archived'
   sessionKeyId?: Id<'sessionKeys'>
+  smartSessionId?: string
   requiresManualApproval?: boolean // Phase 1: true means each execution needs user approval
   cronExpression?: string
   lastExecutedAt?: number

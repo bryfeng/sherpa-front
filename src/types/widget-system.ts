@@ -66,6 +66,11 @@ export type WidgetKind =
   | 'dca-strategies'
   | 'my-strategies'
   | 'pending-approvals'
+  // Polymarket widgets
+  | 'polymarket-markets'
+  | 'polymarket-market-detail'
+  | 'polymarket-portfolio'
+  | 'polymarket-leaderboard'
 
 // ============================================
 // WIDGET SIZING
@@ -414,6 +419,11 @@ export interface WidgetPayloads {
   'pending-approvals': {
     walletAddress: string
   }
+  // Polymarket widgets
+  'polymarket-markets': Record<string, unknown>
+  'polymarket-market-detail': { marketId: string }
+  'polymarket-portfolio': { address: string }
+  'polymarket-leaderboard': { sortBy: string }
 }
 
 /**

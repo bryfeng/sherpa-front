@@ -17,6 +17,12 @@ import { usePendingApprovals, useExecutionMutations, formatWaitingTime, formatSt
 import { useStrategyExecution, formatExecutionStatus, getExecutionStatusColor, type ExecutionStatus } from '../../hooks/useStrategyExecution'
 import type { Id } from '../../../convex/_generated/dataModel'
 import { useGenericStrategies, useGenericStrategyMutations, type GenericStrategy } from '../../hooks/useStrategies'
+import {
+  PolymarketMarketsWidget,
+  PolymarketMarketDetailWidget,
+  PolymarketPortfolioWidget,
+  PolymarketLeaderboardWidget,
+} from './polymarket'
 import '../../styles/design-system.css'
 
 // ============================================
@@ -1735,6 +1741,18 @@ export function WidgetContent({ widget, walletAddress, isPro }: WidgetContentPro
           }}
         />
       )
+
+    case 'polymarket-markets':
+      return <PolymarketMarketsWidget widget={widget as any} />
+
+    case 'polymarket-market-detail':
+      return <PolymarketMarketDetailWidget widget={widget as any} />
+
+    case 'polymarket-portfolio':
+      return <PolymarketPortfolioWidget widget={widget as any} walletAddress={walletAddress} />
+
+    case 'polymarket-leaderboard':
+      return <PolymarketLeaderboardWidget widget={widget as any} />
 
     default:
       return (

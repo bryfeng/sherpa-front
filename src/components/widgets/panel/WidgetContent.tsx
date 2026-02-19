@@ -41,6 +41,20 @@ const TransactionHistoryWidget = React.lazy(() =>
   import('../../transactions/TransactionHistoryWidget').then((m) => ({ default: m.TransactionHistoryWidget }))
 )
 
+// Polymarket widgets
+const PolymarketMarketsWidget = React.lazy(() =>
+  import('../polymarket/PolymarketMarketsWidget').then((m) => ({ default: m.PolymarketMarketsWidget }))
+)
+const PolymarketMarketDetailWidget = React.lazy(() =>
+  import('../polymarket/PolymarketMarketDetailWidget').then((m) => ({ default: m.PolymarketMarketDetailWidget }))
+)
+const PolymarketPortfolioWidget = React.lazy(() =>
+  import('../polymarket/PolymarketPortfolioWidget').then((m) => ({ default: m.PolymarketPortfolioWidget }))
+)
+const PolymarketLeaderboardWidget = React.lazy(() =>
+  import('../polymarket/PolymarketLeaderboardWidget').then((m) => ({ default: m.PolymarketLeaderboardWidget }))
+)
+
 // Type for dca-strategies payload
 interface DCAStrategiesPayload {
   walletAddress?: string
@@ -210,6 +224,19 @@ function WidgetRenderer({
     // Transaction history widget
     case 'transaction-history':
       return <TransactionHistoryWidget />
+
+    // Polymarket widgets
+    case 'polymarket-markets':
+      return <PolymarketMarketsWidget widget={widget} />
+
+    case 'polymarket-market-detail':
+      return <PolymarketMarketDetailWidget widget={widget} />
+
+    case 'polymarket-portfolio':
+      return <PolymarketPortfolioWidget widget={widget} walletAddress={walletAddress} />
+
+    case 'polymarket-leaderboard':
+      return <PolymarketLeaderboardWidget widget={widget} />
 
     default:
       return (

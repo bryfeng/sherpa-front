@@ -18,6 +18,9 @@ import {
   Clock,
   Check,
   History,
+  Activity,
+  PieChart,
+  Trophy,
 } from 'lucide-react'
 import { useSherpaStore } from '../../../store'
 import type { Widget } from '../../../types/widgets'
@@ -77,6 +80,33 @@ const AVAILABLE_WIDGETS = [
     icon: History,
     category: 'history',
     tags: ['transactions', 'executions', 'activity', 'history'],
+  },
+  {
+    id: 'polymarket-markets',
+    kind: 'polymarket-markets' as const,
+    name: 'Prediction Markets',
+    description: 'Browse, search, and explore Polymarket prediction markets',
+    icon: Activity,
+    category: 'data',
+    tags: ['polymarket', 'prediction', 'markets', 'browse'],
+  },
+  {
+    id: 'polymarket-portfolio',
+    kind: 'polymarket-portfolio' as const,
+    name: 'Prediction Portfolio',
+    description: 'View your Polymarket positions, P&L, and portfolio summary',
+    icon: PieChart,
+    category: 'data',
+    tags: ['polymarket', 'prediction', 'portfolio', 'positions'],
+  },
+  {
+    id: 'polymarket-leaderboard',
+    kind: 'polymarket-leaderboard' as const,
+    name: 'Top Predictors',
+    description: 'Leaderboard of top Polymarket traders by PnL, ROI, and win rate',
+    icon: Trophy,
+    category: 'data',
+    tags: ['polymarket', 'prediction', 'leaderboard', 'traders', 'predictors'],
   },
 ]
 
